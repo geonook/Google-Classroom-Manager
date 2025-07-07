@@ -1,0 +1,279 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run linter
+      run: npm run lint
+      
+    - name: Check code formatting
+      run: npm run format -- --check
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run unit tests
+      run: npm run test:unit
+      
+    - name: Run integration tests
+      run: npm run test:integration
+      
+    - name: Generate coverage report
+      run: npm run test:coverage
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+
+  build:
+    name: Build Project
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build project
+      run: npm run build
+      
+    - name: Validate build artifacts
+      run: |
+        ls -la dist/
+        [ -f dist/Code.js ] || exit 1
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    
+    environment:
+      name: staging
+      url: https://script.google.com/d/${{ secrets.STAGING_SCRIPT_ID }}/edit
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Setup Google Apps Script CLI
+      run: |
+        npm install -g @google/clasp
+        echo '${{ secrets.CLASP_CREDENTIALS }}' > ~/.clasprc.json
+        
+    - name: Configure staging deployment
+      run: |
+        echo '{"scriptId":"${{ secrets.STAGING_SCRIPT_ID }}","rootDir":"./src"}' > .clasp.json
+        
+    - name: Deploy to staging
+      run: |
+        clasp push
+        clasp deploy --description "Staging deployment $(date +'%Y-%m-%d %H:%M:%S')"
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    environment:
+      name: production
+      url: https://script.google.com/d/${{ secrets.PRODUCTION_SCRIPT_ID }}/edit
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Setup Google Apps Script CLI
+      run: |
+        npm install -g @google/clasp
+        echo '${{ secrets.CLASP_CREDENTIALS }}' > ~/.clasprc.json
+        
+    - name: Configure production deployment
+      run: |
+        echo '{"scriptId":"${{ secrets.PRODUCTION_SCRIPT_ID }}","rootDir":"./src"}' > .clasp.json
+        
+    - name: Deploy to production
+      run: |
+        clasp push
+        clasp deploy --description "Production v${{ github.ref_name }} $(date +'%Y-%m-%d %H:%M:%S')"
+        
+    - name: Create GitHub release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          ## Changes in this Release
+          - Deployed to production at $(date +'%Y-%m-%d %H:%M:%S')
+          - Commit: ${{ github.sha }}
+          
+          ## Deployment Info
+          - Script ID: ${{ secrets.PRODUCTION_SCRIPT_ID }}
+          - Environment: Production
+        draft: false
+        prerelease: false
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  performance-test:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run performance tests
+      run: npm run test:performance
+      
+    - name: Comment PR with performance results
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          try {
+            const results = fs.readFileSync('performance-results.json', 'utf8');
+            const data = JSON.parse(results);
+            
+            const comment = `## 🚀 Performance Test Results
+            
+            | Metric | Value | Status |
+            |--------|-------|--------|
+            | API Calls | ${data.apiCalls}/min | ${data.apiCalls < 50 ? '✅' : '⚠️'} |
+            | Memory Usage | ${data.memoryUsage}MB | ${data.memoryUsage < 50 ? '✅' : '⚠️'} |
+            | Execution Time | ${data.executionTime}ms | ${data.executionTime < 300000 ? '✅' : '⚠️'} |
+            
+            ${data.recommendations ? '### 💡 Recommendations\n' + data.recommendations : ''}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          } catch (error) {
+            console.log('Performance results file not found or invalid');
+          }
+
+  notification:
+    name: Notify Team
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    
+    steps:
+    - name: Notify deployment status
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          Deployment Status: ${{ job.status }}
+          Environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
