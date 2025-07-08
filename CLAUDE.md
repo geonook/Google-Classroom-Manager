@@ -1,8 +1,8 @@
 # CLAUDE.md - Google Classroom Manager Pro SuperClaude Configuration
 
 ## 專案概述
-Google Classroom Manager Pro v2.0.0 - 企業級課程管理自動化工具
-基於 Google Apps Script 的批次處理引擎，支援大規模課程與成員管理
+Google Classroom Manager Pro v2.0.0 - 課程管理工具
+基於 Google Apps Script 的批次處理工具，用於課程與成員管理
 
 ## 核心配置
 @include shared/superclaude-core.yml#Core_Philosophy
@@ -26,9 +26,9 @@ Google Classroom Manager Pro v2.0.0 - 企業級課程管理自動化工具
 
 ### 架構模式
 - 模組化設計 (RateLimiter, ErrorHandler, ProgressTracker)
-- 批次處理優先
-- 5分鐘智能快取
-- 企業級錯誤恢復
+- 批次處理功能
+- 5分鐘快取機制
+- 錯誤處理和重試
 
 ### 性能要求
 - API 請求限速: 50/分鐘
@@ -81,20 +81,20 @@ npm run deploy:prod
 - 遵循 OWASP 安全準則
 - 符合 FERPA 和 GDPR 法規要求
 
-## 效能基準
-- API 效率提升: +60%
-- 錯誤恢復率: 95%+
-- 處理速度: 1000+ 課程/小時
-- 記憶體使用: <50MB
-- 執行時間: <6分鐘
+## 效能指標
+- API 效率: 快取機制改善
+- 錯誤處理: 自動重試功能
+- 處理速度: 支援大量課程
+- 記憶體使用: 低使用量
+- 執行時間: 6分鐘內
 
 ## SuperClaude 整合
 
-### 智能功能
-- 自動代碼優化
-- 批次處理效率提升
-- 智能錯誤診斷
-- 性能瓶頸識別
+### 輔助功能
+- 代碼優化建議
+- 批次處理效率
+- 錯誤診斷協助
+- 性能分析
 
 ### 開發輔助
 - 自動生成單元測試
@@ -109,4 +109,4 @@ npm run deploy:prod
 - 性能優化需要基準測試
 
 ---
-*SuperClaude v2.0.1 | Google Classroom Manager Pro | 企業級教育自動化解決方案*
+*SuperClaude v2.0.1 | Google Classroom Manager Pro | 教育管理工具*
