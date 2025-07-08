@@ -3,61 +3,60 @@
  * 提供一致的錯誤處理、日誌記錄和使用者通知
  */
 class ErrorHandler {
-  
   /**
    * 處理一般錯誤
    */
   static handle(error, operation = '操作', showToUser = true) {
     const errorInfo = this.parseError(error);
     const message = `${operation}失敗：${errorInfo.userMessage}`;
-    
+
     // 記錄詳細錯誤
     Logger.error(`[${operation}] ${errorInfo.technicalMessage}`, {
       error: error,
       stack: error.stack,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     // 通知使用者
     if (showToUser) {
       SpreadsheetApp.getUi().alert('錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
     }
-    
+
     return {
       success: false,
       error: errorInfo,
-      userMessage: message
+      userMessage: message,
     };
   }
-  
+
   /**
    * 處理 API 錯誤
    */
   static handleApiError(error, operation = 'API 呼叫') {
     const errorInfo = this.parseApiError(error);
-    
+
     Logger.error(`[API錯誤] ${operation}`, {
       error: error,
       apiError: errorInfo,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-    
+
     // 根據錯誤類型決定是否重試
     if (errorInfo.shouldRetry) {
       Logger.info(`${operation} 將自動重試`);
       return { shouldRetry: true, delay: errorInfo.retryDelay };
     }
-    
+
     const message = `${operation}失敗：${errorInfo.userMessage}`;
     SpreadsheetApp.getUi().alert('API 錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
-    
+
     return {
       success: false,
       error: errorInfo,
-      userMessage: message
+      userMessage: message,
     };
   }
-  
+
   /**
    * 解析一般錯誤
    */
@@ -65,48 +64,48 @@ class ErrorHandler {
     if (!error) {
       return {
         userMessage: '未知錯誤',
-        technicalMessage: 'Undefined error'
+        technicalMessage: 'Undefined error',
       };
     }
-    
+
     const message = error.message || error.toString();
-    
+
     // 權限錯誤
     if (message.includes('permission') || message.includes('access')) {
       return {
         userMessage: '權限不足，請檢查存取權限',
-        technicalMessage: message
+        technicalMessage: message,
       };
     }
-    
+
     // 網路錯誤
     if (message.includes('network') || message.includes('timeout')) {
       return {
         userMessage: '網路連線問題，請稍後再試',
-        technicalMessage: message
+        technicalMessage: message,
       };
     }
-    
+
     // 資料錯誤
     if (message.includes('Invalid') || message.includes('not found')) {
       return {
         userMessage: '資料格式錯誤或找不到指定項目',
-        technicalMessage: message
+        technicalMessage: message,
       };
     }
-    
+
     return {
       userMessage: '系統發生錯誤，請聯繫管理員',
-      technicalMessage: message
+      technicalMessage: message,
     };
   }
-  
+
   /**
    * 解析 API 錯誤
    */
   static parseApiError(error) {
     const message = error.message || error.toString();
-    
+
     // 配額超限
     if (message.includes('quota') || message.includes('rate limit')) {
       return {
@@ -114,10 +113,10 @@ class ErrorHandler {
         userMessage: 'API 使用量超限，請稍後再試',
         technicalMessage: message,
         shouldRetry: true,
-        retryDelay: 60000 // 1 分鐘
+        retryDelay: 60000, // 1 分鐘
       };
     }
-    
+
     // 暫時性錯誤
     if (message.includes('503') || message.includes('502')) {
       return {
@@ -125,91 +124,90 @@ class ErrorHandler {
         userMessage: '服務暫時無法使用，正在重試',
         technicalMessage: message,
         shouldRetry: true,
-        retryDelay: 5000 // 5 秒
+        retryDelay: 5000, // 5 秒
       };
     }
-    
+
     // 認證錯誤
     if (message.includes('401') || message.includes('unauthorized')) {
       return {
         type: 'UNAUTHORIZED',
         userMessage: '認證失敗，請重新授權',
         technicalMessage: message,
-        shouldRetry: false
+        shouldRetry: false,
       };
     }
-    
+
     // 找不到資源
     if (message.includes('404') || message.includes('not found')) {
       return {
         type: 'NOT_FOUND',
         userMessage: '找不到指定的課程或使用者',
         technicalMessage: message,
-        shouldRetry: false
+        shouldRetry: false,
       };
     }
-    
+
     return {
       type: 'UNKNOWN_API_ERROR',
       userMessage: 'API 呼叫失敗，請稍後再試',
       technicalMessage: message,
-      shouldRetry: false
+      shouldRetry: false,
     };
   }
-  
+
   /**
    * 執行帶錯誤處理的操作
    */
   static async executeWithRetry(operation, operationName, maxRetries = 3) {
     let lastError;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         Logger.debug(`執行 ${operationName}，第 ${attempt} 次嘗試`);
         const result = await operation();
-        
+
         if (attempt > 1) {
           Logger.info(`${operationName} 重試成功`);
         }
-        
+
         return { success: true, result };
-        
       } catch (error) {
         lastError = error;
         const errorInfo = this.handleApiError(error, operationName);
-        
+
         if (!errorInfo.shouldRetry || attempt === maxRetries) {
           Logger.error(`${operationName} 最終失敗，已嘗試 ${attempt} 次`);
           break;
         }
-        
+
         Logger.warn(`${operationName} 第 ${attempt} 次失敗，等待重試`);
         await Utilities.sleep(errorInfo.delay || 1000);
       }
     }
-    
+
     return this.handle(lastError, operationName);
   }
-  
+
   /**
    * 驗證必要參數
    */
   static validateRequired(params, requiredFields) {
     const missing = [];
-    
+
     for (const field of requiredFields) {
       if (!params[field] || params[field].toString().trim() === '') {
         missing.push(field);
       }
     }
-    
+
     if (missing.length > 0) {
       const message = `缺少必要參數：${missing.join(', ')}`;
       Logger.error('參數驗證失敗', { missing, params });
       SpreadsheetApp.getUi().alert('參數錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
       return false;
     }
-    
+
     return true;
   }
 }

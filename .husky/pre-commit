@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔧 Pre-commit: 格式化程式碼並推送到 Google Apps Script..."
+
+# 格式化和檢查程式碼
+npm run format
+npm run lint:fix
+
+# 檢查是否有 .clasp.json 和登入狀態
+if [ -f .clasp.json ] && [ -f ~/.clasprc.json ]; then
+    echo "📤 推送到 Google Apps Script..."
+    clasp push
+    echo "✅ 程式碼已自動推送到 Google Apps Script"
+else
+    echo "⚠️  CLASP 未設定，跳過自動推送"
+    echo "請執行 'clasp login' 和設定 .clasp.json"
+fi
