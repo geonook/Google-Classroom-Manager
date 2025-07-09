@@ -130,3 +130,44 @@ config/local.json
 
 # SuperClaude (external dependency - not part of our project)
 SuperClaude/
+
+# Output files (should use output/ directory instead)
+*.csv
+*.json
+*.xlsx
+output/
+
+# Root directory files prevention (Template requirement)
+# Prevent files from being created in root - use src/ instead
+# Note: src/Code.js is allowed, but /Code.js in root is not
+/main.js
+/index.js
+/app.js
+/script.js
+/utils.js
+/config.js
+/manager.js
+/service.js
+/handler.js
+/tracker.js
+/limiter.js
+
+# Backup files (prevent technical debt)
+*_backup.*
+*_old.*
+*_v2.*
+*_new.*
+*_enhanced.*
+*_improved.*
+*_copy.*
+
+# Git hooks (they should be tracked)
+!.git/hooks/
+
+# GitHub CLI cache
+.gh/
+
+# Claude Code specific ignores
+.claude/
+claude-*.log
+claude-*.tmp
