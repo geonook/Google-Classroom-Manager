@@ -11,7 +11,7 @@
     "deploy:prod": "clasp deploy --description \"Production v$(npm run version --silent)\"",
     "deploy:test": "clasp deploy --description \"Test v$(npm run version --silent)\"",
     "auto-push": "npm run format && npm run lint:fix && clasp push",
-    "auto-backup": "npm run format && npm run lint:fix && npm run github:backup",
+    "auto-backup": "npm run format && npm run lint:fix && clasp push && npm run github:backup",
     "watch": "nodemon --watch src --ext js --exec \"npm run auto-push\"",
     "dev:watch": "npm run watch",
     "logs": "clasp logs",
@@ -134,7 +134,7 @@
     "tabWidth": 2
   },
   "clasp": {
-    "scriptId": "",
+    "scriptId": "1REhYatgGc86DxHhAyJnMUzOJovshLcrcWQPIsFGYlymFzvxd80mZOt7W",
     "rootDir": "./src",
     "filePushOrder": [
       "appsscript.json",

@@ -180,6 +180,8 @@ npm run deploy:prod
 - `clasp pull`: 從 GAS 拉取代碼
 - `clasp logs`: 查看執行日誌
 - `clasp deploy`: 部署新版本
+- `clasp login`: 登入 Google Apps Script
+- `clasp open`: 開啟 Apps Script IDE
 
 ## 安全標準
 - 不在代碼中硬編碼 API 金鑰
@@ -240,10 +242,14 @@ npm run test             # Run tests
 # Deployment
 npm run deploy:test      # Deploy to test environment
 npm run deploy:prod      # Deploy to production
-clasp logs              # View execution logs
+npm run logs             # View execution logs
+npm run open             # Open Apps Script IDE
 
 # GitHub backup (MANDATORY after commits)
 git push origin main
+
+# Google Apps Script setup (first time only)
+clasp login              # Login to Google Apps Script
 ```
 
 ## 🚨 TECHNICAL DEBT PREVENTION
