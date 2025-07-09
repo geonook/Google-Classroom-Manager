@@ -280,6 +280,12 @@ Edit(file_path="src/ExistingFeature.js", old_string="...", new_string="...")
 - Maintain Google Apps Script globals
 - Use proper error handling patterns
 
+### ⚠️ KNOWN TECHNICAL DEBT:
+- `OptimizedCode.js` duplicates functionality from `Code.js`
+- Future refactoring should consolidate these into single source of truth
+- Current main file: `Code.js` (as per filePushOrder)
+- Consider merging optimizations into main file
+
 ---
 
 **⚠️ Prevention is better than consolidation - build clean from the start.**  

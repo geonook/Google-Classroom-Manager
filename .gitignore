@@ -160,6 +160,7 @@ output/
 *_enhanced.*
 *_improved.*
 *_copy.*
+*_optimized.*
 
 # Git hooks (they should be tracked)
 !.git/hooks/
