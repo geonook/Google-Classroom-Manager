@@ -16,7 +16,7 @@ class ClassroomService {
 
     // 檢查快取
     if (this.isCacheValid(cacheKey) && !options.forceRefresh) {
-      Logger.debug('使用快取的課程清單');
+      console.log('使用快取的課程清單');
       return this.cache.get(cacheKey).data;
     }
 
@@ -54,7 +54,7 @@ class ClassroomService {
     this.updateCache(cacheKey, courses);
 
     progress.complete();
-    Logger.info(`載入完成，共 ${courses.length} 個課程`);
+    console.log(`載入完成，共 ${courses.length} 個課程`);
 
     return {
       success: true,
@@ -173,7 +173,7 @@ class ClassroomService {
         });
       });
 
-      Logger.info(`課程建立成功：${courseName} (ID: ${course.id})`);
+      console.log(`課程建立成功：${courseName} (ID: ${course.id})`);
       return course;
     }, `建立課程：${courseName}`);
   }
@@ -254,6 +254,41 @@ class ClassroomService {
   }
 
   /**
+   * 新增老師 (如果不存在)
+   */
+  async addTeacherIfNotExists(courseId, teacherEmail) {
+    // 首先，獲取該課程的所有老師
+    const teachersResult = await this.getCourseTeachers(courseId);
+    if (!teachersResult.success) {
+      return { success: false, error: `無法獲取課程 ${courseId} 的老師列表。` };
+    }
+
+    // 檢查老師是否已經存在
+    const teachers = teachersResult.result || [];
+    const teacherExists = teachers.some(teacher => 
+        teacher && 
+        teacher.profile && 
+        teacher.profile.emailAddress && 
+        teacher.profile.emailAddress.toLowerCase() === teacherEmail.toLowerCase()
+    );
+
+    if (teacherExists) {
+      console.log(`老師 ${teacherEmail} 已存在於課程 ${courseId} 中，無需新增。`);
+      return { success: true, status: 'ALREADY_EXISTS' };
+    }
+
+    // 如果老師不存在，則新增老師
+    console.log(`正在將老師 ${teacherEmail} 新增到課程 ${courseId}...`);
+    const addResult = await this.addSingleMember(courseId, teacherEmail, 'TEACHER');
+    if (addResult.success) {
+        return { success: true, status: 'ADDED' };
+    } else {
+        return { success: false, error: addResult.error };
+    }
+  }
+
+
+  /**
    * 更新課程
    */
   async updateCourse(courseId, updates) {
@@ -304,7 +339,7 @@ class ClassroomService {
 
   clearCache() {
     this.cache.clear();
-    Logger.debug('快取已清除');
+    console.log('快取已清除');
   }
 
   clearCacheByPattern(pattern) {

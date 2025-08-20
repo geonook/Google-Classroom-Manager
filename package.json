@@ -16,7 +16,7 @@
     "dev:watch": "npm run watch",
     "logs": "clasp logs",
     "open": "clasp open",
-    "test": "echo 'No tests configured yet'",
+    "test": "jest",
     "test:unit": "echo 'Unit tests not implemented yet'",
     "test:integration": "echo 'Integration tests not implemented yet'",
     "test:performance": "echo 'Performance tests not implemented yet'",
