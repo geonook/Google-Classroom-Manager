@@ -33,20 +33,6 @@ async function addTeachersWithCheck(spreadsheetId = null) {
     }
 
     console.log(`正在處理課程 ${courseId} 中的老師 ${teacherEmail}...`);
-    
-    // 先檢查權限
-    const permissionCheck = checkCoursePermission(courseId);
-    if (!permissionCheck.hasPermission) {
-      if (permissionCheck.reason === 'NOT_OWNER') {
-        console.log(`  ⚠️ 權限不足：您不是課程 ${courseId} 的擁有者`);
-        console.log(`  👤 課程擁有者: ${permissionCheck.ownerId}`);
-        console.log(`  💡 解決方案: 請課程擁有者執行此函數，或聯絡 Google Workspace 管理員`);
-      } else {
-        console.log(`  ❌ 權限檢查失敗: ${permissionCheck.error || permissionCheck.reason}`);
-      }
-      continue; // 跳過這個課程
-    }
-    
     const result = await classroomService.addTeacherIfNotExists(courseId, teacherEmail);
 
     if (result.success) {
