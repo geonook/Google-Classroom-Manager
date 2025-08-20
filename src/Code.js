@@ -303,11 +303,13 @@ function diagnosePermissions() {
   console.log('=== 權限診斷工具 ===');
   
   // 檢查當前執行者
+  let currentUserEmail = 'unknown';
   try {
-    const userEmail = Session.getActiveUser().getEmail();
-    console.log(`📧 當前執行者: ${userEmail}`);
+    currentUserEmail = Session.getActiveUser().getEmail();
+    console.log(`📧 當前執行者: ${currentUserEmail}`);
   } catch (e) {
-    console.log(`❌ 無法取得執行者資訊: ${e.message}`);
+    console.log(`⚠️ 無法取得執行者Email: ${e.message}`);
+    console.log(`💡 建議: 需要在 appsscript.json 中新增 userinfo.email 權限並重新授權`);
   }
   
   // 檢查指定課程資訊
@@ -317,9 +319,24 @@ function diagnosePermissions() {
   try {
     const course = Classroom.Courses.get(testCourseId);
     console.log(`📚 課程名稱: ${course.name}`);
-    console.log(`👤 課程擁有者: ${course.ownerId}`);
+    console.log(`👤 課程擁有者ID: ${course.ownerId}`);
     console.log(`📊 課程狀態: ${course.courseState}`);
     console.log(`🔗 課程連結: ${course.alternateLink}`);
+    
+    // 嘗試透過 Admin Directory API 解析擁有者email
+    try {
+      const ownerInfo = AdminDirectory.Users.get(course.ownerId);
+      console.log(`📧 擁有者Email: ${ownerInfo.primaryEmail}`);
+      
+      if (currentUserEmail !== 'unknown' && currentUserEmail === ownerInfo.primaryEmail) {
+        console.log(`✅ 您是課程擁有者，有完整權限！`);
+      } else {
+        console.log(`⚠️ 您不是課程擁有者`);
+      }
+    } catch (e) {
+      console.log(`⚠️ 無法取得擁有者Email詳細資訊: ${e.message}`);
+    }
+    
   } catch (e) {
     console.log(`❌ 無法取得課程資訊: ${e.message}`);
   }
@@ -330,7 +347,8 @@ function diagnosePermissions() {
     console.log(`\n👥 當前老師數量: ${teachers.teachers ? teachers.teachers.length : 0}`);
     if (teachers.teachers) {
       teachers.teachers.forEach((teacher, index) => {
-        console.log(`  ${index + 1}. ${teacher.profile.name.fullName} (${teacher.profile.emailAddress})`);
+        const email = teacher.profile.emailAddress || 'Email未顯示';
+        console.log(`  ${index + 1}. ${teacher.profile.name.fullName} (${email})`);
       });
     }
   } catch (e) {
@@ -338,6 +356,10 @@ function diagnosePermissions() {
   }
   
   console.log('\n=== 診斷完成 ===');
+  console.log('\n🔧 下一步建議:');
+  console.log('1. 推送更新的權限設定到 Google Apps Script');
+  console.log('2. 重新授權應用程式');
+  console.log('3. 再次執行此診斷工具確認權限');
 }
 
 /**
@@ -351,21 +373,89 @@ function checkCoursePermission(courseId) {
     
     // 嘗試取得課程詳細資訊
     const course = Classroom.Courses.get(courseId);
-    const currentUser = Session.getActiveUser().getEmail();
     
-    if (course.ownerId === currentUser) {
+    // 嘗試取得當前用戶資訊
+    let currentUserEmail = 'unknown';
+    let currentUserId = 'unknown';
+    
+    try {
+      currentUserEmail = Session.getActiveUser().getEmail();
+      // 嘗試透過Admin Directory API取得用戶ID
+      const userInfo = AdminDirectory.Users.get(currentUserEmail);
+      currentUserId = userInfo.id;
+    } catch (e) {
+      console.log(`⚠️ 無法取得完整用戶資訊，將使用基本檢查`);
+    }
+    
+    // 檢查是否為課程擁有者 (比較ID或email)
+    let isOwner = false;
+    let ownerEmail = 'unknown';
+    
+    try {
+      // 嘗試取得擁有者email
+      const ownerInfo = AdminDirectory.Users.get(course.ownerId);
+      ownerEmail = ownerInfo.primaryEmail;
+      
+      // 比較email或ID
+      isOwner = (currentUserEmail !== 'unknown' && currentUserEmail === ownerEmail) ||
+                (currentUserId !== 'unknown' && currentUserId === course.ownerId);
+    } catch (e) {
+      console.log(`⚠️ 無法解析課程擁有者資訊: ${e.message}`);
+    }
+    
+    if (isOwner) {
       console.log(`✅ 您是課程擁有者，有完整權限`);
       return { hasPermission: true, reason: 'OWNER' };
     } else {
       console.log(`⚠️ 您不是課程擁有者`);
-      console.log(`  課程擁有者: ${course.ownerId}`);
-      console.log(`  當前執行者: ${currentUser}`);
-      return { hasPermission: false, reason: 'NOT_OWNER', ownerId: course.ownerId };
+      console.log(`  課程擁有者ID: ${course.ownerId}`);
+      console.log(`  課程擁有者Email: ${ownerEmail}`);
+      console.log(`  當前執行者: ${currentUserEmail}`);
+      return { 
+        hasPermission: false, 
+        reason: 'NOT_OWNER', 
+        ownerId: course.ownerId,
+        ownerEmail: ownerEmail 
+      };
     }
     
   } catch (e) {
     console.log(`❌ 檢查課程權限時發生錯誤: ${e.message}`);
     return { hasPermission: false, reason: 'ERROR', error: e.message };
+  }
+}
+
+/**
+ * 取得課程擁有者的詳細資訊
+ */
+function getCourseOwnerInfo(courseId) {
+  try {
+    const course = Classroom.Courses.get(courseId);
+    console.log(`📚 課程: ${course.name}`);
+    console.log(`👤 擁有者ID: ${course.ownerId}`);
+    
+    try {
+      const ownerInfo = AdminDirectory.Users.get(course.ownerId);
+      console.log(`📧 擁有者Email: ${ownerInfo.primaryEmail}`);
+      console.log(`👤 擁有者姓名: ${ownerInfo.name.fullName}`);
+      return {
+        success: true,
+        ownerId: course.ownerId,
+        ownerEmail: ownerInfo.primaryEmail,
+        ownerName: ownerInfo.name.fullName,
+        courseName: course.name
+      };
+    } catch (e) {
+      console.log(`⚠️ 無法取得擁有者詳細資訊: ${e.message}`);
+      return {
+        success: false,
+        ownerId: course.ownerId,
+        error: e.message
+      };
+    }
+  } catch (e) {
+    console.log(`❌ 無法取得課程資訊: ${e.message}`);
+    return { success: false, error: e.message };
   }
 }
 
