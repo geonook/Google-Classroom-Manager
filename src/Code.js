@@ -16,6 +16,9 @@ async function addTeachersWithCheck(spreadsheetId = null) {
     return;
   }
 
+  console.log(`📧 當前執行者: ${Session.getActiveUser().getEmail()}`);
+  console.log(`📊 開始處理外部試算表的老師新增作業...`);
+
   const dataRange = sheet.getRange('A2:H' + sheet.getLastRow());
   const data = dataRange.getValues();
 
@@ -30,6 +33,20 @@ async function addTeachersWithCheck(spreadsheetId = null) {
     }
 
     console.log(`正在處理課程 ${courseId} 中的老師 ${teacherEmail}...`);
+    
+    // 先檢查權限
+    const permissionCheck = checkCoursePermission(courseId);
+    if (!permissionCheck.hasPermission) {
+      if (permissionCheck.reason === 'NOT_OWNER') {
+        console.log(`  ⚠️ 權限不足：您不是課程 ${courseId} 的擁有者`);
+        console.log(`  👤 課程擁有者: ${permissionCheck.ownerId}`);
+        console.log(`  💡 解決方案: 請課程擁有者執行此函數，或聯絡 Google Workspace 管理員`);
+      } else {
+        console.log(`  ❌ 權限檢查失敗: ${permissionCheck.error || permissionCheck.reason}`);
+      }
+      continue; // 跳過這個課程
+    }
+    
     const result = await classroomService.addTeacherIfNotExists(courseId, teacherEmail);
 
     if (result.success) {
@@ -40,7 +57,13 @@ async function addTeachersWithCheck(spreadsheetId = null) {
       }
       statusCell.check();
     } else {
-      console.log(`  ❌ 新增老師 ${teacherEmail} 到課程 ${courseId} 失敗: ${JSON.stringify(result.error, null, 2)}`);
+      // 更詳細的錯誤處理
+      if (result.error && result.error.details && result.error.details.code === 403) {
+        console.log(`  🚫 權限錯誤：無法新增老師 ${teacherEmail} 到課程 ${courseId}`);
+        console.log(`  💡 建議：請課程擁有者或 Google Workspace 管理員執行此操作`);
+      } else {
+        console.log(`  ❌ 新增老師 ${teacherEmail} 到課程 ${courseId} 失敗: ${JSON.stringify(result.error, null, 2)}`);
+      }
     }
     
     Utilities.sleep(1000);
@@ -271,6 +294,79 @@ function getScriptProperty(key) {
 
 function setScriptProperty(key, value) {
   PropertiesService.getScriptProperties().setProperty(key, value);
+}
+
+/**
+ * 檢查當前用戶權限和課程資訊的診斷工具
+ */
+function diagnosePermissions() {
+  console.log('=== 權限診斷工具 ===');
+  
+  // 檢查當前執行者
+  try {
+    const userEmail = Session.getActiveUser().getEmail();
+    console.log(`📧 當前執行者: ${userEmail}`);
+  } catch (e) {
+    console.log(`❌ 無法取得執行者資訊: ${e.message}`);
+  }
+  
+  // 檢查指定課程資訊
+  const testCourseId = '779922029471';
+  console.log(`\n🔍 檢查課程: ${testCourseId}`);
+  
+  try {
+    const course = Classroom.Courses.get(testCourseId);
+    console.log(`📚 課程名稱: ${course.name}`);
+    console.log(`👤 課程擁有者: ${course.ownerId}`);
+    console.log(`📊 課程狀態: ${course.courseState}`);
+    console.log(`🔗 課程連結: ${course.alternateLink}`);
+  } catch (e) {
+    console.log(`❌ 無法取得課程資訊: ${e.message}`);
+  }
+  
+  // 檢查是否能列出課程老師
+  try {
+    const teachers = Classroom.Courses.Teachers.list(testCourseId);
+    console.log(`\n👥 當前老師數量: ${teachers.teachers ? teachers.teachers.length : 0}`);
+    if (teachers.teachers) {
+      teachers.teachers.forEach((teacher, index) => {
+        console.log(`  ${index + 1}. ${teacher.profile.name.fullName} (${teacher.profile.emailAddress})`);
+      });
+    }
+  } catch (e) {
+    console.log(`❌ 無法列出課程老師: ${e.message}`);
+  }
+  
+  console.log('\n=== 診斷完成 ===');
+}
+
+/**
+ * 檢查用戶是否有權限修改指定課程
+ */
+function checkCoursePermission(courseId) {
+  try {
+    // 嘗試列出課程老師（這個操作需要讀取權限）
+    const teachers = Classroom.Courses.Teachers.list(courseId);
+    console.log(`✅ 有讀取課程 ${courseId} 的權限`);
+    
+    // 嘗試取得課程詳細資訊
+    const course = Classroom.Courses.get(courseId);
+    const currentUser = Session.getActiveUser().getEmail();
+    
+    if (course.ownerId === currentUser) {
+      console.log(`✅ 您是課程擁有者，有完整權限`);
+      return { hasPermission: true, reason: 'OWNER' };
+    } else {
+      console.log(`⚠️ 您不是課程擁有者`);
+      console.log(`  課程擁有者: ${course.ownerId}`);
+      console.log(`  當前執行者: ${currentUser}`);
+      return { hasPermission: false, reason: 'NOT_OWNER', ownerId: course.ownerId };
+    }
+    
+  } catch (e) {
+    console.log(`❌ 檢查課程權限時發生錯誤: ${e.message}`);
+    return { hasPermission: false, reason: 'ERROR', error: e.message };
+  }
 }
 
 // =============================================
