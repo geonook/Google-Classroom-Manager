@@ -485,9 +485,11 @@ async function transferCourseOwnership(newOwnerId, spreadsheetId = null) {
         continue;
       }
       
-      // 轉移擁有權
+      // 轉移擁有權 - 必須包含課程名稱
       const updatedCourse = Classroom.Courses.update({
-        ownerId: newOwnerId
+        name: course.name,
+        ownerId: newOwnerId,
+        courseState: course.courseState
       }, courseId);
       
       console.log(`  ✅ 成功轉移課程 ${courseId} (${course.name}) 給 ${newOwnerId}`);
