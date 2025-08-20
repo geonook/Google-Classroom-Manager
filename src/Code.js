@@ -445,6 +445,82 @@ function getCourseOwnerInfo(courseId) {
   }
 }
 
+/**
+ * 批次轉移課程擁有權工具
+ * 將所有課程的擁有權轉移給指定用戶
+ */
+async function transferCourseOwnership(newOwnerId, spreadsheetId = null) {
+  const sheetName = 'course_teacher';
+  console.log(`--- 開始批次轉移課程擁有權 ---`);
+  console.log(`新擁有者: ${newOwnerId}`);
+  
+  const ss = spreadsheetId ? 
+    SpreadsheetApp.openById(spreadsheetId) : 
+    SpreadsheetApp.getActiveSpreadsheet();
+    
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    console.log(`錯誤：找不到名為 "${sheetName}" 的工作表。`);
+    return;
+  }
+
+  const dataRange = sheet.getRange('A2:H' + sheet.getLastRow());
+  const data = dataRange.getValues();
+  
+  const uniqueCourseIds = [...new Set(data.map(row => row[6]).filter(id => id))];
+  console.log(`發現 ${uniqueCourseIds.length} 個唯一課程需要轉移擁有權`);
+  
+  let successCount = 0;
+  let failCount = 0;
+  
+  for (const courseId of uniqueCourseIds) {
+    try {
+      console.log(`正在轉移課程 ${courseId} 的擁有權...`);
+      
+      // 檢查當前擁有者
+      const course = Classroom.Courses.get(courseId);
+      if (course.ownerId === newOwnerId) {
+        console.log(`  ☑️ 課程 ${courseId} 已經是 ${newOwnerId} 擁有`);
+        successCount++;
+        continue;
+      }
+      
+      // 轉移擁有權
+      const updatedCourse = Classroom.Courses.update({
+        ownerId: newOwnerId
+      }, courseId);
+      
+      console.log(`  ✅ 成功轉移課程 ${courseId} (${course.name}) 給 ${newOwnerId}`);
+      successCount++;
+      
+    } catch (e) {
+      console.log(`  ❌ 轉移課程 ${courseId} 失敗: ${e.message}`);
+      failCount++;
+    }
+    
+    Utilities.sleep(1000); // 避免API限速
+  }
+  
+  console.log(`--- 擁有權轉移完成 ---`);
+  console.log(`成功: ${successCount}, 失敗: ${failCount}`);
+}
+
+/**
+ * 轉移外部試算表中所有課程的擁有權給當前執行者
+ */
+async function transferExternalSheetCourseOwnership() {
+  const currentUser = Session.getActiveUser().getEmail();
+  const EXTERNAL_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
+  
+  console.log(`--- 轉移外部試算表課程擁有權 ---`);
+  console.log(`目標擁有者: ${currentUser}`);
+  console.log(`試算表ID: ${EXTERNAL_SPREADSHEET_ID}`);
+  
+  await transferCourseOwnership(currentUser, EXTERNAL_SPREADSHEET_ID);
+  
+  console.log(`--- 擁有權轉移完成，現在可以新增老師了 ---`);
+}
+
 // =============================================
 // Direct Batch Execution Function
 // =============================================
