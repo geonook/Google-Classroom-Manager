@@ -2827,7 +2827,9 @@ function handleBatchAddResult(result, ui) {
       `📊 處理統計：\n` +
       `• 總分配任務：${result.totalAssignments || 0}\n` +
       `• 已處理：${result.processedCount || 0}\n` +
-      `• 成功新增：${summary.statistics.successful}\n` +
+      `• 成功處理：${summary.statistics.successful}\n` +
+      `  - 新增成功：${result.addedCount || 0}\n` +
+      `  - 已存在：${result.existingCount || 0}\n` +
       `• 失敗項目：${summary.statistics.failed}\n` +
       `• 處理時間：${summary.statistics.duration}ms\n\n` +
       `⏱️ 平均處理時間：${Math.round(summary.statistics.averageTime)}ms/任務\n\n` +
@@ -2841,6 +2843,8 @@ function handleBatchAddResult(result, ui) {
         `📊 處理統計：\n` +
         `• 總任務：${result.totalAssignments || 0}\n` +
         `• 已處理：${result.processedCount || 0}\n` +
+        `  - 新增成功：${result.addedCount || 0}\n` +
+        `  - 已存在：${result.existingCount || 0}\n` +
         `• 剩餘未處理：${(result.totalAssignments || 0) - (result.processedCount || 0)}\n\n` +
         `❌ 主要錯誤：${result.error || '未知錯誤'}\n\n` +
         `💡 建議：檢查「一般新增報告」工作表查看詳細結果`;
@@ -2971,6 +2975,8 @@ async function executeBatchStudentAddition(assignments, sheetName) {
   const startTime = Date.now();
   let processedCount = 0;
   let successCount = 0;
+  let addedCount = 0;        // 新增成功的數量
+  let existingCount = 0;     // 已存在的數量
   let errorCount = 0;
   const errors = [];
 
@@ -2989,24 +2995,34 @@ async function executeBatchStudentAddition(assignments, sheetName) {
       // 處理當前批次
       for (const assignment of batch) {
         try {
-          const result = await classroomService.addSingleMember(
+          // 使用智能重複檢查新增學生
+          const result = await classroomService.addStudentIfNotExists(
             assignment.courseId, 
-            assignment.studentEmail, 
-            'STUDENT'
+            assignment.studentEmail
           );
 
           if (result.success) {
-            progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName}`);
-            successCount++;
-            
-            // 更新狀態到工作表
-            await updateStudentCourseStatus(assignment, sheetName, 'success');
+            if (result.status === 'ALREADY_EXISTS') {
+              progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName} (已存在)`);
+              successCount++;
+              existingCount++;
+              
+              // 更新狀態到工作表 - 已存在，並打勾
+              await updateStudentCourseStatus(assignment, sheetName, 'already_exists');
+            } else if (result.status === 'ADDED') {
+              progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName} (新增成功)`);
+              successCount++;
+              addedCount++;
+              
+              // 更新狀態到工作表 - 新增成功，並打勾
+              await updateStudentCourseStatus(assignment, sheetName, 'success');
+            }
           } else {
             progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, result.error);
             errors.push({ assignment, error: result.error });
             errorCount++;
             
-            // 記錄失敗狀態
+            // 記錄失敗狀態 - 不打勾
             await updateStudentCourseStatus(assignment, sheetName, 'failed', result.error);
           }
 
@@ -3033,6 +3049,8 @@ async function executeBatchStudentAddition(assignments, sheetName) {
     console.log(`  總任務: ${totalAssignments}`);
     console.log(`  已處理: ${processedCount}`);
     console.log(`  成功: ${successCount}`);
+    console.log(`    - 新增成功: ${addedCount}`);
+    console.log(`    - 已存在: ${existingCount}`);
     console.log(`  失敗: ${errorCount}`);
     console.log(`  執行時間: ${Date.now() - startTime}ms`);
 
@@ -3041,6 +3059,8 @@ async function executeBatchStudentAddition(assignments, sheetName) {
       summary,
       processedCount,
       successCount,
+      addedCount,
+      existingCount,
       errorCount,
       errors,
       totalTime: Date.now() - startTime
@@ -3053,7 +3073,7 @@ async function executeBatchStudentAddition(assignments, sheetName) {
 }
 
 /**
- * 🔄 更新學生-課程狀態 (用於一般批次新增)
+ * 🔄 更新學生-課程狀態 (用於一般批次新增) - 含打勾機制
  */
 async function updateStudentCourseStatus(assignment, sheetName, status, error = null) {
   try {
@@ -3065,21 +3085,39 @@ async function updateStudentCourseStatus(assignment, sheetName, status, error = 
     }
 
     let statusMessage = '';
+    let shouldCheck = false;
     const timestamp = new Date().toLocaleString('zh-TW');
     
     switch (status) {
       case 'success':
         statusMessage = `✅ 已新增 (${timestamp})`;
+        shouldCheck = true;
+        break;
+      case 'already_exists':
+        statusMessage = `✅ 已存在 (${timestamp})`;
+        shouldCheck = true;
         break;
       case 'failed':
         statusMessage = `❌ 新增失敗: ${error || '未知錯誤'} (${timestamp})`;
+        shouldCheck = false;
         break;
       default:
         statusMessage = `${status} (${timestamp})`;
+        shouldCheck = false;
     }
 
     // 更新狀態列 (第3列)
     sheet.getRange(assignment.rowIndex, 3).setValue(statusMessage);
+    
+    // 根據狀態決定是否打勾 (假設第4列是勾選欄)
+    if (shouldCheck) {
+      try {
+        sheet.getRange(assignment.rowIndex, 4).check();
+        console.log(`[STATUS] 已為 ${assignment.studentEmail} → ${assignment.courseId} 打勾`);
+      } catch (checkError) {
+        console.log(`[WARN] 無法打勾: ${checkError.message}`);
+      }
+    }
     
     console.log(`[STATUS] 已更新 ${assignment.studentEmail} → ${assignment.courseId} 狀態: ${statusMessage}`);
     
@@ -3257,7 +3295,9 @@ function handleDistributionResult(result, ui) {
       `📊 處理統計：\n` +
       `• 總分配任務：${result.totalAssignments || 0}\n` +
       `• 已處理：${result.processedCount || 0}\n` +
-      `• 成功分配：${summary.statistics.successful}\n` +
+      `• 成功處理：${summary.statistics.successful}\n` +
+      `  - 新增成功：${result.addedCount || 0}\n` +
+      `  - 已存在：${result.existingCount || 0}\n` +
       `• 失敗項目：${summary.statistics.failed}\n` +
       `• 處理時間：${summary.statistics.duration}ms\n\n` +
       `📈 分配到課程：${result.distributedCourses || 0} 門\n` +
@@ -3272,6 +3312,8 @@ function handleDistributionResult(result, ui) {
         `📊 處理統計：\n` +
         `• 總任務：${result.totalAssignments || 0}\n` +
         `• 已處理：${result.processedCount || 0}\n` +
+        `  - 新增成功：${result.addedCount || 0}\n` +
+        `  - 已存在：${result.existingCount || 0}\n` +
         `• 剩餘未處理：${(result.totalAssignments || 0) - (result.processedCount || 0)}\n\n` +
         `❌ 主要錯誤：${result.error || '未知錯誤'}\n\n` +
         `💡 建議：檢查「智能分配報告」工作表查看詳細結果`;
@@ -3561,6 +3603,8 @@ async function executeBatchDistribution(assignments) {
   const startTime = Date.now();
   let processedCount = 0;
   let successCount = 0;
+  let addedCount = 0;        // 新增成功的數量
+  let existingCount = 0;     // 已存在的數量
   let errorCount = 0;
   const errors = [];
 
@@ -3579,18 +3623,28 @@ async function executeBatchDistribution(assignments) {
       // 處理當前批次
       for (const assignment of batch) {
         try {
-          const result = await classroomService.addSingleMember(
+          // 使用智能重複檢查新增學生
+          const result = await classroomService.addStudentIfNotExists(
             assignment.courseId, 
-            assignment.studentEmail, 
-            'STUDENT'
+            assignment.studentEmail
           );
 
           if (result.success) {
-            progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName}`);
-            successCount++;
-            
-            // 更新學生處理狀態 (斷點續傳支援)
-            await updateStudentStatus(assignment, 'success');
+            if (result.status === 'ALREADY_EXISTS') {
+              progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName} (已存在)`);
+              successCount++;
+              existingCount++;
+              
+              // 更新學生處理狀態 - 已存在
+              await updateStudentStatus(assignment, 'already_exists');
+            } else if (result.status === 'ADDED') {
+              progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName} (新增成功)`);
+              successCount++;
+              addedCount++;
+              
+              // 更新學生處理狀態 - 新增成功
+              await updateStudentStatus(assignment, 'success');
+            }
           } else {
             progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, result.error);
             errors.push({ assignment, error: result.error });
@@ -3604,6 +3658,7 @@ async function executeBatchDistribution(assignments) {
           progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, error);
           errors.push({ assignment, error: error.message });
           errorCount++;
+          await updateStudentStatus(assignment, 'failed', error.message);
         }
 
         processedCount++;
@@ -3622,6 +3677,8 @@ async function executeBatchDistribution(assignments) {
     console.log(`  總任務: ${totalAssignments}`);
     console.log(`  已處理: ${processedCount}`);
     console.log(`  成功: ${successCount}`);
+    console.log(`    - 新增成功: ${addedCount}`);
+    console.log(`    - 已存在: ${existingCount}`);
     console.log(`  失敗: ${errorCount}`);
     console.log(`  執行時間: ${Date.now() - startTime}ms`);
 
@@ -3630,6 +3687,8 @@ async function executeBatchDistribution(assignments) {
       summary,
       processedCount,
       successCount,
+      addedCount,
+      existingCount,
       errorCount,
       errors,
       totalTime: Date.now() - startTime
@@ -3642,7 +3701,7 @@ async function executeBatchDistribution(assignments) {
 }
 
 /**
- * 🔄 更新學生處理狀態 (斷點續傳支援)
+ * 🔄 更新學生處理狀態 (斷點續傳支援) - 含打勾機制
  */
 async function updateStudentStatus(assignment, status, error = null) {
   try {
@@ -3656,24 +3715,43 @@ async function updateStudentStatus(assignment, status, error = null) {
 
     // 準備狀態訊息
     let statusMessage = '';
+    let shouldCheck = false;
     const timestamp = new Date().toLocaleString('zh-TW');
     
     switch (status) {
       case 'success':
         statusMessage = `✅ 已分配到 ${assignment.courseName} (${timestamp})`;
+        shouldCheck = true;
+        break;
+      case 'already_exists':
+        statusMessage = `✅ 已存在於 ${assignment.courseName} (${timestamp})`;
+        shouldCheck = true;
         break;
       case 'failed':
         statusMessage = `❌ 分配失敗: ${error || '未知錯誤'} (${timestamp})`;
+        shouldCheck = false;
         break;
       case 'processing':
         statusMessage = `⏳ 處理中... (${timestamp})`;
+        shouldCheck = false;
         break;
       default:
         statusMessage = `${status} (${timestamp})`;
+        shouldCheck = false;
     }
 
-    // 更新狀態列 (假設第3列是狀態列)
+    // 更新狀態列 (第3列是狀態列)
     sheet.getRange(assignment.rowIndex, 3).setValue(statusMessage);
+    
+    // 根據狀態決定是否打勾 (假設第4列是勾選欄)
+    if (shouldCheck) {
+      try {
+        sheet.getRange(assignment.rowIndex, 4).check();
+        console.log(`[STATUS] 已為學生 ${assignment.studentEmail} 打勾`);
+      } catch (checkError) {
+        console.log(`[WARN] 無法打勾: ${checkError.message}`);
+      }
+    }
     
     console.log(`[STATUS] 已更新學生 ${assignment.studentEmail} 狀態: ${statusMessage}`);
     

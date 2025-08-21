@@ -289,6 +289,41 @@ class ClassroomService {
   }
 
   /**
+   * 新增學生 (如果不存在)
+   */
+  async addStudentIfNotExists(courseId, studentEmail) {
+    // 首先，獲取該課程的所有學生
+    const studentsResult = await this.getCourseStudents(courseId);
+    if (!studentsResult.success) {
+      return { success: false, error: `無法獲取課程 ${courseId} 的學生列表。` };
+    }
+
+    // 檢查學生是否已經存在
+    const students = studentsResult.result || [];
+    const studentExists = students.some(
+      (student) =>
+        student &&
+        student.profile &&
+        student.profile.emailAddress &&
+        student.profile.emailAddress.toLowerCase() === studentEmail.toLowerCase()
+    );
+
+    if (studentExists) {
+      console.log(`學生 ${studentEmail} 已存在於課程 ${courseId} 中，無需新增。`);
+      return { success: true, status: 'ALREADY_EXISTS' };
+    }
+
+    // 如果學生不存在，則新增學生
+    console.log(`正在將學生 ${studentEmail} 新增到課程 ${courseId}...`);
+    const addResult = await this.addSingleMember(courseId, studentEmail, 'STUDENT');
+    if (addResult.success) {
+      return { success: true, status: 'ADDED' };
+    } else {
+      return { success: false, error: addResult.error };
+    }
+  }
+
+  /**
    * 更新課程
    */
   async updateCourse(courseId, updates) {
