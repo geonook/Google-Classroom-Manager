@@ -2747,26 +2747,434 @@ function addTeachersUI() {
 }
 
 /**
- * 新增學生 UI (一般批次新增)
+ * 👨‍🎓 一般批次新增學生 UI
+ * 根據工作表中的學生Email和課程ID直接進行批次新增
  */
 function addStudentsUI() {
   const ui = SpreadsheetApp.getUi();
-  const result = ui.prompt(
-    '👨‍🎓 新增學生',
-    '請輸入要處理新增學生的工作表名稱（預設：新增學生）',
+  
+  // 步驟1: 獲取工作表名稱
+  const sheetNameResult = ui.prompt(
+    '👨‍🎓 一般批次新增學生 - 步驟 1/2',
+    '請輸入包含學生資料的工作表名稱（預設：新增學生）\n格式需包含：學生Email | 課程ID | 狀態',
     ui.ButtonSet.OK_CANCEL
   );
 
-  if (result.getSelectedButton() !== ui.Button.OK) {
+  if (sheetNameResult.getSelectedButton() !== ui.Button.OK) {
     return;
   }
 
-  const sheetName = result.getResponseText() || '新增學生';
+  const sheetName = sheetNameResult.getResponseText() || '新增學生';
+
+  // 步驟2: 確認執行模式
+  const confirmResult = ui.alert(
+    '👨‍🎓 一般批次新增學生 - 步驟 2/2',
+    `即將執行一般批次新增學生功能：\n\n📊 工作表：${sheetName}\n📋 格式：學生Email | 課程ID | 狀態\n\n✅ 確定：開始批次新增\n❌ 取消：取消操作\n\n💡 提醒：如需自動配對班級到課程，請使用「🎯 智能學生分配」功能`,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (confirmResult !== ui.Button.OK) {
+    return;
+  }
 
   try {
-    ui.alert('🚧 功能開發中', '一般批次新增學生功能正在開發中。\n\n💡 建議使用：「🎯 智能學生分配」功能，可自動為班級分配到對應課程。', ui.ButtonSet.OK);
+    // 執行權限預檢
+    console.log('🔍 執行權限預檢...');
+    const currentUser = Session.getActiveUser().getEmail();
+    
+    // 使用 Promise 處理異步操作
+    performPermissionPrecheck(currentUser).then(permissionCheck => {
+      if (!permissionCheck.canProceed) {
+        const continueResult = ui.alert(
+          '⚠️ 權限檢查',
+          `權限檢查發現問題：\n${permissionCheck.issue}\n\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續執行？`,
+          ui.ButtonSet.YES_NO
+        );
+        
+        if (continueResult !== ui.Button.YES) {
+          ui.alert('操作已取消', '建議先解決權限問題後再執行批次新增功能。', ui.ButtonSet.OK);
+          return;
+        }
+      }
+
+      // 執行一般批次新增
+      console.log('🚀 開始執行一般批次新增學生');
+      batchAddStudentsFromSheet(sheetName).then(result => {
+        handleBatchAddResult(result, ui);
+      }).catch(error => {
+        console.log(`[ERROR] 一般批次新增失敗: ${error.message}`);
+        ui.alert('❌ 系統錯誤', `一般批次新增發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
+      });
+      
+    }).catch(error => {
+      console.log(`[ERROR] 權限檢查失敗: ${error.message}`);
+      ui.alert('❌ 權限檢查錯誤', `權限檢查發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
+    });
+    
   } catch (error) {
-    ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+    console.log(`[ERROR] 一般批次新增學生失敗: ${error.message}`);
+    ui.alert('❌ 系統錯誤', `一般批次新增系統發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 📊 處理一般批次新增結果
+ */
+function handleBatchAddResult(result, ui) {
+  if (result.success) {
+    const summary = result.summary;
+    const message = `🎉 一般批次新增學生完成！\n\n` +
+      `📊 處理統計：\n` +
+      `• 總分配任務：${result.totalAssignments || 0}\n` +
+      `• 已處理：${result.processedCount || 0}\n` +
+      `• 成功新增：${summary.statistics.successful}\n` +
+      `• 失敗項目：${summary.statistics.failed}\n` +
+      `• 處理時間：${summary.statistics.duration}ms\n\n` +
+      `⏱️ 平均處理時間：${Math.round(summary.statistics.averageTime)}ms/任務\n\n` +
+      `📊 詳細報告已保存至「一般新增報告」工作表`;
+    
+    ui.alert('✅ 新增完成', message, ui.ButtonSet.OK);
+  } else {
+    // 顯示部分成功的情況
+    if (result.processedCount && result.processedCount > 0) {
+      const message = `⚠️ 新增部分完成\n\n` +
+        `📊 處理統計：\n` +
+        `• 總任務：${result.totalAssignments || 0}\n` +
+        `• 已處理：${result.processedCount || 0}\n` +
+        `• 剩餘未處理：${(result.totalAssignments || 0) - (result.processedCount || 0)}\n\n` +
+        `❌ 主要錯誤：${result.error || '未知錯誤'}\n\n` +
+        `💡 建議：檢查「一般新增報告」工作表查看詳細結果`;
+      
+      ui.alert('⚠️ 部分完成', message, ui.ButtonSet.OK);
+    } else {
+      ui.alert('❌ 新增失敗', `新增過程中發生錯誤：\n${result.error || '未知錯誤'}`, ui.ButtonSet.OK);
+    }
+  }
+}
+
+/**
+ * 👨‍🎓 一般批次新增學生 - 核心執行函數
+ * 根據工作表中的學生Email和課程ID直接進行批次新增
+ */
+async function batchAddStudentsFromSheet(sheetName) {
+  console.log(`🚀 開始一般批次新增學生: ${sheetName}`);
+  
+  try {
+    // 步驟1: 讀取學生-課程配對資料
+    const studentCourseData = await readStudentCourseDataFromSheet(sheetName);
+    if (!studentCourseData.success) {
+      return { success: false, error: studentCourseData.error };
+    }
+
+    console.log(`📊 讀取完成: ${studentCourseData.assignments.length} 項新增任務`);
+
+    // 步驟2: 執行批次學生新增
+    const batchResult = await executeBatchStudentAddition(studentCourseData.assignments, sheetName);
+    
+    // 步驟3: 生成和保存詳細報告
+    if (batchResult.processedCount > 0) {
+      console.log('📈 生成新增報告...');
+      const report = generateBatchAddReport(batchResult, studentCourseData.assignments);
+      const saveResult = saveBatchAddReportToSheet(report);
+      
+      if (saveResult.success) {
+        console.log(`📊 詳細報告已保存至 "${saveResult.sheetName}" 工作表`);
+      }
+    }
+    
+    return {
+      success: batchResult.success,
+      summary: batchResult.summary,
+      error: batchResult.error,
+      processedCount: batchResult.processedCount,
+      totalAssignments: studentCourseData.assignments.length
+    };
+
+  } catch (error) {
+    console.log(`[ERROR] 一般批次新增系統錯誤: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 📋 從工作表讀取學生-課程配對資料
+ * 格式：學生Email | 課程ID | 狀態
+ */
+async function readStudentCourseDataFromSheet(sheetName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      return { success: false, error: `找不到名為 "${sheetName}" 的工作表` };
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, error: '工作表中沒有學生資料' };
+    }
+
+    // 讀取資料 (跳過標題行)
+    const range = sheet.getRange(2, 1, lastRow - 1, 3);
+    const data = range.getValues();
+
+    const assignments = [];
+
+    data.forEach((row, index) => {
+      const [email, courseId, status] = row;
+      
+      if (!email || !courseId) {
+        console.log(`[WARN] 第 ${index + 2} 行資料不完整，跳過 (Email: ${email}, CourseID: ${courseId})`);
+        return;
+      }
+
+      // 跳過已處理的項目
+      if (status && status.toString().trim()) {
+        console.log(`[INFO] 學生 ${email} → 課程 ${courseId} 已處理，跳過`);
+        return;
+      }
+
+      const assignment = {
+        studentEmail: email.toString().trim(),
+        courseId: courseId.toString().trim(),
+        rowIndex: index + 2,
+        courseName: `課程 ${courseId}` // 簡化的課程名稱
+      };
+
+      assignments.push(assignment);
+    });
+
+    console.log(`📊 讀取完成: ${assignments.length} 項新增任務 (跳過已處理項目)`);
+    return { 
+      success: true, 
+      assignments,
+      totalAssignments: assignments.length
+    };
+
+  } catch (error) {
+    return { success: false, error: `讀取學生-課程資料失敗: ${error.message}` };
+  }
+}
+
+/**
+ * ⚡ 執行批次學生新增 (專用於一般批次新增)
+ */
+async function executeBatchStudentAddition(assignments, sheetName) {
+  const totalAssignments = assignments.length;
+  console.log(`⚡ 開始一般批次學生新增: ${totalAssignments} 項任務`);
+  
+  const progress = new ProgressTracker(totalAssignments, '一般批次新增學生');
+  const BATCH_SIZE = 20; // 每批處理20個新增任務
+  const REST_INTERVAL = 1000; // 每批之間休息1秒
+  const MAX_EXECUTION_TIME = 300000; // 5分鐘執行限制
+  
+  const startTime = Date.now();
+  let processedCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
+  const errors = [];
+
+  try {
+    // 分批處理
+    for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
+      // 檢查執行時間
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+        console.log(`[WARN] 接近執行時間限制，停止處理。已處理 ${processedCount}/${totalAssignments}`);
+        break;
+      }
+
+      const batch = assignments.slice(i, i + BATCH_SIZE);
+      console.log(`📦 處理批次 ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} 項任務`);
+
+      // 處理當前批次
+      for (const assignment of batch) {
+        try {
+          const result = await classroomService.addSingleMember(
+            assignment.courseId, 
+            assignment.studentEmail, 
+            'STUDENT'
+          );
+
+          if (result.success) {
+            progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName}`);
+            successCount++;
+            
+            // 更新狀態到工作表
+            await updateStudentCourseStatus(assignment, sheetName, 'success');
+          } else {
+            progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, result.error);
+            errors.push({ assignment, error: result.error });
+            errorCount++;
+            
+            // 記錄失敗狀態
+            await updateStudentCourseStatus(assignment, sheetName, 'failed', result.error);
+          }
+
+        } catch (error) {
+          progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, error);
+          errors.push({ assignment, error: error.message });
+          errorCount++;
+          await updateStudentCourseStatus(assignment, sheetName, 'failed', error.message);
+        }
+
+        processedCount++;
+      }
+
+      // 批次間休息
+      if (i + BATCH_SIZE < assignments.length) {
+        console.log(`⏳ 批次完成，休息 ${REST_INTERVAL}ms...`);
+        await Utilities.sleep(REST_INTERVAL);
+      }
+    }
+
+    const summary = progress.complete();
+    
+    console.log(`📊 一般批次新增完成統計:`);
+    console.log(`  總任務: ${totalAssignments}`);
+    console.log(`  已處理: ${processedCount}`);
+    console.log(`  成功: ${successCount}`);
+    console.log(`  失敗: ${errorCount}`);
+    console.log(`  執行時間: ${Date.now() - startTime}ms`);
+
+    return {
+      success: errorCount === 0,
+      summary,
+      processedCount,
+      successCount,
+      errorCount,
+      errors,
+      totalTime: Date.now() - startTime
+    };
+
+  } catch (error) {
+    console.log(`[ERROR] 一般批次新增系統錯誤: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🔄 更新學生-課程狀態 (用於一般批次新增)
+ */
+async function updateStudentCourseStatus(assignment, sheetName, status, error = null) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet || !assignment.rowIndex) {
+      return;
+    }
+
+    let statusMessage = '';
+    const timestamp = new Date().toLocaleString('zh-TW');
+    
+    switch (status) {
+      case 'success':
+        statusMessage = `✅ 已新增 (${timestamp})`;
+        break;
+      case 'failed':
+        statusMessage = `❌ 新增失敗: ${error || '未知錯誤'} (${timestamp})`;
+        break;
+      default:
+        statusMessage = `${status} (${timestamp})`;
+    }
+
+    // 更新狀態列 (第3列)
+    sheet.getRange(assignment.rowIndex, 3).setValue(statusMessage);
+    
+    console.log(`[STATUS] 已更新 ${assignment.studentEmail} → ${assignment.courseId} 狀態: ${statusMessage}`);
+    
+  } catch (error) {
+    console.log(`[WARN] 無法更新學生課程狀態: ${error.message}`);
+  }
+}
+
+/**
+ * 📈 生成一般批次新增報告
+ */
+function generateBatchAddReport(batchResult, assignments) {
+  const report = {
+    timestamp: new Date().toISOString(),
+    type: 'batch_add_students',
+    summary: {
+      totalAssignments: assignments.length,
+      processedCount: batchResult.processedCount,
+      successCount: batchResult.successCount,
+      errorCount: batchResult.errorCount,
+      successRate: Math.round((batchResult.successCount / batchResult.processedCount) * 100),
+      totalTime: batchResult.totalTime,
+      averageTimePerAssignment: Math.round(batchResult.totalTime / batchResult.processedCount)
+    },
+    performance: {
+      assignmentsPerSecond: Math.round(batchResult.processedCount / (batchResult.totalTime / 1000)),
+      timeEfficiency: batchResult.totalTime < 300000 ? 'excellent' : 'acceptable'
+    },
+    errors: batchResult.errors || [],
+    recommendations: []
+  };
+
+  // 生成建議
+  if (report.summary.errorCount > 0) {
+    report.recommendations.push('檢查失敗的新增項目，確認課程ID和學生Email格式正確');
+    
+    if (report.summary.successRate < 80) {
+      report.recommendations.push('成功率較低，建議檢查權限設定或課程ID有效性');
+    }
+  }
+
+  if (report.performance.assignmentsPerSecond < 1) {
+    report.recommendations.push('處理速度較慢，考慮優化批次大小');
+  }
+
+  console.log('📈 一般新增報告生成完成:');
+  console.log(`  成功率: ${report.summary.successRate}%`);
+  console.log(`  處理速度: ${report.performance.assignmentsPerSecond} 新增/秒`);
+
+  return report;
+}
+
+/**
+ * 💾 保存一般批次新增報告到工作表
+ */
+function saveBatchAddReportToSheet(report) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const reportSheetName = '一般新增報告';
+    
+    let reportSheet = ss.getSheetByName(reportSheetName);
+    if (!reportSheet) {
+      reportSheet = ss.insertSheet(reportSheetName);
+      
+      // 建立標題行
+      const headers = [
+        '時間戳記', '總任務數', '已處理', '成功數', '失敗數', 
+        '成功率(%)', '總時間(ms)', '平均時間(ms)', '處理速度(/秒)', '建議'
+      ];
+      reportSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      reportSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+
+    // 新增報告記錄
+    const newRow = [
+      report.timestamp,
+      report.summary.totalAssignments,
+      report.summary.processedCount,
+      report.summary.successCount,
+      report.summary.errorCount,
+      report.summary.successRate,
+      report.summary.totalTime,
+      report.summary.averageTimePerAssignment,
+      report.performance.assignmentsPerSecond,
+      report.recommendations.join('; ')
+    ];
+
+    reportSheet.appendRow(newRow);
+    console.log(`📊 一般新增報告已保存到 "${reportSheetName}" 工作表`);
+    
+    return { success: true, sheetName: reportSheetName };
+    
+  } catch (error) {
+    console.log(`[ERROR] 保存一般新增報告失敗: ${error.message}`);
+    return { success: false, error: error.message };
   }
 }
 
