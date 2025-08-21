@@ -64,6 +64,14 @@ function onOpen() {
         .createMenu('🔧 診斷工具')
         .addItem('🔍 用戶 ID 查詢', 'lookupUserById')
         .addItem('🔧 權限診斷', 'enhancedPermissionDiagnosis')
+        .addItem('🔬 深度權限診斷', 'deepPermissionDiagnosis')
+        .addItem('🎯 Classroom API 測試', 'testClassroomPermissions')
+        .addItem('👨‍💼 域管理員權限檢查', 'checkDomainAdminPermissions')
+        .addItem('🔬 綜合權限測試', 'comprehensivePermissionTest')
+        .addSeparator()
+        .addItem('🔄 重新授權權限', 'reauthorizePermissions')
+        .addItem('📋 授權設定指引', 'showAuthorizationGuideUI')
+        .addSeparator()
         .addItem('📊 系統狀態', 'showSystemStatusUI')
         .addItem('🗑️ 清除快取', 'clearCacheUI')
     )
@@ -113,30 +121,81 @@ async function addTeachersWithCheck(spreadsheetId = null) {
       }
       statusCell.check();
     } else {
-      // 🔧 增強版錯誤處理與解決建議
-      if (result.error && result.error.details && result.error.details.code === 403) {
-        console.log(`  🚫 權限錯誤：無法新增老師 ${teacherEmail} 到課程 ${courseId}`);
-        console.log(`  📋 錯誤分析：只有課程擁有者才能新增老師`);
-        console.log(`  \n🔧 解決方案（請選擇其中一種）：`);
-        console.log(`     1. 📞 聯絡課程擁有者執行新增作業`);
-        console.log(`     2. 🔍 使用 lookupUserById('課程擁有者ID') 查詢擁有者Email`);
-        console.log(`     3. 🛠️ 使用 enhancedPermissionDiagnosis('${courseId}') 獲得詳細診斷`);
-        console.log(`     4. 👨‍💼 請 Google Workspace 管理員協助執行`);
-        console.log(`     5. 📧 發送操作請求給課程擁有者：addTeachersFromExternalSheet()`);
-      } else if (
-        result.error &&
-        result.error.message &&
-        result.error.message.includes('not found')
-      ) {
-        console.log(`  ❌ 找不到老師或課程：${teacherEmail} -> 課程 ${courseId}`);
-        console.log(`  🔧 解決方案：`);
-        console.log(`     1. 檢查老師 Email 格式是否正確`);
-        console.log(`     2. 確認課程 ID 是否有效`);
-        console.log(`     3. 確認老師是否為 Google Workspace 用戶`);
+      // 🔧 增強版智能錯誤處理與自動診斷
+      console.log(`  ❌ 新增老師失敗：${teacherEmail} -> 課程 ${courseId}`);
+      
+      // 自動執行詳細錯誤分析
+      const errorAnalysis = analyzePermissionError(result.error, courseId, teacherEmail);
+      console.log(`  🔍 錯誤類型：${errorAnalysis.errorType} (嚴重程度: ${errorAnalysis.severity})`);
+      console.log(`  📋 問題描述：${errorAnalysis.description}`);
+      
+      if (errorAnalysis.errorType === 'PERMISSION_DENIED') {
+        console.log(`  \n🔬 自動權限診斷：`);
+        
+        // 自動檢查課程擁有者
+        try {
+          const course = Classroom.Courses.get(courseId);
+          const currentUser = Session.getActiveUser().getEmail();
+          
+          console.log(`     👤 當前執行者：${currentUser}`);
+          console.log(`     📚 課程擁有者 ID：${course.ownerId}`);
+          
+          // 嘗試查詢擁有者詳細資訊
+          const ownerInfo = lookupUserById(course.ownerId);
+          if (ownerInfo.success) {
+            console.log(`     📧 課程擁有者 Email：${ownerInfo.email}`);
+            
+            if (currentUser === ownerInfo.email) {
+              console.log(`     ⚠️ 您是課程擁有者但仍失敗，可能原因：`);
+              console.log(`        • 缺少域管理員權限新增外部用戶`);
+              console.log(`        • OAuth 權限需要重新授權`);
+              console.log(`        • Google Workspace 安全設定限制`);
+              console.log(`     💡 建議立即執行：checkDomainAdminPermissions()`);
+            } else {
+              console.log(`     ❌ 權限不足：您不是課程擁有者`);
+              console.log(`     📞 請聯絡課程擁有者：${ownerInfo.email}`);
+            }
+          } else {
+            console.log(`     ❌ 無法查詢擁有者資訊，可能需要更高權限`);
+          }
+        } catch (e) {
+          console.log(`     ❌ 課程查詢失敗：${e.message}`);
+        }
+        
+      } else if (errorAnalysis.errorType === 'NOT_FOUND') {
+        console.log(`  \n🔍 資源檢查：`);
+        console.log(`     📧 檢查老師 Email：${teacherEmail}`);
+        console.log(`     🎓 檢查課程 ID：${courseId}`);
+        
+      } else if (errorAnalysis.errorType === 'QUOTA_EXCEEDED') {
+        console.log(`  \n⏱️ 配額管理建議：`);
+        console.log(`     • 等待 60 秒後重新嘗試`);
+        console.log(`     • 考慮減少批次處理數量`);
+        
+      }
+      
+      // 顯示建議的解決方案
+      if (errorAnalysis.suggestions.length > 0) {
+        console.log(`  \n💡 建議解決方案：`);
+        errorAnalysis.suggestions.forEach((suggestion, index) => {
+          console.log(`     ${index + 1}. ${suggestion}`);
+        });
+      }
+      
+      // 提供快速診斷工具建議
+      console.log(`  \n🛠️ 快速診斷工具：`);
+      if (errorAnalysis.errorType === 'PERMISSION_DENIED') {
+        console.log(`     • deepPermissionDiagnosis() - 深度權限檢查`);
+        console.log(`     • checkDomainAdminPermissions() - 管理員權限檢查`);
+        console.log(`     • reauthorizePermissions() - 重新授權`);
       } else {
-        console.log(`  ❌ 新增老師失敗：${teacherEmail} -> 課程 ${courseId}`);
-        console.log(`  📋 錯誤詳情: ${JSON.stringify(result.error, null, 2)}`);
-        console.log(`  🔧 建議：使用 enhancedPermissionDiagnosis() 進行詳細診斷`);
+        console.log(`     • testClassroomPermissions() - API 權限測試`);
+        console.log(`     • enhancedPermissionDiagnosis('${courseId}') - 課程權限診斷`);
+      }
+      
+      // 記錄詳細錯誤資訊（僅在高詳細度時）
+      if (errorAnalysis.severity === 'high') {
+        console.log(`  📊 詳細錯誤：${JSON.stringify(errorAnalysis, null, 2)}`);
       }
     }
 
@@ -1124,6 +1183,773 @@ function testAddTeacher() {
     console.log('完整錯誤物件:');
     console.log(JSON.stringify(e, null, 2));
   }
+}
+
+/**
+ * 深度權限診斷工具 - 檢查 OAuth token 和 API 權限
+ */
+function deepPermissionDiagnosis() {
+  console.log('=== 🔬 深度權限診斷工具 ===');
+  
+  const results = {
+    timestamp: new Date().toLocaleString(),
+    currentUser: null,
+    oauthScopes: [],
+    apiPermissions: {},
+    domainInfo: {},
+    recommendations: []
+  };
+  
+  // 步驟1: 檢查當前用戶
+  try {
+    results.currentUser = Session.getActiveUser().getEmail();
+    console.log(`📧 當前執行者: ${results.currentUser}`);
+  } catch (e) {
+    console.log(`❌ 無法取得用戶資訊: ${e.message}`);
+    results.recommendations.push('需要 userinfo.email 權限');
+  }
+  
+  // 步驟2: 檢查 OAuth 權限範圍
+  console.log(`\n🔍 檢查 OAuth 權限範圍...`);
+  try {
+    // 嘗試訪問不同的 API 來檢查權限
+    const permissionTests = [
+      {
+        name: 'Classroom 課程讀取',
+        test: () => Classroom.Courses.list({ pageSize: 1 }),
+        scope: 'https://www.googleapis.com/auth/classroom.courses'
+      },
+      {
+        name: 'Classroom 名冊讀取', 
+        test: () => Classroom.Courses.Teachers.list('779922029471', { pageSize: 1 }),
+        scope: 'https://www.googleapis.com/auth/classroom.rosters'
+      },
+      {
+        name: 'Admin Directory 用戶讀取',
+        test: () => AdminDirectory.Users.get('me'),
+        scope: 'https://www.googleapis.com/auth/admin.directory.user.readonly'
+      },
+      {
+        name: 'Spreadsheets 讀寫',
+        test: () => SpreadsheetApp.getActiveSpreadsheet().getId(),
+        scope: 'https://www.googleapis.com/auth/spreadsheets'
+      }
+    ];
+    
+    for (const test of permissionTests) {
+      try {
+        test.test();
+        results.apiPermissions[test.name] = { status: '✅ 成功', scope: test.scope };
+        console.log(`✅ ${test.name}: 權限正常`);
+      } catch (error) {
+        results.apiPermissions[test.name] = { 
+          status: '❌ 失敗', 
+          error: error.message, 
+          scope: test.scope 
+        };
+        console.log(`❌ ${test.name}: ${error.message}`);
+        
+        if (error.message.includes('403') || error.message.includes('permission')) {
+          results.recommendations.push(`需要重新授權 ${test.scope}`);
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.log(`❌ 權限檢查失敗: ${error.message}`);
+  }
+  
+  // 步驟3: 檢查域管理員權限
+  console.log(`\n🔍 檢查域管理員權限...`);
+  try {
+    const userInfo = AdminDirectory.Users.get('me');
+    results.domainInfo = {
+      isAdmin: userInfo.isAdmin || false,
+      isDelegatedAdmin: userInfo.isDelegatedAdmin || false,
+      orgUnitPath: userInfo.orgUnitPath || '未知',
+      domain: userInfo.primaryEmail ? userInfo.primaryEmail.split('@')[1] : '未知'
+    };
+    
+    console.log(`👤 域管理員狀態: ${results.domainInfo.isAdmin ? '是' : '否'}`);
+    console.log(`🎯 委派管理員: ${results.domainInfo.isDelegatedAdmin ? '是' : '否'}`);
+    console.log(`🏢 組織單位: ${results.domainInfo.orgUnitPath}`);
+    console.log(`🌐 域名: ${results.domainInfo.domain}`);
+    
+  } catch (error) {
+    console.log(`⚠️ 無法檢查域管理員權限: ${error.message}`);
+    results.domainInfo.error = error.message;
+  }
+  
+  // 步驟4: 特定測試 - Classroom 教師新增權限
+  console.log(`\n🎯 測試 Classroom 教師新增權限...`);
+  try {
+    // 嘗試獲取一個課程的教師列表來測試讀取權限
+    const teachers = Classroom.Courses.Teachers.list('779922029471');
+    console.log(`✅ 可以讀取課程教師列表 (${teachers.teachers ? teachers.teachers.length : 0} 位教師)`);
+    results.apiPermissions['教師列表讀取'] = { status: '✅ 成功' };
+    
+    // 注意：我們不會實際嘗試新增教師，因為這會產生副作用
+    console.log(`⚠️ 教師新增權限需要實際執行才能測試`);
+    
+  } catch (error) {
+    console.log(`❌ 無法讀取教師列表: ${error.message}`);
+    results.apiPermissions['教師列表讀取'] = { status: '❌ 失敗', error: error.message };
+    
+    if (error.message.includes('403')) {
+      results.recommendations.push('需要課程擁有者權限或域管理員權限');
+    }
+  }
+  
+  // 步驟5: 生成建議
+  console.log(`\n💡 診斷建議:`);
+  if (results.recommendations.length === 0) {
+    results.recommendations.push('所有權限檢查正常，可以嘗試執行教師新增功能');
+    console.log(`✅ 所有權限檢查正常`);
+  } else {
+    results.recommendations.forEach((rec, index) => {
+      console.log(`${index + 1}. ${rec}`);
+    });
+  }
+  
+  // 步驟6: 生成重新授權指引
+  const failedPermissions = Object.values(results.apiPermissions).filter(p => p.status.includes('❌'));
+  if (failedPermissions.length > 0) {
+    console.log(`\n🔄 重新授權指引:`);
+    console.log(`1. 開啟 Google Apps Script 編輯器`);
+    console.log(`2. 點擊「執行」按鈕重新觸發權限請求`);
+    console.log(`3. 在彈出視窗中檢查並授權所有必要權限`);
+    console.log(`4. 確保授權包含：Classroom、Spreadsheets、Admin Directory`);
+    results.recommendations.push('需要重新授權 Google Apps Script');
+  }
+  
+  console.log(`\n📊 診斷完成時間: ${results.timestamp}`);
+  return results;
+}
+
+/**
+ * 測試 Classroom API 權限的專用函數
+ */
+function testClassroomPermissions(courseId = '779922029471') {
+  console.log('=== 🎯 Classroom API 權限測試 ===');
+  
+  const tests = [
+    {
+      name: '讀取課程資訊',
+      action: () => Classroom.Courses.get(courseId),
+      required: '課程基本讀取權限'
+    },
+    {
+      name: '列出所有課程',
+      action: () => Classroom.Courses.list({ pageSize: 5 }),
+      required: '課程列表讀取權限'
+    },
+    {
+      name: '讀取教師列表',
+      action: () => Classroom.Courses.Teachers.list(courseId),
+      required: '名冊讀取權限'
+    },
+    {
+      name: '讀取學生列表',
+      action: () => Classroom.Courses.Students.list(courseId),
+      required: '名冊讀取權限'
+    }
+  ];
+  
+  const results = [];
+  
+  for (const test of tests) {
+    try {
+      const result = test.action();
+      console.log(`✅ ${test.name}: 成功`);
+      results.push({
+        test: test.name,
+        status: 'success',
+        result: result
+      });
+    } catch (error) {
+      console.log(`❌ ${test.name}: ${error.message}`);
+      results.push({
+        test: test.name,
+        status: 'failed',
+        error: error.message,
+        required: test.required
+      });
+    }
+  }
+  
+  // 分析結果
+  const successCount = results.filter(r => r.status === 'success').length;
+  const failCount = results.filter(r => r.status === 'failed').length;
+  
+  console.log(`\n📊 測試結果: ${successCount}/${tests.length} 通過`);
+  
+  if (failCount > 0) {
+    console.log(`\n❌ 失敗的測試需要以下權限:`);
+    results.filter(r => r.status === 'failed').forEach(r => {
+      console.log(`• ${r.test}: ${r.required}`);
+    });
+    
+    console.log(`\n💡 解決方案:`);
+    console.log(`1. 檢查 appsscript.json 中的 oauthScopes 設定`);
+    console.log(`2. 重新授權 Google Apps Script`);
+    console.log(`3. 確認當前用戶有適當的 Classroom 權限`);
+  }
+  
+  return results;
+}
+
+/**
+ * 重新授權 Google Apps Script 權限
+ */
+function reauthorizePermissions() {
+  console.log('=== 🔄 重新授權權限設定 ===');
+  
+  console.log('📋 當前需要的權限範圍:');
+  const requiredScopes = [
+    'https://www.googleapis.com/auth/classroom.courses',
+    'https://www.googleapis.com/auth/classroom.courses.readonly',
+    'https://www.googleapis.com/auth/classroom.rosters',
+    'https://www.googleapis.com/auth/classroom.rosters.readonly',
+    'https://www.googleapis.com/auth/classroom.profile.emails',
+    'https://www.googleapis.com/auth/classroom.profile.photos',
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/admin.directory.user.readonly',
+    'https://www.googleapis.com/auth/admin.directory.domain.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile'
+  ];
+  
+  requiredScopes.forEach((scope, index) => {
+    console.log(`${index + 1}. ${scope}`);
+  });
+  
+  console.log('\n🔧 重新授權步驟：');
+  console.log('1. 在 Google Apps Script 編輯器中點擊「執行」按鈕');
+  console.log('2. 在彈出的授權對話框中點擊「檢查權限」');
+  console.log('3. 選擇正確的 Google 帳戶');
+  console.log('4. 仔細檢查所有權限請求，確保包含：');
+  console.log('   • Google Classroom 課程和名冊管理');
+  console.log('   • Google Spreadsheets 讀寫');
+  console.log('   • Admin Directory 用戶查詢');
+  console.log('5. 點擊「允許」授權所有權限');
+  
+  console.log('\n⚠️ 重要提醒：');
+  console.log('• 必須使用具有 Google Workspace 管理員權限的帳戶');
+  console.log('• 確保域設定允許第三方應用存取');
+  console.log('• 如果仍然失敗，請聯絡 IT 管理員檢查域安全設定');
+  
+  // 嘗試觸發權限請求
+  console.log('\n🎯 嘗試觸發權限檢查...');
+  try {
+    // 嘗試訪問需要權限的 API
+    Session.getActiveUser().getEmail();
+    console.log('✅ 用戶資訊權限正常');
+    
+    Classroom.Courses.list({ pageSize: 1 });
+    console.log('✅ Classroom 課程權限正常');
+    
+    SpreadsheetApp.getActiveSpreadsheet().getId();
+    console.log('✅ Spreadsheets 權限正常');
+    
+    AdminDirectory.Users.get('me');
+    console.log('✅ Admin Directory 權限正常');
+    
+    console.log('\n🎉 所有權限檢查通過！可以嘗試執行教師新增功能。');
+    
+  } catch (error) {
+    console.log(`\n❌ 權限檢查失敗: ${error.message}`);
+    console.log('\n💡 解決方案：');
+    console.log('1. 重新運行此函數以觸發授權流程');
+    console.log('2. 檢查 Google Workspace 管理控制台的應用程式設定');
+    console.log('3. 確認當前帳戶有適當的管理員權限');
+    console.log('4. 聯絡 IT 支援檢查域安全政策');
+  }
+  
+  return {
+    requiredScopes,
+    timestamp: new Date().toLocaleString()
+  };
+}
+
+/**
+ * 權限設定指引 UI
+ */
+function showAuthorizationGuideUI() {
+  const ui = SpreadsheetApp.getUi();
+  
+  const message = `📋 Google Apps Script 權限設定指引
+
+🔧 重新授權步驟：
+1. 點擊 Google Apps Script 編輯器中的「執行」按鈕
+2. 在授權對話框中點擊「檢查權限」
+3. 選擇正確的 Google 帳戶
+4. 檢查並允許所有權限請求
+5. 完成授權後重新嘗試功能
+
+💡 常見問題：
+• 如果看到「應用程式未驗證」警告，點擊「進階」→「前往...（不安全）」
+• 確保使用具有管理員權限的帳戶
+• 檢查 Google Workspace 安全設定
+
+🛠️ 需要協助？
+使用診斷工具：「🔬 深度權限診斷」檢查具體權限狀態。`;
+  
+  ui.alert('🔄 權限設定指引', message, ui.ButtonSet.OK);
+}
+
+/**
+ * 檢查域管理員權限和設定
+ */
+function checkDomainAdminPermissions() {
+  console.log('=== 👨‍💼 域管理員權限檢查 ===');
+  
+  const results = {
+    timestamp: new Date().toLocaleString(),
+    currentUser: null,
+    adminStatus: {},
+    domainSettings: {},
+    classroomSettings: {},
+    recommendations: []
+  };
+  
+  // 步驟1: 檢查當前用戶基本資訊
+  try {
+    results.currentUser = Session.getActiveUser().getEmail();
+    console.log(`📧 當前用戶: ${results.currentUser}`);
+    console.log(`🌐 域名: ${results.currentUser.split('@')[1]}`);
+  } catch (e) {
+    console.log(`❌ 無法取得用戶資訊: ${e.message}`);
+    results.recommendations.push('檢查 userinfo.email 權限設定');
+  }
+  
+  // 步驟2: 檢查管理員權限
+  console.log('\n🔍 檢查管理員權限...');
+  try {
+    const userInfo = AdminDirectory.Users.get('me');
+    results.adminStatus = {
+      isAdmin: userInfo.isAdmin || false,
+      isDelegatedAdmin: userInfo.isDelegatedAdmin || false,
+      orgUnitPath: userInfo.orgUnitPath || '/',
+      customSchemas: userInfo.customSchemas || {},
+      suspended: userInfo.suspended || false,
+      primaryEmail: userInfo.primaryEmail
+    };
+    
+    console.log(`👤 超級管理員: ${results.adminStatus.isAdmin ? '✅ 是' : '❌ 否'}`);
+    console.log(`🎯 委派管理員: ${results.adminStatus.isDelegatedAdmin ? '✅ 是' : '❌ 否'}`);
+    console.log(`🏢 組織單位: ${results.adminStatus.orgUnitPath}`);
+    console.log(`📊 帳戶狀態: ${results.adminStatus.suspended ? '❌ 已停用' : '✅ 活躍'}`);
+    
+    if (!results.adminStatus.isAdmin && !results.adminStatus.isDelegatedAdmin) {
+      console.log(`⚠️ 警告: 當前用戶不具備管理員權限`);
+      results.recommendations.push('需要超級管理員或委派管理員權限');
+      results.recommendations.push('聯絡 Google Workspace 管理員提升權限');
+    }
+    
+  } catch (error) {
+    console.log(`❌ 無法檢查管理員權限: ${error.message}`);
+    results.adminStatus.error = error.message;
+    results.recommendations.push('檢查 Admin Directory API 權限');
+  }
+  
+  // 步驟3: 檢查域設定 (如果有管理員權限)
+  if (results.adminStatus.isAdmin || results.adminStatus.isDelegatedAdmin) {
+    console.log('\n🔍 檢查域級別設定...');
+    try {
+      // 嘗試獲取域資訊
+      const domain = results.currentUser.split('@')[1];
+      console.log(`🌐 檢查域: ${domain}`);
+      
+      // 檢查是否能訪問域設定
+      try {
+        const domainInfo = AdminDirectory.Domains.get(Session.getActiveUser().getEmail().split('@')[1]);
+        results.domainSettings = {
+          domainName: domainInfo.domainName,
+          verified: domainInfo.verified,
+          isPrimary: domainInfo.isPrimary
+        };
+        console.log(`✅ 域驗證狀態: ${domainInfo.verified ? '已驗證' : '未驗證'}`);
+        console.log(`🎯 主要域: ${domainInfo.isPrimary ? '是' : '否'}`);
+      } catch (domainError) {
+        console.log(`⚠️ 無法獲取域詳細資訊: ${domainError.message}`);
+        results.domainSettings.error = domainError.message;
+      }
+      
+    } catch (error) {
+      console.log(`❌ 域設定檢查失敗: ${error.message}`);
+      results.domainSettings.error = error.message;
+    }
+  }
+  
+  // 步驟4: 檢查 Classroom 特定權限
+  console.log('\n🎓 檢查 Classroom 管理權限...');
+  try {
+    // 測試是否能夠執行管理級別的 Classroom 操作
+    const courses = Classroom.Courses.list({ pageSize: 1 });
+    console.log(`✅ 可以列出課程`);
+    
+    // 測試是否能查看其他用戶的課程 (管理員特權)
+    try {
+      const allCourses = Classroom.Courses.list({ 
+        pageSize: 10,
+        courseStates: ['ACTIVE', 'ARCHIVED', 'PROVISIONED', 'DECLINED']
+      });
+      
+      if (allCourses.courses && allCourses.courses.length > 0) {
+        const ownedCourses = allCourses.courses.filter(c => c.ownerId === results.adminStatus.primaryEmail);
+        const otherCourses = allCourses.courses.filter(c => c.ownerId !== results.adminStatus.primaryEmail);
+        
+        console.log(`📚 可查看課程總數: ${allCourses.courses.length}`);
+        console.log(`👤 自己擁有的課程: ${ownedCourses.length}`);
+        console.log(`👥 其他人的課程: ${otherCourses.length}`);
+        
+        results.classroomSettings = {
+          totalCourses: allCourses.courses.length,
+          ownedCourses: ownedCourses.length,
+          otherCourses: otherCourses.length,
+          canViewAllCourses: otherCourses.length > 0
+        };
+        
+        if (otherCourses.length > 0) {
+          console.log(`✅ 具備域管理員級別的 Classroom 權限`);
+        } else {
+          console.log(`⚠️ 只能查看自己的課程，可能缺少域管理員權限`);
+          results.recommendations.push('檢查 Classroom 域管理員權限設定');
+        }
+      }
+      
+    } catch (courseError) {
+      console.log(`⚠️ Classroom 權限限制: ${courseError.message}`);
+      results.classroomSettings.error = courseError.message;
+    }
+    
+  } catch (error) {
+    console.log(`❌ Classroom 權限檢查失敗: ${error.message}`);
+    results.classroomSettings.error = error.message;
+    results.recommendations.push('檢查 Classroom API 基本權限');
+  }
+  
+  // 步驟5: 生成具體建議
+  console.log('\n💡 權限分析與建議:');
+  
+  if (results.adminStatus.isAdmin) {
+    console.log('✅ 您是超級管理員，應該具備所有必要權限');
+    if (results.recommendations.length === 0) {
+      results.recommendations.push('權限檢查通過，可以嘗試執行教師新增功能');
+    }
+  } else if (results.adminStatus.isDelegatedAdmin) {
+    console.log('🎯 您是委派管理員，請確認是否具備 Classroom 管理權限');
+    results.recommendations.push('檢查委派管理員角色是否包含 Classroom 管理權限');
+  } else {
+    console.log('❌ 您不是管理員，這可能是權限問題的根本原因');
+    results.recommendations.push('請聯絡超級管理員提升您的權限');
+    results.recommendations.push('或請具備管理員權限的用戶執行此操作');
+  }
+  
+  // 輸出所有建議
+  if (results.recommendations.length > 0) {
+    console.log('\n🔧 具體建議:');
+    results.recommendations.forEach((rec, index) => {
+      console.log(`${index + 1}. ${rec}`);
+    });
+  }
+  
+  console.log(`\n📊 檢查完成時間: ${results.timestamp}`);
+  return results;
+}
+
+/**
+ * 分析權限錯誤的詳細類型和原因
+ */
+function analyzePermissionError(error, courseId = null, userEmail = null) {
+  const errorMessage = error?.message || error?.toString() || '未知錯誤';
+  const errorCode = error?.code || error?.details?.code || null;
+  
+  let errorType = 'UNKNOWN';
+  let description = '未知錯誤類型';
+  let severity = 'medium';
+  let suggestions = [];
+  
+  // 分析不同類型的錯誤
+  if (errorCode === 403 || errorMessage.includes('permission') || errorMessage.includes('The caller does not have permission')) {
+    errorType = 'PERMISSION_DENIED';
+    severity = 'high';
+    
+    if (errorMessage.includes('The caller does not have permission')) {
+      description = '當前用戶缺少執行此操作的權限';
+      suggestions = [
+        '檢查是否為課程擁有者',
+        '確認是否具備域管理員權限',
+        '重新授權 Google Apps Script',
+        '聯絡課程擁有者或 IT 管理員'
+      ];
+    } else {
+      description = '權限不足或認證失效';
+      suggestions = [
+        '重新登入 Google 帳戶',
+        '檢查 OAuth 權限範圍',
+        '確認帳戶具備必要權限'
+      ];
+    }
+    
+  } else if (errorCode === 404 || errorMessage.includes('not found') || errorMessage.includes('Not Found')) {
+    errorType = 'NOT_FOUND';
+    severity = 'medium';
+    description = '找不到指定的資源（課程或用戶）';
+    suggestions = [
+      '確認課程 ID 正確',
+      '檢查用戶 Email 格式',
+      '確認用戶存在於 Google Workspace',
+      '檢查課程是否已刪除或封存'
+    ];
+    
+  } else if (errorCode === 429 || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+    errorType = 'QUOTA_EXCEEDED';
+    severity = 'low';
+    description = 'API 配額超限或請求頻率過高';
+    suggestions = [
+      '等待一段時間後重試',
+      '減少並行請求數量',
+      '檢查 API 配額設定',
+      '聯絡管理員增加配額'
+    ];
+    
+  } else if (errorCode === 401 || errorMessage.includes('unauthorized') || errorMessage.includes('authentication')) {
+    errorType = 'AUTHENTICATION_FAILED';
+    severity = 'high';
+    description = '認證失敗或 token 過期';
+    suggestions = [
+      '重新授權應用程式',
+      '檢查登入狀態',
+      '確認 OAuth 設定正確',
+      '聯絡管理員檢查帳戶狀態'
+    ];
+    
+  } else if (errorMessage.includes('network') || errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+    errorType = 'NETWORK_ERROR';
+    severity = 'low';
+    description = '網路連線問題';
+    suggestions = [
+      '檢查網路連線',
+      '稍後重新嘗試',
+      '確認 Google 服務可用性'
+    ];
+    
+  } else if (errorMessage.includes('invalid') || errorMessage.includes('malformed')) {
+    errorType = 'INVALID_REQUEST';
+    severity = 'medium';
+    description = '請求格式錯誤或參數無效';
+    suggestions = [
+      '檢查輸入參數格式',
+      '確認 API 呼叫語法正確',
+      '查看 API 文檔確認需求'
+    ];
+  }
+  
+  return {
+    errorType,
+    description,
+    severity,
+    suggestions,
+    originalError: errorMessage,
+    code: errorCode,
+    context: {
+      courseId,
+      userEmail,
+      timestamp: new Date().toISOString()
+    }
+  };
+}
+
+/**
+ * 綜合權限測試工具 - 一鍵執行所有診斷
+ */
+function comprehensivePermissionTest() {
+  console.log('=== 🔬 綜合權限測試工具 ===');
+  console.log('🚀 執行完整的權限診斷流程...\n');
+  
+  const testResults = {
+    timestamp: new Date().toLocaleString(),
+    tests: {},
+    summary: {
+      passed: 0,
+      failed: 0,
+      warnings: 0
+    },
+    recommendations: []
+  };
+  
+  // 測試 1: 基本用戶資訊
+  console.log('📋 測試 1: 基本用戶資訊');
+  try {
+    const userEmail = Session.getActiveUser().getEmail();
+    console.log(`✅ 當前用戶: ${userEmail}`);
+    testResults.tests.userInfo = { status: 'passed', data: userEmail };
+    testResults.summary.passed++;
+  } catch (e) {
+    console.log(`❌ 無法獲取用戶資訊: ${e.message}`);
+    testResults.tests.userInfo = { status: 'failed', error: e.message };
+    testResults.summary.failed++;
+    testResults.recommendations.push('檢查 userinfo.email 權限');
+  }
+  
+  // 測試 2: Admin Directory 權限
+  console.log('\n📋 測試 2: Admin Directory 權限');
+  try {
+    const adminInfo = AdminDirectory.Users.get('me');
+    const isAdmin = adminInfo.isAdmin || false;
+    const isDelegatedAdmin = adminInfo.isDelegatedAdmin || false;
+    
+    console.log(`✅ Admin Directory 存取正常`);
+    console.log(`👤 超級管理員: ${isAdmin ? '是' : '否'}`);
+    console.log(`🎯 委派管理員: ${isDelegatedAdmin ? '是' : '否'}`);
+    
+    testResults.tests.adminDirectory = { 
+      status: 'passed', 
+      isAdmin, 
+      isDelegatedAdmin,
+      orgUnit: adminInfo.orgUnitPath 
+    };
+    testResults.summary.passed++;
+    
+    if (!isAdmin && !isDelegatedAdmin) {
+      testResults.summary.warnings++;
+      testResults.recommendations.push('考慮申請管理員權限以獲得完整功能');
+    }
+    
+  } catch (e) {
+    console.log(`❌ Admin Directory 存取失敗: ${e.message}`);
+    testResults.tests.adminDirectory = { status: 'failed', error: e.message };
+    testResults.summary.failed++;
+    testResults.recommendations.push('檢查 Admin Directory API 權限設定');
+  }
+  
+  // 測試 3: Classroom 基本權限
+  console.log('\n📋 測試 3: Classroom 基本權限');
+  try {
+    const courses = Classroom.Courses.list({ pageSize: 5 });
+    const courseCount = courses.courses ? courses.courses.length : 0;
+    
+    console.log(`✅ Classroom API 存取正常`);
+    console.log(`📚 可查看課程數: ${courseCount}`);
+    
+    testResults.tests.classroomBasic = { 
+      status: 'passed', 
+      courseCount,
+      courses: courses.courses || []
+    };
+    testResults.summary.passed++;
+    
+  } catch (e) {
+    console.log(`❌ Classroom 基本存取失敗: ${e.message}`);
+    testResults.tests.classroomBasic = { status: 'failed', error: e.message };
+    testResults.summary.failed++;
+    testResults.recommendations.push('檢查 Classroom API 基本權限');
+  }
+  
+  // 測試 4: 特定課程權限測試
+  console.log('\n📋 測試 4: 特定課程權限');
+  const testCourseId = '779922029471';
+  try {
+    const course = Classroom.Courses.get(testCourseId);
+    console.log(`✅ 可讀取課程: ${course.name}`);
+    console.log(`👤 課程擁有者 ID: ${course.ownerId}`);
+    
+    // 測試教師列表讀取
+    try {
+      const teachers = Classroom.Courses.Teachers.list(testCourseId);
+      const teacherCount = teachers.teachers ? teachers.teachers.length : 0;
+      console.log(`✅ 可讀取教師列表: ${teacherCount} 位教師`);
+      
+      testResults.tests.specificCourse = { 
+        status: 'passed', 
+        courseName: course.name,
+        ownerId: course.ownerId,
+        teacherCount
+      };
+      testResults.summary.passed++;
+      
+    } catch (teacherError) {
+      console.log(`⚠️ 無法讀取教師列表: ${teacherError.message}`);
+      testResults.tests.specificCourse = { 
+        status: 'warning', 
+        courseName: course.name,
+        ownerId: course.ownerId,
+        teacherError: teacherError.message
+      };
+      testResults.summary.warnings++;
+      testResults.recommendations.push('檢查課程名冊讀取權限');
+    }
+    
+  } catch (e) {
+    console.log(`❌ 無法讀取測試課程: ${e.message}`);
+    testResults.tests.specificCourse = { status: 'failed', error: e.message };
+    testResults.summary.failed++;
+    testResults.recommendations.push('檢查課程讀取權限或課程ID');
+  }
+  
+  // 測試 5: Spreadsheets 權限
+  console.log('\n📋 測試 5: Spreadsheets 權限');
+  try {
+    const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+    const ssName = SpreadsheetApp.getActiveSpreadsheet().getName();
+    console.log(`✅ Spreadsheets 存取正常`);
+    console.log(`📊 當前試算表: ${ssName}`);
+    
+    testResults.tests.spreadsheets = { 
+      status: 'passed', 
+      spreadsheetId: ssId,
+      spreadsheetName: ssName
+    };
+    testResults.summary.passed++;
+    
+  } catch (e) {
+    console.log(`❌ Spreadsheets 存取失敗: ${e.message}`);
+    testResults.tests.spreadsheets = { status: 'failed', error: e.message };
+    testResults.summary.failed++;
+    testResults.recommendations.push('檢查 Spreadsheets API 權限');
+  }
+  
+  // 生成測試摘要
+  console.log('\n📊 測試摘要:');
+  console.log(`✅ 通過: ${testResults.summary.passed}`);
+  console.log(`⚠️ 警告: ${testResults.summary.warnings}`);
+  console.log(`❌ 失敗: ${testResults.summary.failed}`);
+  
+  const totalTests = testResults.summary.passed + testResults.summary.warnings + testResults.summary.failed;
+  const successRate = Math.round((testResults.summary.passed / totalTests) * 100);
+  console.log(`🎯 成功率: ${successRate}%`);
+  
+  // 生成建議
+  if (testResults.recommendations.length > 0) {
+    console.log('\n💡 改善建議:');
+    testResults.recommendations.forEach((rec, index) => {
+      console.log(`${index + 1}. ${rec}`);
+    });
+  }
+  
+  // 整體評估
+  console.log('\n🔍 整體評估:');
+  if (testResults.summary.failed === 0) {
+    if (testResults.summary.warnings === 0) {
+      console.log('🎉 權限設定完美！可以正常執行所有功能。');
+    } else {
+      console.log('✅ 基本權限正常，有些功能可能受限但不影響主要操作。');
+    }
+  } else {
+    console.log('⚠️ 發現權限問題，需要處理才能正常使用功能。');
+    
+    // 提供快速修復建議
+    console.log('\n🚀 快速修復建議:');
+    console.log('1. 執行 reauthorizePermissions() 重新授權');
+    console.log('2. 檢查 Google Workspace 管理控制台設定');
+    console.log('3. 確認當前帳戶權限等級');
+  }
+  
+  testResults.overallStatus = testResults.summary.failed === 0 ? 'healthy' : 'needs_attention';
+  console.log(`\n📈 測試完成: ${testResults.timestamp}`);
+  
+  return testResults;
 }
 
 /**
