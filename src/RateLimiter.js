@@ -26,7 +26,7 @@ class RateLimiter {
       return result;
     } catch (error) {
       if (this.isQuotaError(error)) {
-        Logger.warn('API 配額超限，等待重試');
+        console.log('[WARN] API 配額超限，等待重試');
         await this.handleQuotaExceeded();
         return this.execute(apiFunction, ...args);
       }
@@ -43,7 +43,7 @@ class RateLimiter {
 
     if (timeSinceLastCall < this.MIN_DELAY_MS) {
       const waitTime = this.MIN_DELAY_MS - timeSinceLastCall;
-      Logger.debug(`API 限速等待 ${waitTime}ms`);
+      console.log(`[DEBUG] API 限速等待 ${waitTime}ms`);
       await Utilities.sleep(waitTime);
     }
   }
@@ -79,7 +79,7 @@ class RateLimiter {
    */
   async handleQuotaExceeded() {
     const waitTime = 60000; // 等待 1 分鐘
-    Logger.warn(`API 配額超限，等待 ${waitTime / 1000} 秒`);
+    console.log(`[WARN] API 配額超限，等待 ${waitTime / 1000} 秒`);
     await Utilities.sleep(waitTime);
   }
 

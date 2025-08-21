@@ -11,11 +11,10 @@ class ErrorHandler {
     const message = `${operation}失敗：${errorInfo.userMessage}`;
 
     // 記錄詳細錯誤
-    Logger.error(`[${operation}] ${errorInfo.technicalMessage}`, {
-      error: error,
-      stack: error.stack,
-      timestamp: new Date().toISOString(),
-    });
+    console.log(`[ERROR] [${operation}] ${errorInfo.technicalMessage}`);
+    if (error.stack) {
+      console.log(`[ERROR] Stack: ${error.stack}`);
+    }
 
     // 通知使用者
     if (showToUser) {
@@ -35,15 +34,11 @@ class ErrorHandler {
   static handleApiError(error, operation = 'API 呼叫') {
     const errorInfo = this.parseApiError(error);
 
-    Logger.error(`[API錯誤] ${operation}`, {
-      error: error,
-      apiError: errorInfo,
-      timestamp: new Date().toISOString(),
-    });
+    console.log(`[ERROR] [API錯誤] ${operation}: ${errorInfo.technicalMessage}`);
 
     // 根據錯誤類型決定是否重試
     if (errorInfo.shouldRetry) {
-      Logger.info(`${operation} 將自動重試`);
+      console.log(`[INFO] ${operation} 將自動重試`);
       return { shouldRetry: true, delay: errorInfo.retryDelay };
     }
 
@@ -164,11 +159,11 @@ class ErrorHandler {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        Logger.debug(`執行 ${operationName}，第 ${attempt} 次嘗試`);
+        console.log(`[DEBUG] 執行 ${operationName}，第 ${attempt} 次嘗試`);
         const result = await operation();
 
         if (attempt > 1) {
-          Logger.info(`${operationName} 重試成功`);
+          console.log(`[INFO] ${operationName} 重試成功`);
         }
 
         return { success: true, result };
@@ -177,11 +172,11 @@ class ErrorHandler {
         const errorInfo = this.handleApiError(error, operationName);
 
         if (!errorInfo.shouldRetry || attempt === maxRetries) {
-          Logger.error(`${operationName} 最終失敗，已嘗試 ${attempt} 次`);
+          console.log(`[ERROR] ${operationName} 最終失敗，已嘗試 ${attempt} 次`);
           break;
         }
 
-        Logger.warn(`${operationName} 第 ${attempt} 次失敗，等待重試`);
+        console.log(`[WARN] ${operationName} 第 ${attempt} 次失敗，等待重試`);
         await Utilities.sleep(errorInfo.delay || 1000);
       }
     }
@@ -203,7 +198,7 @@ class ErrorHandler {
 
     if (missing.length > 0) {
       const message = `缺少必要參數：${missing.join(', ')}`;
-      Logger.error('參數驗證失敗', { missing, params });
+      console.log(`[ERROR] 參數驗證失敗: 缺少 ${missing.join(', ')}`);
       SpreadsheetApp.getUi().alert('參數錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
       return false;
     }

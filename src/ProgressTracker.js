@@ -50,7 +50,7 @@ class ProgressTracker {
       details,
       timestamp: new Date().toISOString(),
     });
-    Logger.error(`${this.operation} 錯誤`, { item, error, details });
+    console.log(`[ERROR] ${this.operation} 錯誤: ${item} - ${error.message || error}`);
     this.update();
   }
 
@@ -81,7 +81,7 @@ class ProgressTracker {
       status += `\n${message}`;
     }
 
-    Logger.info(status);
+    console.log(`[INFO] ${status}`);
 
     // 只在重要節點顯示 Toast 通知，避免干擾使用者
     if (percentage % 25 === 0 || this.current === this.total) {
@@ -120,7 +120,7 @@ class ProgressTracker {
     const duration = Date.now() - this.startTime;
     const summary = this.generateSummary(duration);
 
-    Logger.info(`${this.operation} 完成`, summary);
+    console.log(`[INFO] ${this.operation} 完成`);
 
     // 顯示結果對話框
     const ui = SpreadsheetApp.getUi();
@@ -175,7 +175,7 @@ class ProgressTracker {
    * 中斷處理
    */
   abort(reason = '使用者中斷') {
-    Logger.warn(`${this.operation} 被中斷：${reason}`);
+    console.log(`[WARN] ${this.operation} 被中斷：${reason}`);
 
     const summary = this.generateSummary(Date.now() - this.startTime);
     summary.userMessage = `處理被中斷：${reason}\n\n` + summary.userMessage;
