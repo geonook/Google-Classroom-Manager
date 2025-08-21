@@ -3,37 +3,62 @@
  */
 
 /**
- * 🎓 Google Classroom Manager Pro v2.0.0
+ * 🎓 Google Classroom Manager Pro v2.0.0 - 增強版權限管理系統
  *
- * ⚠️ 權限問題故障排除指南 ⚠️
+ * 🎉 【成功案例記錄】
+ * ✅ 2025-08-21: tsehunhchen@kcislk.ntpc.edu.tw 成功執行教師新增功能
+ *    問題：lkclassle114@kcislk.ntpc.edu.tw (課程擁有者) 遇到 403 權限錯誤
+ *    解決：切換到具備域管理員權限的帳戶
+ *    結論：課程擁有者權限 ≠ 域管理員權限
  *
- * 🚨 常見問題：403 權限錯誤 "The caller does not have permission"
- * 📋 原因：只有課程擁有者才能新增老師到課程中
+ * 📚 【最佳實踐指南】
  *
- * 🔧 解決方案（按順序嘗試）：
+ * 🚀 快速開始流程：
+ * 1. 開啟選單 → 🔧 診斷工具 → 👤 查看我的權限狀態
+ * 2. 如權限充足 → 直接執行 🚀 執行外部表單老師新增
+ * 3. 如權限不足 → 使用 🔧 自動權限修復 或切換到推薦帳戶
  *
- * 1️⃣ 【診斷權限問題】
- *    • 執行 enhancedPermissionDiagnosis() 獲得詳細診斷
- *    • 執行 lookupUserById('110732085101506554189') 查詢課程擁有者
+ * 👤 推薦執行帳戶（已驗證）：
+ * • tsehunhchen@kcislk.ntpc.edu.tw ✅ 成功案例
+ * • 其他具備超級管理員或委派管理員權限的帳戶
  *
- * 2️⃣ 【聯絡課程擁有者】
- *    • 請課程擁有者登入並執行 addTeachersFromExternalSheet()
- *    • 或請課程擁有者將您加為共同擁有者
+ * ⚠️ 權限問題解決流程：
+ * 1️⃣ 自動診斷：執行 quickPermissionCheckUI() 快速檢查
+ * 2️⃣ 權限預檢：系統會在執行前自動檢查權限等級
+ * 3️⃣ 智能修復：使用 autoPermissionRecoveryFlow() 自動修復
+ * 4️⃣ 手動切換：必要時切換到具備管理員權限的帳戶
  *
- * 3️⃣ 【聯絡管理員】
- *    • 請 Google Workspace 域管理員協助執行
- *    • 或請管理員修改組織權限政策
+ * 🔧 常見問題與解決方案：
+ * • 403 權限錯誤 → 檢查是否為域管理員（非僅課程擁有者）
+ * • 課程擁有者無法新增老師 → 需要域級別管理員權限
+ * • OAuth 權限不足 → 執行重新授權流程
+ * • API 配額超限 → 等待或聯絡管理員增加配額
  *
- * 📋 主要功能：
- * • addTeachersFromExternalSheet() - 從外部試算表批次新增老師
- * • enhancedPermissionDiagnosis() - 權限診斷工具
+ * 💡 權限架構理解：
+ * 域超級管理員 > 委派管理員 > 課程擁有者 > 課程教師 > 學生
+ * 新增教師功能需要：域管理員權限 OR (課程擁有者 + 特殊域授權)
+ *
+ * 📋 核心功能：
+ * • addTeachersFromExternalSheet() - 從外部試算表批次新增老師（含權限預檢）
+ * • performPermissionPrecheck() - 執行前智能權限檢查
+ * • autoPermissionRecoveryFlow() - 自動權限問題修復流程
+ * • showUserPermissionStatusUI() - 用戶權限狀態顯示
+ * • comprehensivePermissionTest() - 綜合權限測試套件
+ *
+ * 🛠️ 診斷工具：
+ * • deepPermissionDiagnosis() - 深度 OAuth 和 API 權限診斷
+ * • checkDomainAdminPermissions() - 域管理員權限檢查
+ * • testClassroomPermissions() - Classroom API 專項測試
+ * • enhancedPermissionDiagnosis() - 增強版權限診斷
+ * • analyzePermissionError() - 智能錯誤分析系統
+ * • reauthorizePermissions() - 重新授權流程
  * • lookupUserById() - 用戶ID查詢工具
- * • onOpen() - 建立操作選單
  *
- * 💡 使用提示：
- * - 開啟試算表時會自動建立操作選單
- * - 遇到問題時先使用診斷工具
- * - 所有操作都會在控制台顯示詳細日誌
+ * 🔒 安全特性：
+ * • 權限預檢防止無效操作
+ * • 智能錯誤分析提供具體解決方案
+ * • 自動推薦具備權限的帳戶
+ * • 詳細的權限等級顯示和說明
  */
 
 /**
@@ -62,6 +87,9 @@ function onOpen() {
     .addSubMenu(
       SpreadsheetApp.getUi()
         .createMenu('🔧 診斷工具')
+        .addItem('👤 查看我的權限狀態', 'showUserPermissionStatusUI')
+        .addItem('🚀 快速權限檢查', 'quickPermissionCheckUI')
+        .addSeparator()
         .addItem('🔍 用戶 ID 查詢', 'lookupUserById')
         .addItem('🔧 權限診斷', 'enhancedPermissionDiagnosis')
         .addItem('🔬 深度權限診斷', 'deepPermissionDiagnosis')
@@ -69,6 +97,7 @@ function onOpen() {
         .addItem('👨‍💼 域管理員權限檢查', 'checkDomainAdminPermissions')
         .addItem('🔬 綜合權限測試', 'comprehensivePermissionTest')
         .addSeparator()
+        .addItem('🔧 自動權限修復', 'autoPermissionRecoveryFlow')
         .addItem('🔄 重新授權權限', 'reauthorizePermissions')
         .addItem('📋 授權設定指引', 'showAuthorizationGuideUI')
         .addSeparator()
@@ -146,14 +175,23 @@ async function addTeachersWithCheck(spreadsheetId = null) {
             console.log(`     📧 課程擁有者 Email：${ownerInfo.email}`);
             
             if (currentUser === ownerInfo.email) {
-              console.log(`     ⚠️ 您是課程擁有者但仍失敗，可能原因：`);
-              console.log(`        • 缺少域管理員權限新增外部用戶`);
-              console.log(`        • OAuth 權限需要重新授權`);
+              console.log(`     ⚠️ 您是課程擁有者但仍失敗，這是常見情況！`);
+              console.log(`     📋 原因分析：`);
+              console.log(`        • 課程擁有者權限 ≠ 域管理員權限`);
+              console.log(`        • 新增教師功能需要更高的域級別權限`);
               console.log(`        • Google Workspace 安全設定限制`);
-              console.log(`     💡 建議立即執行：checkDomainAdminPermissions()`);
+              console.log(`     ✅ 成功案例參考：tsehunhchen@kcislk.ntpc.edu.tw 成功執行`);
+              console.log(`     💡 解決方案：`);
+              console.log(`        1. 🎯 請使用具備域管理員權限的帳戶`);
+              console.log(`        2. 🔄 執行 checkDomainAdminPermissions() 檢查當前權限`);
+              console.log(`        3. 📞 聯絡 IT 管理員申請域管理員權限`);
+              console.log(`        4. 🔧 或請 tsehunhchen@kcislk.ntpc.edu.tw 代為執行`);
             } else {
-              console.log(`     ❌ 權限不足：您不是課程擁有者`);
-              console.log(`     📞 請聯絡課程擁有者：${ownerInfo.email}`);
+              console.log(`     ❌ 權限不足：您不是課程擁有者且缺少管理員權限`);
+              console.log(`     📞 建議解決方案：`);
+              console.log(`        1. 請課程擁有者 ${ownerInfo.email} 執行（如果有管理員權限）`);
+              console.log(`        2. 或使用成功案例帳戶：tsehunhchen@kcislk.ntpc.edu.tw`);
+              console.log(`        3. 聯絡 IT 管理員協助處理`);
             }
           } else {
             console.log(`     ❌ 無法查詢擁有者資訊，可能需要更高權限`);
@@ -239,6 +277,45 @@ async function addTeachersFromExternalSheet() {
   console.log(`   • enhancedPermissionDiagnosis() - 詳細權限診斷`);
   console.log(`   • lookupUserById('課程擁有者ID') - 查詢擁有者身份`);
   console.log(``);
+
+  // 🔍 權限預檢：執行前檢查用戶權限等級
+  console.log(`🔍 執行權限預檢...`);
+  const permissionCheck = await performPermissionPrecheck(currentUser);
+  
+  if (!permissionCheck.canProceed) {
+    console.log(`\n⚠️ 權限預檢失敗！`);
+    console.log(`📋 問題：${permissionCheck.issue}`);
+    console.log(`💡 建議：${permissionCheck.recommendation}`);
+    
+    if (permissionCheck.alternativeAccounts && permissionCheck.alternativeAccounts.length > 0) {
+      console.log(`\n🎯 建議使用以下具備管理員權限的帳戶：`);
+      permissionCheck.alternativeAccounts.forEach((account, index) => {
+        console.log(`   ${index + 1}. ${account}`);
+      });
+    }
+    
+    console.log(`\n🛠️ 立即診斷工具：`);
+    console.log(`   • checkDomainAdminPermissions() - 檢查管理員權限`);
+    console.log(`   • comprehensivePermissionTest() - 完整權限測試`);
+    
+    // 詢問用戶是否要繼續
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert(
+      '⚠️ 權限不足警告',
+      `檢測到您可能沒有足夠的權限執行此操作。\n\n問題：${permissionCheck.issue}\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續嘗試？`,
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (response !== ui.Button.YES) {
+      console.log(`\n❌ 用戶選擇取消操作`);
+      return;
+    }
+    
+    console.log(`\n⚠️ 用戶選擇強制繼續，開始執行...`);
+  } else {
+    console.log(`✅ 權限預檢通過：${permissionCheck.status}`);
+    console.log(`👤 權限等級：${permissionCheck.userLevel}`);
+  }
 
   try {
     await addTeachersWithCheck(EXTERNAL_SPREADSHEET_ID);
@@ -1950,6 +2027,401 @@ function comprehensivePermissionTest() {
   console.log(`\n📈 測試完成: ${testResults.timestamp}`);
   
   return testResults;
+}
+
+/**
+ * 執行權限預檢 - 在主要操作前檢查用戶權限等級
+ */
+async function performPermissionPrecheck(currentUser) {
+  const result = {
+    canProceed: false,
+    userLevel: 'unknown',
+    status: '',
+    issue: '',
+    recommendation: '',
+    alternativeAccounts: []
+  };
+  
+  try {
+    // 檢查基本用戶資訊
+    if (!currentUser || currentUser === 'unknown') {
+      result.issue = '無法識別當前執行用戶';
+      result.recommendation = '請確認已正確登入 Google 帳戶並重新授權';
+      return result;
+    }
+    
+    // 檢查管理員權限
+    try {
+      const adminInfo = AdminDirectory.Users.get('me');
+      const isAdmin = adminInfo.isAdmin || false;
+      const isDelegatedAdmin = adminInfo.isDelegatedAdmin || false;
+      
+      if (isAdmin) {
+        result.canProceed = true;
+        result.userLevel = '超級管理員';
+        result.status = '具備完整管理員權限，可執行所有操作';
+        return result;
+        
+      } else if (isDelegatedAdmin) {
+        result.canProceed = true;
+        result.userLevel = '委派管理員';
+        result.status = '具備委派管理員權限，應能執行大部分操作';
+        return result;
+        
+      } else {
+        // 非管理員，檢查是否為課程擁有者且有足夠權限
+        try {
+          // 測試能否讀取課程和教師列表
+          const testCourseId = '779922029471';
+          const course = Classroom.Courses.get(testCourseId);
+          const teachers = Classroom.Courses.Teachers.list(testCourseId);
+          
+          // 檢查是否為課程擁有者
+          const ownerInfo = lookupUserById(course.ownerId);
+          if (ownerInfo.success && ownerInfo.email === currentUser) {
+            result.canProceed = true;
+            result.userLevel = '課程擁有者';
+            result.status = '您是課程擁有者，具備基本操作權限';
+          } else {
+            result.canProceed = false;
+            result.userLevel = '一般用戶';
+            result.issue = '您不是管理員也不是課程擁有者';
+            result.recommendation = '請使用具備管理員權限的帳戶執行此操作';
+            
+            // 建議可能的管理員帳戶
+            result.alternativeAccounts = [
+              'tsehunhchen@kcislk.ntpc.edu.tw', // 已知的成功帳戶
+              ownerInfo.success ? ownerInfo.email : '課程擁有者帳戶'
+            ];
+          }
+          
+        } catch (courseError) {
+          result.canProceed = false;
+          result.userLevel = '受限用戶';
+          result.issue = '無法讀取課程資訊，權限不足';
+          result.recommendation = '需要管理員權限或課程擁有者權限';
+          result.alternativeAccounts = ['tsehunhchen@kcislk.ntpc.edu.tw'];
+        }
+      }
+      
+    } catch (adminError) {
+      result.canProceed = false;
+      result.userLevel = '無法確認';
+      result.issue = '無法檢查管理員權限，可能缺少 Admin Directory API 存取權';
+      result.recommendation = '請檢查 OAuth 權限設定或使用管理員帳戶';
+      result.alternativeAccounts = ['tsehunhchen@kcislk.ntpc.edu.tw'];
+    }
+    
+  } catch (error) {
+    result.canProceed = false;
+    result.userLevel = '錯誤';
+    result.issue = `權限檢查失敗：${error.message}`;
+    result.recommendation = '請檢查網路連線和 API 權限設定';
+  }
+  
+  return result;
+}
+
+/**
+ * 顯示當前用戶權限狀態的 UI 功能
+ */
+function showUserPermissionStatusUI() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    // 獲取當前用戶
+    const currentUser = Session.getActiveUser().getEmail();
+    let statusMessage = `👤 當前用戶：${currentUser}\n\n`;
+    
+    // 檢查管理員權限
+    try {
+      const adminInfo = AdminDirectory.Users.get('me');
+      const isAdmin = adminInfo.isAdmin || false;
+      const isDelegatedAdmin = adminInfo.isDelegatedAdmin || false;
+      
+      if (isAdmin) {
+        statusMessage += `🎉 權限等級：超級管理員\n`;
+        statusMessage += `✅ 狀態：具備完整管理權限\n`;
+        statusMessage += `🚀 功能：可執行所有操作\n\n`;
+        statusMessage += `💡 您可以：\n`;
+        statusMessage += `• 直接執行教師新增功能\n`;
+        statusMessage += `• 管理所有課程和用戶\n`;
+        statusMessage += `• 存取所有診斷工具`;
+        
+      } else if (isDelegatedAdmin) {
+        statusMessage += `🎯 權限等級：委派管理員\n`;
+        statusMessage += `✅ 狀態：具備部分管理權限\n`;
+        statusMessage += `🚀 功能：可執行大部分操作\n\n`;
+        statusMessage += `💡 您可以：\n`;
+        statusMessage += `• 執行教師新增功能\n`;
+        statusMessage += `• 管理指定範圍的課程\n`;
+        statusMessage += `• 使用所有診斷工具`;
+        
+      } else {
+        statusMessage += `⚠️ 權限等級：一般用戶\n`;
+        statusMessage += `❌ 狀態：權限受限\n`;
+        statusMessage += `🔧 功能：可能無法執行某些操作\n\n`;
+        
+        // 檢查是否為課程擁有者
+        try {
+          const testCourseId = '779922029471';
+          const course = Classroom.Courses.get(testCourseId);
+          const ownerInfo = lookupUserById(course.ownerId);
+          
+          if (ownerInfo.success && ownerInfo.email === currentUser) {
+            statusMessage += `📚 您是課程擁有者但權限可能不足\n`;
+            statusMessage += `⚠️ 注意：課程擁有者 ≠ 域管理員\n\n`;
+          }
+          
+        } catch (e) {
+          statusMessage += `❌ 無法檢查課程擁有者狀態\n\n`;
+        }
+        
+        statusMessage += `💡 建議：\n`;
+        statusMessage += `• 使用具備管理員權限的帳戶\n`;
+        statusMessage += `• 成功案例：tsehunhchen@kcislk.ntpc.edu.tw\n`;
+        statusMessage += `• 聲請 IT 管理員協助`;
+      }
+      
+    } catch (adminError) {
+      statusMessage += `❌ 權限等級：無法確認\n`;
+      statusMessage += `⚠️ 狀態：Admin Directory API 存取失敗\n\n`;
+      statusMessage += `🔧 可能原因：\n`;
+      statusMessage += `• OAuth 權限不足\n`;
+      statusMessage += `• 需要重新授權\n\n`;
+      statusMessage += `💡 建議：\n`;
+      statusMessage += `• 執行重新授權功能\n`;
+      statusMessage += `• 檢查 Google Workspace 設定`;
+    }
+    
+  } catch (userError) {
+    statusMessage = `❌ 無法獲取用戶資訊\n\n`;
+    statusMessage += `錯誤：${userError.message}\n\n`;
+    statusMessage += `請檢查：\n`;
+    statusMessage += `• 是否已正確登入\n`;
+    statusMessage += `• OAuth 權限設定`;
+  }
+  
+  ui.alert('👤 用戶權限狀態', statusMessage, ui.ButtonSet.OK);
+}
+
+/**
+ * 快速權限檢查和建議 UI
+ */
+function quickPermissionCheckUI() {
+  const ui = SpreadsheetApp.getUi();
+  
+  // 執行快速檢查
+  console.log('=== 🚀 快速權限檢查 ===');
+  
+  try {
+    const currentUser = Session.getActiveUser().getEmail();
+    console.log(`👤 檢查用戶：${currentUser}`);
+    
+    // 執行綜合測試
+    const testResults = comprehensivePermissionTest();
+    
+    // 生成 UI 訊息
+    let message = `檢查完成！\n\n`;
+    message += `✅ 通過：${testResults.summary.passed}\n`;
+    message += `⚠️ 警告：${testResults.summary.warnings}\n`;
+    message += `❌ 失敗：${testResults.summary.failed}\n\n`;
+    
+    if (testResults.summary.failed === 0) {
+      message += `🎉 權限狀態良好！\n\n`;
+      message += `您可以：\n`;
+      message += `• 直接執行教師新增功能\n`;
+      message += `• 使用所有系統功能`;
+    } else {
+      message += `⚠️ 發現權限問題\n\n`;
+      message += `建議：\n`;
+      if (testResults.recommendations.length > 0) {
+        testResults.recommendations.slice(0, 3).forEach((rec, index) => {
+          message += `${index + 1}. ${rec}\n`;
+        });
+      }
+      message += `\n🎯 成功案例：tsehunhchen@kcislk.ntpc.edu.tw`;
+    }
+    
+    ui.alert('🔍 快速權限檢查結果', message, ui.ButtonSet.OK);
+    
+  } catch (error) {
+    ui.alert('❌ 檢查失敗', `無法完成權限檢查：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 自動權限修復流程
+ */
+function autoPermissionRecoveryFlow() {
+  console.log('=== 🔧 自動權限修復流程 ===');
+  
+  const ui = SpreadsheetApp.getUi();
+  let currentUser = 'unknown';
+  
+  try {
+    currentUser = Session.getActiveUser().getEmail();
+    console.log(`👤 當前用戶：${currentUser}`);
+  } catch (e) {
+    console.log(`❌ 無法識別用戶：${e.message}`);
+  }
+  
+  // 步驟1: 執行全面診斷
+  console.log('\n📋 步驟 1: 執行全面權限診斷...');
+  const diagnostics = {
+    userInfo: null,
+    adminStatus: null,
+    permissionTest: null,
+    recommendations: []
+  };
+  
+  try {
+    // 用戶資訊診斷
+    try {
+      const adminInfo = AdminDirectory.Users.get('me');
+      diagnostics.adminStatus = {
+        isAdmin: adminInfo.isAdmin || false,
+        isDelegatedAdmin: adminInfo.isDelegatedAdmin || false,
+        orgUnit: adminInfo.orgUnitPath
+      };
+      console.log(`✅ 管理員狀態：${diagnostics.adminStatus.isAdmin ? '超級管理員' : diagnostics.adminStatus.isDelegatedAdmin ? '委派管理員' : '一般用戶'}`);
+    } catch (e) {
+      console.log(`❌ 無法檢查管理員狀態：${e.message}`);
+    }
+    
+    // 權限測試
+    try {
+      diagnostics.permissionTest = comprehensivePermissionTest();
+      console.log(`✅ 權限測試完成：${diagnostics.permissionTest.summary.passed}/${diagnostics.permissionTest.summary.passed + diagnostics.permissionTest.summary.failed} 通過`);
+    } catch (e) {
+      console.log(`❌ 權限測試失敗：${e.message}`);
+    }
+    
+  } catch (error) {
+    console.log(`❌ 診斷過程錯誤：${error.message}`);
+  }
+  
+  // 步驟2: 分析問題並生成解決方案
+  console.log('\n📋 步驟 2: 分析問題並生成解決方案...');
+  
+  let recoveryPlan = [];
+  let canAutoFix = false;
+  
+  // 分析診斷結果
+  if (diagnostics.adminStatus) {
+    if (diagnostics.adminStatus.isAdmin || diagnostics.adminStatus.isDelegatedAdmin) {
+      console.log('✅ 檢測到管理員權限');
+      if (diagnostics.permissionTest && diagnostics.permissionTest.summary.failed > 0) {
+        recoveryPlan.push({
+          step: '重新授權 OAuth 權限',
+          action: 'reauthorizePermissions',
+          autoFixable: true,
+          description: '您有管理員權限但某些 API 存取失敗，需要重新授權'
+        });
+        canAutoFix = true;
+      } else {
+        recoveryPlan.push({
+          step: '權限狀態正常',
+          action: 'none',
+          autoFixable: false,
+          description: '您的權限設定正常，可以直接執行功能'
+        });
+      }
+    } else {
+      console.log('⚠️ 檢測到非管理員用戶');
+      recoveryPlan.push({
+        step: '切換到管理員帳戶',
+        action: 'switchAccount',
+        autoFixable: false,
+        description: '建議使用具備管理員權限的帳戶',
+        recommendedAccounts: ['tsehunhchen@kcislk.ntpc.edu.tw']
+      });
+    }
+  } else {
+    console.log('❌ 無法檢測管理員狀態');
+    recoveryPlan.push({
+      step: '修復基本權限',
+      action: 'reauthorizePermissions',
+      autoFixable: true,
+      description: '無法存取 Admin Directory，需要重新授權基本權限'
+    });
+    canAutoFix = true;
+  }
+  
+  // 步驟3: 顯示修復計劃
+  console.log('\n📋 步驟 3: 顯示修復計劃...');
+  
+  let planMessage = `🔧 自動修復計劃\n\n`;
+  planMessage += `👤 當前用戶：${currentUser}\n`;
+  planMessage += `📊 檢測結果：${recoveryPlan.length} 個修復步驟\n\n`;
+  
+  recoveryPlan.forEach((plan, index) => {
+    planMessage += `${index + 1}. ${plan.step}\n`;
+    planMessage += `   ${plan.description}\n`;
+    if (plan.recommendedAccounts) {
+      planMessage += `   建議帳戶：${plan.recommendedAccounts.join(', ')}\n`;
+    }
+    planMessage += `\n`;
+  });
+  
+  if (canAutoFix) {
+    planMessage += `🚀 可以自動修復某些問題\n`;
+    planMessage += `是否要執行自動修復？`;
+    
+    const response = ui.alert('🔧 自動權限修復', planMessage, ui.ButtonSet.YES_NO);
+    
+    if (response === ui.Button.YES) {
+      console.log('\n🚀 開始執行自動修復...');
+      
+      // 執行自動修復
+      for (const plan of recoveryPlan) {
+        if (plan.autoFixable) {
+          try {
+            console.log(`📋 執行：${plan.step}`);
+            
+            if (plan.action === 'reauthorizePermissions') {
+              reauthorizePermissions();
+              console.log('✅ 重新授權完成');
+            }
+            
+          } catch (error) {
+            console.log(`❌ 修復失敗：${error.message}`);
+          }
+        }
+      }
+      
+      // 重新測試
+      console.log('\n🔍 重新測試權限狀態...');
+      try {
+        const retestResults = comprehensivePermissionTest();
+        let retestMessage = `修復完成！\n\n`;
+        retestMessage += `✅ 通過：${retestResults.summary.passed}\n`;
+        retestMessage += `❌ 失敗：${retestResults.summary.failed}\n\n`;
+        
+        if (retestResults.summary.failed === 0) {
+          retestMessage += `🎉 所有權限問題已解決！\n現在可以正常使用所有功能。`;
+        } else {
+          retestMessage += `⚠️ 仍有部分問題需要手動處理\n請參考診斷建議或聯絡管理員。`;
+        }
+        
+        ui.alert('🎯 修復結果', retestMessage, ui.ButtonSet.OK);
+        
+      } catch (error) {
+        ui.alert('❌ 重新測試失敗', `無法完成重新測試：${error.message}`, ui.ButtonSet.OK);
+      }
+      
+    } else {
+      console.log('❌ 用戶取消自動修復');
+      ui.alert('ℹ️ 已取消', '自動修復已取消。您可以稍後再嘗試或手動執行建議的步驟。', ui.ButtonSet.OK);
+    }
+    
+  } else {
+    planMessage += `⚠️ 需要手動處理\n`;
+    planMessage += `請按照上述步驟進行修復。`;
+    ui.alert('🔧 權限修復計劃', planMessage, ui.ButtonSet.OK);
+  }
+  
+  console.log('\n📈 自動權限修復流程完成');
 }
 
 /**
