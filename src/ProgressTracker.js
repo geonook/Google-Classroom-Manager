@@ -55,7 +55,7 @@ class ProgressTracker {
   }
 
   /**
-   * 顯示進度
+   * 顯示進度 - 優化版本，提供更好的實時反饋
    */
   showProgress(message = '') {
     const percentage = Math.round((this.current / this.total) * 100);
@@ -66,26 +66,65 @@ class ProgressTracker {
     const progressBar = this.createProgressBar(percentage);
     const timeInfo = this.formatTime(remaining);
 
-    let status = `${this.operation} ${progressBar} ${percentage}%\n`;
-    status += `進度：${this.current}/${this.total}`;
+    // 建立詳細的進度訊息
+    let status = `🚀 ${this.operation}\n`;
+    status += `${progressBar} ${percentage}%\n`;
+    status += `📊 進度：${this.current}/${this.total}`;
 
     if (this.current > 0 && this.current < this.total) {
-      status += ` | 預估剩餘：${timeInfo}`;
+      status += ` | ⏱️ 剩餘：${timeInfo}`;
     }
 
-    if (this.errors.length > 0) {
-      status += ` | 錯誤：${this.errors.length}`;
+    // 成功和錯誤統計
+    const successCount = this.successes.length;
+    const errorCount = this.errors.length;
+    
+    if (successCount > 0 || errorCount > 0) {
+      status += `\n✅ 成功：${successCount}`;
+      if (errorCount > 0) {
+        status += ` | ❌ 錯誤：${errorCount}`;
+      }
+    }
+
+    // 顯示處理速度
+    if (this.current > 0) {
+      const itemsPerSecond = Math.round((this.current / (elapsed / 1000)) * 10) / 10;
+      status += ` | 🚄 速度：${itemsPerSecond}/秒`;
     }
 
     if (message) {
-      status += `\n${message}`;
+      status += `\n💡 ${message}`;
     }
 
-    console.log(`[INFO] ${status}`);
+    console.log(`[PROGRESS] ${status.replace(/\n/g, ' | ')}`);
 
-    // 只在重要節點顯示 Toast 通知，避免干擾使用者
-    if (percentage % 25 === 0 || this.current === this.total) {
-      SpreadsheetApp.getActiveSpreadsheet().toast(status, '進度更新', 3);
+    // 智能 Toast 顯示策略
+    const shouldShowToast = 
+      percentage === 0 ||           // 開始
+      percentage >= 100 ||          // 完成
+      percentage % 20 === 0 ||      // 每20%更新
+      errorCount > 0 ||            // 有錯誤時
+      this.current % Math.max(1, Math.floor(this.total / 10)) === 0; // 每10%進度
+
+    if (shouldShowToast) {
+      try {
+        // 縮短 Toast 訊息以避免過長
+        let toastMessage = `${this.operation} ${percentage}%`;
+        if (this.current < this.total) {
+          toastMessage += ` (${this.current}/${this.total})`;
+        }
+        if (errorCount > 0) {
+          toastMessage += ` ❌${errorCount}`;
+        }
+        
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          toastMessage, 
+          percentage >= 100 ? '✅ 完成' : '⏳ 執行中', 
+          percentage >= 100 ? 5 : 3
+        );
+      } catch (toastError) {
+        console.log(`[WARN] Toast 顯示失敗: ${toastError.message}`);
+      }
     }
   }
 
@@ -114,19 +153,56 @@ class ProgressTracker {
   }
 
   /**
-   * 完成處理並顯示摘要
+   * 完成處理並顯示摘要 - 優化版本，移除重複 UI alert
    */
   complete() {
     const duration = Date.now() - this.startTime;
     const summary = this.generateSummary(duration);
 
-    console.log(`[INFO] ${this.operation} 完成`);
+    const successCount = this.successes.length;
+    const errorCount = this.errors.length;
+    const completionRate = Math.round((successCount / Math.max(this.total, 1)) * 100);
 
-    // 顯示結果對話框
-    const ui = SpreadsheetApp.getUi();
-    const title = this.errors.length === 0 ? '處理完成' : '處理完成（有錯誤）';
+    // 詳細的控制台日誌
+    console.log(`[COMPLETE] ${this.operation} 執行完成:`);
+    console.log(`  📊 總任務: ${this.total}`);
+    console.log(`  ✅ 成功: ${successCount} (${completionRate}%)`);
+    console.log(`  ❌ 失敗: ${errorCount}`);
+    console.log(`  ⏱️ 耗時: ${this.formatTime(duration)}`);
+    
+    if (this.total > 0) {
+      const avgTime = Math.round(duration / this.total);
+      console.log(`  🚄 平均: ${avgTime}ms/任務`);
+    }
 
-    ui.alert(title, summary.userMessage, ui.ButtonSet.OK);
+    // 最終 Toast 通知
+    try {
+      let finalMessage = `${this.operation} 完成`;
+      if (errorCount === 0) {
+        finalMessage += ` ✅ 全部成功 (${successCount})`;
+      } else {
+        finalMessage += ` ⚠️ ${successCount} 成功, ${errorCount} 失敗`;
+      }
+
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        finalMessage,
+        '🎉 執行完成',
+        8
+      );
+    } catch (toastError) {
+      console.log(`[WARN] 完成 Toast 顯示失敗: ${toastError.message}`);
+    }
+
+    // 記錄錯誤詳情（如果有的話）
+    if (errorCount > 0) {
+      console.log(`[ERRORS] 錯誤詳情:`);
+      this.errors.slice(0, 10).forEach((error, index) => {
+        console.log(`  ${index + 1}. ${error.item}: ${error.error}`);
+      });
+      if (errorCount > 10) {
+        console.log(`  ... 以及其他 ${errorCount - 10} 個錯誤`);
+      }
+    }
 
     return summary;
   }

@@ -2747,73 +2747,84 @@ function addTeachersUI() {
 }
 
 /**
- * 👨‍🎓 一般批次新增學生 UI
+ * 👨‍🎓 一般批次新增學生 UI - 修復同步處理
  * 根據工作表中的學生Email和課程ID直接進行批次新增
  */
-function addStudentsUI() {
+async function addStudentsUI() {
   const ui = SpreadsheetApp.getUi();
   
-  // 步驟1: 獲取工作表名稱
-  const sheetNameResult = ui.prompt(
-    '👨‍🎓 一般批次新增學生 - 步驟 1/2',
-    '請輸入包含學生資料的工作表名稱（預設：新增學生）\n格式需包含：學生Email | 課程ID | 狀態',
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  if (sheetNameResult.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
-
-  const sheetName = sheetNameResult.getResponseText() || '新增學生';
-
-  // 步驟2: 確認執行模式
-  const confirmResult = ui.alert(
-    '👨‍🎓 一般批次新增學生 - 步驟 2/2',
-    `即將執行一般批次新增學生功能：\n\n📊 工作表：${sheetName}\n📋 格式：學生Email | 課程ID | 狀態\n\n✅ 確定：開始批次新增\n❌ 取消：取消操作\n\n💡 提醒：如需自動配對班級到課程，請使用「🎯 智能學生分配」功能`,
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  if (confirmResult !== ui.Button.OK) {
-    return;
-  }
-
   try {
+    // 步驟1: 獲取工作表名稱
+    const sheetNameResult = ui.prompt(
+      '👨‍🎓 一般批次新增學生 - 步驟 1/2',
+      '請輸入包含學生資料的工作表名稱（預設：新增學生）\n格式需包含：學生Email | 課程ID | 狀態',
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (sheetNameResult.getSelectedButton() !== ui.Button.OK) {
+      return;
+    }
+
+    const sheetName = sheetNameResult.getResponseText() || '新增學生';
+
+    // 步驟2: 確認執行模式
+    const confirmResult = ui.alert(
+      '👨‍🎓 一般批次新增學生 - 步驟 2/2',
+      `即將執行一般批次新增學生功能：\n\n📊 工作表：${sheetName}\n📋 格式：學生Email | 課程ID | 狀態\n\n✅ 確定：開始批次新增\n❌ 取消：取消操作\n\n💡 提醒：如需自動配對班級到課程，請使用「🎯 智能學生分配」功能`,
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (confirmResult !== ui.Button.OK) {
+      ui.alert('操作已取消', '一般批次新增學生已取消。', ui.ButtonSet.OK);
+      return;
+    }
+
     // 執行權限預檢
     console.log('🔍 執行權限預檢...');
     const currentUser = Session.getActiveUser().getEmail();
     
-    // 使用 Promise 處理異步操作
-    performPermissionPrecheck(currentUser).then(permissionCheck => {
-      if (!permissionCheck.canProceed) {
-        const continueResult = ui.alert(
-          '⚠️ 權限檢查',
-          `權限檢查發現問題：\n${permissionCheck.issue}\n\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續執行？`,
-          ui.ButtonSet.YES_NO
-        );
-        
-        if (continueResult !== ui.Button.YES) {
-          ui.alert('操作已取消', '建議先解決權限問題後再執行批次新增功能。', ui.ButtonSet.OK);
-          return;
-        }
-      }
-
-      // 執行一般批次新增
-      console.log('🚀 開始執行一般批次新增學生');
-      batchAddStudentsFromSheet(sheetName).then(result => {
-        handleBatchAddResult(result, ui);
-      }).catch(error => {
-        console.log(`[ERROR] 一般批次新增失敗: ${error.message}`);
-        ui.alert('❌ 系統錯誤', `一般批次新增發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
-      });
+    const permissionCheck = await performPermissionPrecheck(currentUser);
+    
+    if (!permissionCheck.canProceed) {
+      const continueResult = ui.alert(
+        '⚠️ 權限檢查',
+        `權限檢查發現問題：\n${permissionCheck.issue}\n\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續執行？`,
+        ui.ButtonSet.YES_NO
+      );
       
-    }).catch(error => {
-      console.log(`[ERROR] 權限檢查失敗: ${error.message}`);
-      ui.alert('❌ 權限檢查錯誤', `權限檢查發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
-    });
+      if (continueResult !== ui.Button.YES) {
+        ui.alert('操作已取消', '建議先解決權限問題後再執行批次新增功能。', ui.ButtonSet.OK);
+        return;
+      }
+    }
+
+    // 執行一般批次新增 - 使用同步等待
+    console.log('🚀 開始執行一般批次新增學生');
+    
+    const result = await batchAddStudentsFromSheet(sheetName);
+    
+    // 直接處理結果，確保用戶看到反饋
+    handleBatchAddResult(result, ui);
     
   } catch (error) {
     console.log(`[ERROR] 一般批次新增學生失敗: ${error.message}`);
-    ui.alert('❌ 系統錯誤', `一般批次新增系統發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
+    
+    // 詳細錯誤處理
+    let errorMessage = '批次新增系統發生錯誤';
+    
+    if (error.message.includes('權限')) {
+      errorMessage = '權限不足，請檢查 Google Classroom 存取權限';
+    } else if (error.message.includes('工作表')) {
+      errorMessage = '工作表讀取錯誤，請檢查工作表格式和名稱';
+    } else if (error.message.includes('課程')) {
+      errorMessage = '課程操作錯誤，請檢查課程權限';
+    }
+    
+    ui.alert(
+      '❌ 執行錯誤', 
+      `${errorMessage}：\n\n技術詳情：${error.message}\n\n💡 建議：\n• 檢查網路連線\n• 確認 Google Classroom 權限\n• 驗證工作表格式正確\n• 稍後再試或聯繫管理員`, 
+      ui.ButtonSet.OK
+    );
   }
 }
 
@@ -3220,108 +3231,190 @@ function saveBatchAddReportToSheet(report) {
  * 🎯 智能學生分配系統 UI
  * 自動為每個班級的學生分配到對應的3門課程
  */
-function distributeStudentsUI() {
+async function distributeStudentsUI() {
   const ui = SpreadsheetApp.getUi();
   
-  // 步驟1: 獲取工作表名稱
-  const sheetNameResult = ui.prompt(
-    '🎯 智能學生分配 - 步驟 1/2',
-    '請輸入包含學生資料的工作表名稱（預設：學生分配）\n格式需包含：學生Email | 班級名稱 | 狀態',
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  if (sheetNameResult.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
-
-  const sheetName = sheetNameResult.getResponseText() || '學生分配';
-
-  // 步驟2: 選擇分配模式
-  const modeResult = ui.alert(
-    '🎯 智能學生分配 - 步驟 2/2',
-    '請選擇學生分配模式：\n\n✅ 確定：自動配對模式（推薦）\n系統會自動為每個班級匹配對應的3門課程\n\n❌ 取消：自訂配對模式（進階）\n需要手動指定課程配對規則',
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  const isAutoMode = modeResult === ui.Button.OK;
-
   try {
+    // 步驟1: 獲取工作表名稱
+    const sheetNameResult = ui.prompt(
+      '🎯 智能學生分配 - 步驟 1/2',
+      '請輸入包含學生資料的工作表名稱（預設：學生分配）\n格式需包含：學生Email | 班級名稱 | 狀態',
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (sheetNameResult.getSelectedButton() !== ui.Button.OK) {
+      return;
+    }
+
+    const sheetName = sheetNameResult.getResponseText() || '學生分配';
+
+    // 步驟2: 選擇分配模式
+    const modeResult = ui.alert(
+      '🎯 智能學生分配 - 步驟 2/2',
+      '請選擇學生分配模式：\n\n✅ 確定：自動配對模式（推薦）\n系統會自動為每個班級匹配對應的3門課程\n\n❌ 取消：自訂配對模式（進階）\n需要手動指定課程配對規則',
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    const isAutoMode = modeResult === ui.Button.OK;
+
+    // 顯示開始執行的訊息
+    const startConfirm = ui.alert(
+      '🚀 開始執行',
+      `即將開始智能學生分配：\n\n📊 工作表：${sheetName}\n🎯 模式：${isAutoMode ? '自動配對模式' : '自訂配對模式'}\n\n⏱️ 預估時間：1-5分鐘\n💡 執行期間請勿關閉瀏覽器\n\n✅ 確定：開始執行\n❌ 取消：取消操作`,
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (startConfirm !== ui.Button.OK) {
+      ui.alert('操作已取消', '智能學生分配已取消。', ui.ButtonSet.OK);
+      return;
+    }
+
     // 執行權限預檢
     console.log('🔍 執行權限預檢...');
     const currentUser = Session.getActiveUser().getEmail();
     
-    // 使用 Promise 處理異步操作
-    performPermissionPrecheck(currentUser).then(permissionCheck => {
-      if (!permissionCheck.canProceed) {
-        const continueResult = ui.alert(
-          '⚠️ 權限檢查',
-          `權限檢查發現問題：\n${permissionCheck.issue}\n\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續執行？`,
-          ui.ButtonSet.YES_NO
-        );
-        
-        if (continueResult !== ui.Button.YES) {
-          ui.alert('操作已取消', '建議先解決權限問題後再執行分配功能。', ui.ButtonSet.OK);
-          return;
-        }
-      }
-
-      // 執行智能分配
-      console.log(`🚀 開始執行智能學生分配 (模式: ${isAutoMode ? '自動配對' : '自訂配對'})`);
-      distributeStudentsToCourses(sheetName, isAutoMode).then(result => {
-        handleDistributionResult(result, ui);
-      }).catch(error => {
-        console.log(`[ERROR] 智能學生分配失敗: ${error.message}`);
-        ui.alert('❌ 系統錯誤', `智能分配系統發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
-      });
+    const permissionCheck = await performPermissionPrecheck(currentUser);
+    
+    if (!permissionCheck.canProceed) {
+      const continueResult = ui.alert(
+        '⚠️ 權限檢查',
+        `權限檢查發現問題：\n${permissionCheck.issue}\n\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續執行？`,
+        ui.ButtonSet.YES_NO
+      );
       
-    }).catch(error => {
-      console.log(`[ERROR] 權限檢查失敗: ${error.message}`);
-      ui.alert('❌ 權限檢查錯誤', `權限檢查發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
-    });
+      if (continueResult !== ui.Button.YES) {
+        ui.alert('操作已取消', '建議先解決權限問題後再執行分配功能。', ui.ButtonSet.OK);
+        return;
+      }
+    }
+
+    // 執行智能分配 - 使用同步等待
+    console.log(`🚀 開始執行智能學生分配 (模式: ${isAutoMode ? '自動配對' : '自訂配對'})`);
+    
+    const result = await distributeStudentsToCourses(sheetName, isAutoMode);
+    
+    // 直接處理結果，確保用戶看到反饋
+    handleDistributionResult(result, ui);
     
   } catch (error) {
     console.log(`[ERROR] 智能學生分配失敗: ${error.message}`);
-    ui.alert('❌ 系統錯誤', `智能分配系統發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
+    
+    // 詳細錯誤處理和用戶友善的錯誤訊息
+    let errorMessage = '智能分配系統發生錯誤';
+    
+    if (error.message.includes('權限')) {
+      errorMessage = '權限不足，請檢查 Google Classroom 存取權限';
+    } else if (error.message.includes('工作表')) {
+      errorMessage = '工作表讀取錯誤，請檢查工作表格式和名稱';
+    } else if (error.message.includes('課程')) {
+      errorMessage = '課程操作錯誤，請檢查課程權限';
+    }
+    
+    ui.alert(
+      '❌ 執行錯誤', 
+      `${errorMessage}：\n\n技術詳情：${error.message}\n\n💡 建議：\n• 檢查網路連線\n• 確認 Google Classroom 權限\n• 驗證工作表格式正確\n• 稍後再試或聯繫管理員`, 
+      ui.ButtonSet.OK
+    );
   }
 }
 
 /**
- * 🎯 處理智能分配結果
+ * 🎯 處理智能分配結果 - 改進用戶反饋機制
  */
 function handleDistributionResult(result, ui) {
-  if (result.success) {
-    const summary = result.summary;
-    const message = `🎉 智能學生分配完成！\n\n` +
-      `📊 處理統計：\n` +
-      `• 總分配任務：${result.totalAssignments || 0}\n` +
-      `• 已處理：${result.processedCount || 0}\n` +
-      `• 成功處理：${summary.statistics.successful}\n` +
-      `  - 新增成功：${result.addedCount || 0}\n` +
-      `  - 已存在：${result.existingCount || 0}\n` +
-      `• 失敗項目：${summary.statistics.failed}\n` +
-      `• 處理時間：${summary.statistics.duration}ms\n\n` +
-      `📈 分配到課程：${result.distributedCourses || 0} 門\n` +
-      `⏱️ 平均處理時間：${Math.round(summary.statistics.averageTime)}ms/任務\n\n` +
-      `📊 詳細報告已保存至「智能分配報告」工作表`;
+  console.log('[RESULT] 處理智能分配結果:', JSON.stringify(result, null, 2));
+  
+  // 計算成功率和處理效率
+  const totalTasks = result.totalAssignments || 0;
+  const processedTasks = result.processedCount || 0;
+  const successfulTasks = (result.summary?.statistics?.successful) || 0;
+  const failedTasks = (result.summary?.statistics?.failed) || 0;
+  
+  const successRate = totalTasks > 0 ? Math.round((successfulTasks / totalTasks) * 100) : 0;
+  const processingRate = totalTasks > 0 ? Math.round((processedTasks / totalTasks) * 100) : 0;
+  
+  if (result.success && successfulTasks > 0) {
+    // 完全成功的情況
+    const duration = result.summary?.statistics?.duration || 0;
+    const avgTime = Math.round(duration / Math.max(processedTasks, 1));
     
-    ui.alert('✅ 分配完成', message, ui.ButtonSet.OK);
-  } else {
-    // 顯示部分成功的情況
-    if (result.processedCount && result.processedCount > 0) {
-      const message = `⚠️ 分配部分完成\n\n` +
-        `📊 處理統計：\n` +
-        `• 總任務：${result.totalAssignments || 0}\n` +
-        `• 已處理：${result.processedCount || 0}\n` +
-        `  - 新增成功：${result.addedCount || 0}\n` +
-        `  - 已存在：${result.existingCount || 0}\n` +
-        `• 剩餘未處理：${(result.totalAssignments || 0) - (result.processedCount || 0)}\n\n` +
-        `❌ 主要錯誤：${result.error || '未知錯誤'}\n\n` +
-        `💡 建議：檢查「智能分配報告」工作表查看詳細結果`;
+    const message = `🎉 智能學生分配完成！\n\n` +
+      `📊 執行統計：\n` +
+      `• 總分配任務：${totalTasks}\n` +
+      `• 成功處理：${successfulTasks} (${successRate}%)\n` +
+      `  ✅ 新增成功：${result.addedCount || 0}\n` +
+      `  ✅ 已存在：${result.existingCount || 0}\n` +
+      `• 失敗項目：${failedTasks}\n\n` +
+      `🎯 分配效率：\n` +
+      `• 分配到課程：${result.distributedCourses || 0} 門\n` +
+      `• 總執行時間：${Math.round(duration / 1000)}秒\n` +
+      `• 平均處理時間：${avgTime}ms/任務\n\n` +
+      `📊 詳細報告已保存至「智能分配報告」工作表\n` +
+      `📋 狀態更新已同步至「學生分配」工作表`;
+    
+    ui.alert('✅ 分配成功完成', message, ui.ButtonSet.OK);
+    
+  } else if (processedTasks > 0) {
+    // 部分成功的情況
+    const remainingTasks = totalTasks - processedTasks;
+    
+    const message = `⚠️ 智能學生分配部分完成\n\n` +
+      `📊 執行統計：\n` +
+      `• 總任務：${totalTasks}\n` +
+      `• 已處理：${processedTasks} (${processingRate}%)\n` +
+      `  ✅ 成功：${successfulTasks}\n` +
+      `  ❌ 失敗：${failedTasks}\n` +
+      `• 未處理：${remainingTasks}\n\n` +
+      `⚠️ 主要問題：${result.error || '部分任務執行異常'}\n\n` +
+      `🛠️ 建議措施：\n` +
+      `• 檢查「智能分配報告」了解詳細錯誤\n` +
+      `• 確認失敗項目的課程權限\n` +
+      `• 驗證學生Email格式正確性\n` +
+      `• 稍後重新執行未完成的任務\n\n` +
+      `📋 已處理項目的狀態已更新至工作表`;
+    
+    // 判斷是否需要立即重試
+    if (successRate >= 80) {
+      const retryResult = ui.alert(
+        '⚠️ 部分完成', 
+        message + '\n\n🔄 是否立即重試失敗的任務？', 
+        ui.ButtonSet.YES_NO
+      );
       
-      ui.alert('⚠️ 部分完成', message, ui.ButtonSet.OK);
+      if (retryResult === ui.Button.YES) {
+        ui.alert('💡 重試提示', '請稍後手動重新執行智能學生分配，系統會自動跳過已成功的項目。', ui.ButtonSet.OK);
+      }
     } else {
-      ui.alert('❌ 分配失敗', `分配過程中發生錯誤：\n${result.error || '未知錯誤'}`, ui.ButtonSet.OK);
+      ui.alert('⚠️ 部分完成', message, ui.ButtonSet.OK);
     }
+    
+  } else {
+    // 完全失敗的情況
+    let errorCategory = '系統錯誤';
+    let troubleshootingTips = '';
+    
+    const errorMsg = (result.error || '未知錯誤').toLowerCase();
+    
+    if (errorMsg.includes('權限') || errorMsg.includes('permission')) {
+      errorCategory = '權限問題';
+      troubleshootingTips = '• 確認已授權 Google Classroom API\n• 檢查課程擁有者/老師權限\n• 重新授權應用程式';
+    } else if (errorMsg.includes('工作表') || errorMsg.includes('sheet')) {
+      errorCategory = '工作表問題';  
+      troubleshootingTips = '• 確認工作表名稱正確\n• 檢查工作表格式（學生Email|班級名稱|狀態）\n• 驗證資料完整性';
+    } else if (errorMsg.includes('網路') || errorMsg.includes('network')) {
+      errorCategory = '網路問題';
+      troubleshootingTips = '• 檢查網路連線\n• 稍後再試\n• 確認 Google 服務正常';
+    } else {
+      troubleshootingTips = '• 檢查系統日誌\n• 驗證輸入資料格式\n• 聯繫技術支援';
+    }
+    
+    const message = `❌ 智能學生分配失敗\n\n` +
+      `🔍 錯誤類型：${errorCategory}\n` +
+      `📝 錯誤詳情：${result.error || '未知錯誤'}\n\n` +
+      `🛠️ 故障排除建議：\n${troubleshootingTips}\n\n` +
+      `💡 如問題持續存在，請截圖此訊息並聯繫系統管理員。`;
+    
+    ui.alert('❌ 執行失敗', message, ui.ButtonSet.OK);
   }
 }
 
