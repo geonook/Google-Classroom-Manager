@@ -2,14 +2,84 @@
  * @OnlyCurrentDoc
  */
 
+/**
+ * 🎓 Google Classroom Manager Pro v2.0.0
+ *
+ * ⚠️ 權限問題故障排除指南 ⚠️
+ *
+ * 🚨 常見問題：403 權限錯誤 "The caller does not have permission"
+ * 📋 原因：只有課程擁有者才能新增老師到課程中
+ *
+ * 🔧 解決方案（按順序嘗試）：
+ *
+ * 1️⃣ 【診斷權限問題】
+ *    • 執行 enhancedPermissionDiagnosis() 獲得詳細診斷
+ *    • 執行 lookupUserById('110732085101506554189') 查詢課程擁有者
+ *
+ * 2️⃣ 【聯絡課程擁有者】
+ *    • 請課程擁有者登入並執行 addTeachersFromExternalSheet()
+ *    • 或請課程擁有者將您加為共同擁有者
+ *
+ * 3️⃣ 【聯絡管理員】
+ *    • 請 Google Workspace 域管理員協助執行
+ *    • 或請管理員修改組織權限政策
+ *
+ * 📋 主要功能：
+ * • addTeachersFromExternalSheet() - 從外部試算表批次新增老師
+ * • enhancedPermissionDiagnosis() - 權限診斷工具
+ * • lookupUserById() - 用戶ID查詢工具
+ * • onOpen() - 建立操作選單
+ *
+ * 💡 使用提示：
+ * - 開啟試算表時會自動建立操作選單
+ * - 遇到問題時先使用診斷工具
+ * - 所有操作都會在控制台顯示詳細日誌
+ */
+
+/**
+ * 建立選單 - 當試算表開啟時自動執行
+ */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('🎓 Classroom 管理工具')
+    .addItem('📋 1. 列出所有課程', 'listCoursesUI')
+    .addSeparator()
+    .addItem('🔍 2. 查詢課程師生', 'listMembersUI')
+    .addSeparator()
+    .addItem('📚 3. 建立新課程', 'createCoursesUI')
+    .addSeparator()
+    .addItem('👨‍🏫 4. 新增老師', 'addTeachersUI')
+    .addItem('👨‍🎓 5. 新增學生', 'addStudentsUI')
+    .addSeparator()
+    .addItem('✏️ 6. 更新課程名稱', 'updateCoursesUI')
+    .addItem('📦 7. 封存課程', 'archiveCoursesUI')
+    .addSeparator()
+    .addItem('➕ 8. 新增單一學生到課程', 'addSingleStudentToCourseUI')
+    .addItem('➖ 9. 從課程移除單一學生', 'removeSingleStudentFromCourseUI')
+    .addSeparator()
+    .addItem('⚙️ 10. 設定預設工作表名稱', 'configureDefaultSheetsUI')
+    .addSeparator()
+    .addSubMenu(
+      SpreadsheetApp.getUi()
+        .createMenu('🔧 診斷工具')
+        .addItem('🔍 用戶 ID 查詢', 'lookupUserById')
+        .addItem('🔧 權限診斷', 'enhancedPermissionDiagnosis')
+        .addItem('📊 系統狀態', 'showSystemStatusUI')
+        .addItem('🗑️ 清除快取', 'clearCacheUI')
+    )
+    .addSeparator()
+    .addItem('🚀 執行外部表單老師新增', 'addTeachersFromExternalSheet')
+    .addToUi();
+}
+
 async function addTeachersWithCheck(spreadsheetId = null) {
   const sheetName = 'course_teacher';
-  
+
   // 如果提供了 spreadsheetId，使用外部試算表；否則使用當前開啟的試算表
-  const ss = spreadsheetId ? 
-    SpreadsheetApp.openById(spreadsheetId) : 
-    SpreadsheetApp.getActiveSpreadsheet();
-    
+  const ss = spreadsheetId
+    ? SpreadsheetApp.openById(spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
+
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     console.log(`錯誤：找不到名為 "${sheetName}" 的工作表。`);
@@ -25,7 +95,7 @@ async function addTeachersWithCheck(spreadsheetId = null) {
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     const teacherEmail = row[5]; // F 欄
-    const courseId = row[6];     // G 欄
+    const courseId = row[6]; // G 欄
     const statusCell = sheet.getRange(i + 2, 8); // H 欄
 
     if (!teacherEmail || !courseId || statusCell.isChecked()) {
@@ -43,32 +113,87 @@ async function addTeachersWithCheck(spreadsheetId = null) {
       }
       statusCell.check();
     } else {
-      // 更詳細的錯誤處理
+      // 🔧 增強版錯誤處理與解決建議
       if (result.error && result.error.details && result.error.details.code === 403) {
         console.log(`  🚫 權限錯誤：無法新增老師 ${teacherEmail} 到課程 ${courseId}`);
-        console.log(`  💡 建議：請課程擁有者或 Google Workspace 管理員執行此操作`);
+        console.log(`  📋 錯誤分析：只有課程擁有者才能新增老師`);
+        console.log(`  \n🔧 解決方案（請選擇其中一種）：`);
+        console.log(`     1. 📞 聯絡課程擁有者執行新增作業`);
+        console.log(`     2. 🔍 使用 lookupUserById('課程擁有者ID') 查詢擁有者Email`);
+        console.log(`     3. 🛠️ 使用 enhancedPermissionDiagnosis('${courseId}') 獲得詳細診斷`);
+        console.log(`     4. 👨‍💼 請 Google Workspace 管理員協助執行`);
+        console.log(`     5. 📧 發送操作請求給課程擁有者：addTeachersFromExternalSheet()`);
+      } else if (
+        result.error &&
+        result.error.message &&
+        result.error.message.includes('not found')
+      ) {
+        console.log(`  ❌ 找不到老師或課程：${teacherEmail} -> 課程 ${courseId}`);
+        console.log(`  🔧 解決方案：`);
+        console.log(`     1. 檢查老師 Email 格式是否正確`);
+        console.log(`     2. 確認課程 ID 是否有效`);
+        console.log(`     3. 確認老師是否為 Google Workspace 用戶`);
       } else {
-        console.log(`  ❌ 新增老師 ${teacherEmail} 到課程 ${courseId} 失敗: ${JSON.stringify(result.error, null, 2)}`);
+        console.log(`  ❌ 新增老師失敗：${teacherEmail} -> 課程 ${courseId}`);
+        console.log(`  📋 錯誤詳情: ${JSON.stringify(result.error, null, 2)}`);
+        console.log(`  🔧 建議：使用 enhancedPermissionDiagnosis() 進行詳細診斷`);
       }
     }
-    
+
     Utilities.sleep(1000);
   }
-  
+
   console.log('--- 所有老師處理完畢 ---');
 }
 
 /**
- * 從指定的外部試算表執行老師新增作業
+ * 🚀 從指定的外部試算表執行老師新增作業
+ *
+ * ⚠️ 重要提示：此功能需要課程擁有者權限
+ *
+ * 🔧 使用前檢查清單：
+ * 1. 確認您是所有目標課程的擁有者
+ * 2. 如果不是擁有者，請使用 enhancedPermissionDiagnosis() 查詢擁有者
+ * 3. 請課程擁有者執行此函數
+ *
+ * 📋 故障排除：
+ * - 如遇權限錯誤，使用 lookupUserById() 查詢課程擁有者
+ * - 使用 enhancedPermissionDiagnosis() 進行詳細診斷
  */
 async function addTeachersFromExternalSheet() {
   const EXTERNAL_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
-  console.log(`--- 開始從外部試算表新增老師 ---`);
-  console.log(`試算表ID: ${EXTERNAL_SPREADSHEET_ID}`);
-  
-  await addTeachersWithCheck(EXTERNAL_SPREADSHEET_ID);
-  
-  console.log(`--- 外部試算表老師新增完成 ---`);
+
+  console.log(`=== 🚀 外部試算表老師新增作業 ===`);
+  console.log(`📊 試算表ID: ${EXTERNAL_SPREADSHEET_ID}`);
+  console.log(`⏰ 開始時間: ${new Date().toLocaleString()}`);
+
+  // 預先檢查當前用戶
+  let currentUser = 'unknown';
+  try {
+    currentUser = Session.getActiveUser().getEmail();
+    console.log(`👤 執行者: ${currentUser}`);
+  } catch (e) {
+    console.log(`⚠️ 無法取得執行者資訊: ${e.message}`);
+  }
+
+  console.log(`\n💡 提示：如遇權限問題，請使用以下診斷工具：`);
+  console.log(`   • enhancedPermissionDiagnosis() - 詳細權限診斷`);
+  console.log(`   • lookupUserById('課程擁有者ID') - 查詢擁有者身份`);
+  console.log(``);
+
+  try {
+    await addTeachersWithCheck(EXTERNAL_SPREADSHEET_ID);
+    console.log(`\n✅ 外部試算表老師新增作業完成`);
+    console.log(`⏰ 完成時間: ${new Date().toLocaleString()}`);
+  } catch (error) {
+    console.log(`\n❌ 執行過程發生錯誤: ${error.message}`);
+    console.log(`🔧 建議解決方案：`);
+    console.log(`   1. 檢查網路連線`);
+    console.log(`   2. 確認試算表存取權限`);
+    console.log(`   3. 使用 enhancedPermissionDiagnosis() 診斷權限問題`);
+    console.log(`   4. 聯絡系統管理員協助`);
+    throw error; // 重新拋出錯誤以便追蹤
+  }
 }
 
 function addTeachersDirectly() {
@@ -86,8 +211,8 @@ function addTeachersDirectly() {
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     const teacherEmail = row[5]; // F 欄
-    const courseId = row[6];     // G 欄
-    const status = row[7];       // H 欄 (checkbox value)
+    const courseId = row[6]; // G 欄
+    const status = row[7]; // H 欄 (checkbox value)
 
     if (!teacherEmail || !courseId || status === true) {
       continue;
@@ -98,11 +223,12 @@ function addTeachersDirectly() {
 
       // 檢查老師是否已存在
       const teachers = Classroom.Courses.Teachers.list(courseId).teachers || [];
-      const teacherExists = teachers.some(teacher => 
-        teacher && 
-        teacher.profile && 
-        teacher.profile.emailAddress && 
-        teacher.profile.emailAddress.toLowerCase() === teacherEmail.toLowerCase()
+      const teacherExists = teachers.some(
+        (teacher) =>
+          teacher &&
+          teacher.profile &&
+          teacher.profile.emailAddress &&
+          teacher.profile.emailAddress.toLowerCase() === teacherEmail.toLowerCase()
       );
 
       if (teacherExists) {
@@ -115,20 +241,18 @@ function addTeachersDirectly() {
       console.log(`  ➕ 正在新增老師 ${teacherEmail} 到課程 ${courseId}...`);
       const teacher = { userId: teacherEmail };
       Classroom.Courses.Teachers.create(teacher, courseId);
-      
+
       console.log(`  ✅ 成功新增老師。`);
       sheet.getRange(i + 2, 8).check();
-
     } catch (e) {
       console.log(`  ❌ 處理課程 ${courseId} 中的老師 ${teacherEmail} 時發生錯誤: ${e.message}`);
     }
-    
+
     Utilities.sleep(1000); // To avoid rate limits
   }
-  
+
   console.log('--- 所有老師處理完畢 ---');
 }
-
 
 function listCourses(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -287,7 +411,7 @@ function setScriptProperty(key, value) {
  */
 function diagnosePermissions() {
   console.log('=== 權限診斷工具 ===');
-  
+
   // 檢查當前執行者
   let currentUserEmail = 'unknown';
   try {
@@ -297,23 +421,23 @@ function diagnosePermissions() {
     console.log(`⚠️ 無法取得執行者Email: ${e.message}`);
     console.log(`💡 建議: 需要在 appsscript.json 中新增 userinfo.email 權限並重新授權`);
   }
-  
+
   // 檢查指定課程資訊
   const testCourseId = '779922029471';
   console.log(`\n🔍 檢查課程: ${testCourseId}`);
-  
+
   try {
     const course = Classroom.Courses.get(testCourseId);
     console.log(`📚 課程名稱: ${course.name}`);
     console.log(`👤 課程擁有者ID: ${course.ownerId}`);
     console.log(`📊 課程狀態: ${course.courseState}`);
     console.log(`🔗 課程連結: ${course.alternateLink}`);
-    
+
     // 嘗試透過 Admin Directory API 解析擁有者email
     try {
       const ownerInfo = AdminDirectory.Users.get(course.ownerId);
       console.log(`📧 擁有者Email: ${ownerInfo.primaryEmail}`);
-      
+
       if (currentUserEmail !== 'unknown' && currentUserEmail === ownerInfo.primaryEmail) {
         console.log(`✅ 您是課程擁有者，有完整權限！`);
       } else {
@@ -322,11 +446,10 @@ function diagnosePermissions() {
     } catch (e) {
       console.log(`⚠️ 無法取得擁有者Email詳細資訊: ${e.message}`);
     }
-    
   } catch (e) {
     console.log(`❌ 無法取得課程資訊: ${e.message}`);
   }
-  
+
   // 檢查是否能列出課程老師
   try {
     const teachers = Classroom.Courses.Teachers.list(testCourseId);
@@ -340,12 +463,14 @@ function diagnosePermissions() {
   } catch (e) {
     console.log(`❌ 無法列出課程老師: ${e.message}`);
   }
-  
+
   console.log('\n=== 診斷完成 ===');
+  console.log('\nℹ️ 升級提示: 請使用 enhancedPermissionDiagnosis() 獲得更詳細的診斷和解決方案');
   console.log('\n🔧 下一步建議:');
   console.log('1. 推送更新的權限設定到 Google Apps Script');
   console.log('2. 重新授權應用程式');
-  console.log('3. 再次執行此診斷工具確認權限');
+  console.log('3. 使用 enhancedPermissionDiagnosis() 獲得詳細分析');
+  console.log('4. 使用 lookupUserById() 查詢課程擁有者身份');
 }
 
 /**
@@ -356,14 +481,14 @@ function checkCoursePermission(courseId) {
     // 嘗試列出課程老師（這個操作需要讀取權限）
     const teachers = Classroom.Courses.Teachers.list(courseId);
     console.log(`✅ 有讀取課程 ${courseId} 的權限`);
-    
+
     // 嘗試取得課程詳細資訊
     const course = Classroom.Courses.get(courseId);
-    
+
     // 嘗試取得當前用戶資訊
     let currentUserEmail = 'unknown';
     let currentUserId = 'unknown';
-    
+
     try {
       currentUserEmail = Session.getActiveUser().getEmail();
       // 嘗試透過Admin Directory API取得用戶ID
@@ -372,23 +497,24 @@ function checkCoursePermission(courseId) {
     } catch (e) {
       console.log(`⚠️ 無法取得完整用戶資訊，將使用基本檢查`);
     }
-    
+
     // 檢查是否為課程擁有者 (比較ID或email)
     let isOwner = false;
     let ownerEmail = 'unknown';
-    
+
     try {
       // 嘗試取得擁有者email
       const ownerInfo = AdminDirectory.Users.get(course.ownerId);
       ownerEmail = ownerInfo.primaryEmail;
-      
+
       // 比較email或ID
-      isOwner = (currentUserEmail !== 'unknown' && currentUserEmail === ownerEmail) ||
-                (currentUserId !== 'unknown' && currentUserId === course.ownerId);
+      isOwner =
+        (currentUserEmail !== 'unknown' && currentUserEmail === ownerEmail) ||
+        (currentUserId !== 'unknown' && currentUserId === course.ownerId);
     } catch (e) {
       console.log(`⚠️ 無法解析課程擁有者資訊: ${e.message}`);
     }
-    
+
     if (isOwner) {
       console.log(`✅ 您是課程擁有者，有完整權限`);
       return { hasPermission: true, reason: 'OWNER' };
@@ -397,14 +523,13 @@ function checkCoursePermission(courseId) {
       console.log(`  課程擁有者ID: ${course.ownerId}`);
       console.log(`  課程擁有者Email: ${ownerEmail}`);
       console.log(`  當前執行者: ${currentUserEmail}`);
-      return { 
-        hasPermission: false, 
-        reason: 'NOT_OWNER', 
+      return {
+        hasPermission: false,
+        reason: 'NOT_OWNER',
         ownerId: course.ownerId,
-        ownerEmail: ownerEmail 
+        ownerEmail: ownerEmail,
       };
     }
-    
   } catch (e) {
     console.log(`❌ 檢查課程權限時發生錯誤: ${e.message}`);
     return { hasPermission: false, reason: 'ERROR', error: e.message };
@@ -419,7 +544,7 @@ function getCourseOwnerInfo(courseId) {
     const course = Classroom.Courses.get(courseId);
     console.log(`📚 課程: ${course.name}`);
     console.log(`👤 擁有者ID: ${course.ownerId}`);
-    
+
     try {
       const ownerInfo = AdminDirectory.Users.get(course.ownerId);
       console.log(`📧 擁有者Email: ${ownerInfo.primaryEmail}`);
@@ -429,14 +554,14 @@ function getCourseOwnerInfo(courseId) {
         ownerId: course.ownerId,
         ownerEmail: ownerInfo.primaryEmail,
         ownerName: ownerInfo.name.fullName,
-        courseName: course.name
+        courseName: course.name,
       };
     } catch (e) {
       console.log(`⚠️ 無法取得擁有者詳細資訊: ${e.message}`);
       return {
         success: false,
         ownerId: course.ownerId,
-        error: e.message
+        error: e.message,
       };
     }
   } catch (e) {
@@ -453,11 +578,11 @@ async function transferCourseOwnership(newOwnerId, spreadsheetId = null) {
   const sheetName = 'course_teacher';
   console.log(`--- 開始批次轉移課程擁有權 ---`);
   console.log(`新擁有者: ${newOwnerId}`);
-  
-  const ss = spreadsheetId ? 
-    SpreadsheetApp.openById(spreadsheetId) : 
-    SpreadsheetApp.getActiveSpreadsheet();
-    
+
+  const ss = spreadsheetId
+    ? SpreadsheetApp.openById(spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
+
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     console.log(`錯誤：找不到名為 "${sheetName}" 的工作表。`);
@@ -466,17 +591,17 @@ async function transferCourseOwnership(newOwnerId, spreadsheetId = null) {
 
   const dataRange = sheet.getRange('A2:H' + sheet.getLastRow());
   const data = dataRange.getValues();
-  
-  const uniqueCourseIds = [...new Set(data.map(row => row[6]).filter(id => id))];
+
+  const uniqueCourseIds = [...new Set(data.map((row) => row[6]).filter((id) => id))];
   console.log(`發現 ${uniqueCourseIds.length} 個唯一課程需要轉移擁有權`);
-  
+
   let successCount = 0;
   let failCount = 0;
-  
+
   for (const courseId of uniqueCourseIds) {
     try {
       console.log(`正在轉移課程 ${courseId} 的擁有權...`);
-      
+
       // 檢查當前擁有者
       const course = Classroom.Courses.get(courseId);
       if (course.ownerId === newOwnerId) {
@@ -484,25 +609,27 @@ async function transferCourseOwnership(newOwnerId, spreadsheetId = null) {
         successCount++;
         continue;
       }
-      
+
       // 轉移擁有權 - 必須包含課程名稱
-      const updatedCourse = Classroom.Courses.update({
-        name: course.name,
-        ownerId: newOwnerId,
-        courseState: course.courseState
-      }, courseId);
-      
+      const updatedCourse = Classroom.Courses.update(
+        {
+          name: course.name,
+          ownerId: newOwnerId,
+          courseState: course.courseState,
+        },
+        courseId
+      );
+
       console.log(`  ✅ 成功轉移課程 ${courseId} (${course.name}) 給 ${newOwnerId}`);
       successCount++;
-      
     } catch (e) {
       console.log(`  ❌ 轉移課程 ${courseId} 失敗: ${e.message}`);
       failCount++;
     }
-    
+
     Utilities.sleep(1000); // 避免API限速
   }
-  
+
   console.log(`--- 擁有權轉移完成 ---`);
   console.log(`成功: ${successCount}, 失敗: ${failCount}`);
 }
@@ -513,13 +640,13 @@ async function transferCourseOwnership(newOwnerId, spreadsheetId = null) {
 async function transferExternalSheetCourseOwnership() {
   const currentUser = Session.getActiveUser().getEmail();
   const EXTERNAL_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
-  
+
   console.log(`--- 轉移外部試算表課程擁有權 ---`);
   console.log(`目標擁有者: ${currentUser}`);
   console.log(`試算表ID: ${EXTERNAL_SPREADSHEET_ID}`);
-  
+
   await transferCourseOwnership(currentUser, EXTERNAL_SPREADSHEET_ID);
-  
+
   console.log(`--- 擁有權轉移完成，現在可以新增老師了 ---`);
 }
 
@@ -534,14 +661,25 @@ async function batchCreateAllGradeCourses() {
   // --- 設定 ---
   const GRADES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'];
   const CLASS_NAMES = [
-    'Achievers', 'Discoverers', 'Voyagers', 'Explorers', 'Navigators', 
-    'Adventurers', 'Guardians', 'Pioneers', 'Innovators', 'Visionaries', 
-    'Pathfinders', 'Seekers', 'Trailblazers', 'Inventors'
+    'Achievers',
+    'Discoverers',
+    'Voyagers',
+    'Explorers',
+    'Navigators',
+    'Adventurers',
+    'Guardians',
+    'Pioneers',
+    'Innovators',
+    'Visionaries',
+    'Pathfinders',
+    'Seekers',
+    'Trailblazers',
+    'Inventors',
   ];
   const SUBJECTS = [
     { code: 'LT', teacher: 'Ms. Kate' },
     { code: 'IT', teacher: 'Mr. Perry' },
-    { code: 'KCFS', teacher: 'Mr. Louw' }
+    { code: 'KCFS', teacher: 'Mr. Louw' },
   ];
   const OWNER_ID = 'lkclassle114@kcislk.ntpc.edu.tw';
   const LOG_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
@@ -581,13 +719,19 @@ async function batchCreateAllGradeCourses() {
             totalSuccess++;
             const newCourse = result.result;
             console.log(`  ✅ 成功: ${courseName} (ID: ${newCourse.id})`);
-            
+
             // 將成功結果寫入 Google Sheet
-            const newRow = [subject.code, grade, className, subject.teacher, newCourse.id, newCourse.alternateLink];
+            const newRow = [
+              subject.code,
+              grade,
+              className,
+              subject.teacher,
+              newCourse.id,
+              newCourse.alternateLink,
+            ];
             logSheet.appendRow(newRow);
             SpreadsheetApp.flush(); // 強制儲存變更
             console.log('  ✍️  紀錄已寫入工作表。');
-            
           } else {
             totalFailed++;
             console.log(`  ❌ 失敗: ${courseName} - ${result.error}`);
@@ -621,9 +765,9 @@ function populateSheetFromLog() {
   const LOG_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
   const LOG_SHEET_NAME = 'course_teacher';
   const SUBJECTS_MAP = {
-    'LT': 'Ms. Kate',
-    'IT': 'Mr. Perry',
-    'KCFS': 'Mr. Louw'
+    LT: 'Ms. Kate',
+    IT: 'Mr. Perry',
+    KCFS: 'Mr. Louw',
   };
   // --- 結束設定 ---
 
@@ -885,7 +1029,7 @@ function populateSheetFromLog() {
 
   // --- 開始解析與寫入 ---
   console.log('--- 開始從日誌補登資料 ---');
-  const lines = logData.split('\n').filter(line => line.includes('✅ 成功:'));
+  const lines = logData.split('\n').filter((line) => line.includes('✅ 成功:'));
   console.log(`在日誌中找到 ${lines.length} 筆成功紀錄。`);
 
   // --- 初始化工作表 ---
@@ -898,9 +1042,17 @@ function populateSheetFromLog() {
     }
     // 清空工作表並寫入標頭
     logSheet.clear();
-    const headers = ['Subject', 'Grade', 'Class Name', 'Teacher', 'Email', 'Course ID', 'Course Link', 'Status'];
+    const headers = [
+      'Subject',
+      'Grade',
+      'Class Name',
+      'Teacher',
+      'Email',
+      'Course ID',
+      'Course Link',
+      'Status',
+    ];
     logSheet.appendRow(headers);
-
   } catch (e) {
     console.log(`❌ 無法存取紀錄用的工作表: ${e.toString()}`);
     return;
@@ -927,7 +1079,7 @@ function populateSheetFromLog() {
         const teacher = SUBJECTS_MAP[subjectCode] || '未知';
         const courseLink = `https://classroom.google.com/c/${courseId}`;
 
-        const newRow = [subjectCode, grade, className, teacher, '' , courseId, courseLink, false];
+        const newRow = [subjectCode, grade, className, teacher, '', courseId, courseLink, false];
         logSheet.appendRow(newRow);
         writeSuccess++;
       } else {
@@ -939,7 +1091,7 @@ function populateSheetFromLog() {
       console.log(`  ❌ 寫入時發生錯誤: ${line} - ${e.toString()}`);
     }
   }
-  
+
   SpreadsheetApp.flush(); // 強制儲存所有變更
   console.log(`--- 資料補登結束 ---`);
   console.log(`總計: ${writeSuccess} 筆資料成功寫入，${writeFailed} 筆失敗。`);
@@ -955,22 +1107,491 @@ function addTeachersFromCourseTeacherSheet() {
 function testAddTeacher() {
   const courseId = '779922029471'; // 根據你的日誌
   const teacherEmail = 'wendyyen@kcislk.ntpc.edu.tw'; // 根據你的日誌
-  
+
   try {
     console.log('--- 開始執行 testAddTeacher ---');
     console.log(`正在嘗試將老師 ${teacherEmail} 加入課程 ${courseId}`);
-    
+
     const teacher = { userId: teacherEmail };
     const response = Classroom.Courses.Teachers.create(teacher, courseId);
-    
+
     console.log('✅ 測試成功！API 呼叫已完成。');
     console.log(JSON.stringify(response, null, 2));
-    
   } catch (e) {
     console.log('--- ❌ 測試失敗 ---');
     console.log('錯誤名稱: ' + e.name);
     console.log('錯誤訊息: ' + e.message);
     console.log('完整錯誤物件:');
     console.log(JSON.stringify(e, null, 2));
+  }
+}
+
+/**
+ * 🔍 用戶 ID 查詢工具
+ * 查詢指定用戶 ID 對應的 Email 地址和詳細資訊
+ */
+function lookupUserById(userId = '110732085101506554189') {
+  console.log('=== 🔍 用戶 ID 查詢工具 ===');
+  console.log(`正在查詢用戶 ID: ${userId}`);
+
+  try {
+    // 方法1: 嘗試透過 Admin Directory API 查詢
+    try {
+      console.log('\n📋 方法1: Admin Directory API 查詢...');
+      const userInfo = AdminDirectory.Users.get(userId);
+      console.log(`✅ 找到用戶!`);
+      console.log(`📧 Email: ${userInfo.primaryEmail}`);
+      console.log(`👤 姓名: ${userInfo.name ? userInfo.name.fullName : '未提供'}`);
+      console.log(`🏢 組織: ${userInfo.orgUnitPath || '未提供'}`);
+      console.log(`📊 狀態: ${userInfo.suspended ? '已停用' : '活躍'}`);
+      console.log(`🆔 用戶類型: ${userInfo.customerType || '未知'}`);
+      return {
+        success: true,
+        email: userInfo.primaryEmail,
+        name: userInfo.name ? userInfo.name.fullName : null,
+        orgUnit: userInfo.orgUnitPath,
+        suspended: userInfo.suspended,
+        method: 'AdminDirectory',
+      };
+    } catch (adminError) {
+      console.log(`⚠️ Admin Directory API 查詢失敗: ${adminError.message}`);
+    }
+
+    // 方法2: 嘗試透過課程擁有者身份查詢
+    try {
+      console.log('\n📋 方法2: 透過課程擁有者查詢...');
+      const courses = Classroom.Courses.list({
+        courseStates: ['ACTIVE', 'ARCHIVED', 'PROVISIONED', 'DECLINED'],
+        pageSize: 100,
+      });
+
+      if (courses.courses) {
+        const ownedCourses = courses.courses.filter((course) => course.ownerId === userId);
+        if (ownedCourses.length > 0) {
+          console.log(`✅ 找到該用戶擁有的課程: ${ownedCourses.length} 個`);
+          console.log(`📚 範例課程: ${ownedCourses[0].name} (ID: ${ownedCourses[0].id})`);
+
+          // 嘗試查詢該課程的老師列表來獲取用戶資訊
+          try {
+            const teachers = Classroom.Courses.Teachers.list(ownedCourses[0].id);
+            if (teachers.teachers) {
+              const ownerAsTeacher = teachers.teachers.find(
+                (teacher) => teacher.userId === userId || teacher.profile.id === userId
+              );
+              if (ownerAsTeacher) {
+                console.log(`📧 Email: ${ownerAsTeacher.profile.emailAddress}`);
+                console.log(`👤 姓名: ${ownerAsTeacher.profile.name.fullName}`);
+                return {
+                  success: true,
+                  email: ownerAsTeacher.profile.emailAddress,
+                  name: ownerAsTeacher.profile.name.fullName,
+                  courseCount: ownedCourses.length,
+                  method: 'CourseOwner',
+                };
+              }
+            }
+          } catch (teacherError) {
+            console.log(`⚠️ 無法查詢課程老師列表: ${teacherError.message}`);
+          }
+
+          return {
+            success: true,
+            email: '無法取得',
+            courseCount: ownedCourses.length,
+            sampleCourse: ownedCourses[0].name,
+            method: 'CourseOwner',
+          };
+        }
+      }
+      console.log(`❌ 沒有找到該用戶擁有的課程`);
+    } catch (courseError) {
+      console.log(`⚠️ 課程查詢失敗: ${courseError.message}`);
+    }
+
+    // 方法3: 建議替代方案
+    console.log('\n💡 替代方案建議:');
+    console.log('1. 請 Google Workspace 管理員查詢此用戶 ID');
+    console.log('2. 聯絡組織的 IT 部門協助識別');
+    console.log('3. 檢查 Google Admin Console 的用戶列表');
+    console.log(`4. 在 Admin Console 搜尋: ${userId}`);
+
+    return {
+      success: false,
+      message: '無法透過現有 API 查詢到用戶資訊',
+      suggestions: [
+        '聯絡 Google Workspace 管理員',
+        '檢查 Google Admin Console',
+        '確認用戶 ID 是否正確',
+      ],
+    };
+  } catch (error) {
+    console.log(`❌ 查詢過程發生錯誤: ${error.message}`);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+/**
+ * 🔧 增強版權限診斷工具
+ * 提供更詳細的權限狀態和解決建議
+ */
+function enhancedPermissionDiagnosis(courseId = '779922029471') {
+  console.log('=== 🔧 增強版權限診斷工具 ===');
+
+  // 步驟1: 檢查當前執行者
+  let currentUser = null;
+  try {
+    currentUser = Session.getActiveUser().getEmail();
+    console.log(`📧 當前執行者: ${currentUser}`);
+  } catch (e) {
+    console.log(`⚠️ 無法取得執行者 Email: ${e.message}`);
+    console.log(`💡 解決方案: 在 appsscript.json 添加 userinfo.email 權限`);
+  }
+
+  // 步驟2: 檢查課程詳細資訊
+  console.log(`\n🔍 檢查課程: ${courseId}`);
+  try {
+    const course = Classroom.Courses.get(courseId);
+    console.log(`📚 課程名稱: ${course.name}`);
+    console.log(`👤 課程擁有者 ID: ${course.ownerId}`);
+    console.log(`📊 課程狀態: ${course.courseState}`);
+
+    // 步驟3: 查詢課程擁有者資訊
+    console.log(`\n🔍 查詢課程擁有者詳細資訊...`);
+    const ownerInfo = lookupUserById(course.ownerId);
+
+    if (ownerInfo.success && ownerInfo.email) {
+      console.log(`📧 課程擁有者 Email: ${ownerInfo.email}`);
+      console.log(`👤 擁有者姓名: ${ownerInfo.name || '未知'}`);
+
+      // 步驟4: 權限分析
+      if (currentUser && currentUser === ownerInfo.email) {
+        console.log(`\n✅ 權限狀態: 您是課程擁有者，擁有完整權限！`);
+        return {
+          hasPermission: true,
+          role: 'OWNER',
+          recommendation: '可以直接執行 addTeachersFromExternalSheet()',
+        };
+      } else {
+        console.log(`\n⚠️ 權限狀態: 您不是課程擁有者`);
+        console.log(`\n💡 解決方案選項:`);
+        console.log(`1. 請 ${ownerInfo.email} 執行 addTeachersFromExternalSheet()`);
+        console.log(`2. 請課程擁有者將您設為共同擁有者`);
+        console.log(`3. 聯絡 Google Workspace 管理員協助`);
+
+        return {
+          hasPermission: false,
+          role: 'TEACHER_OR_OTHER',
+          currentUser: currentUser,
+          ownerEmail: ownerInfo.email,
+          ownerName: ownerInfo.name,
+          recommendations: [
+            `請 ${ownerInfo.email} 執行老師新增功能`,
+            '請課程擁有者授予更高權限',
+            '聯絡 Google Workspace 管理員',
+          ],
+        };
+      }
+    } else {
+      console.log(`❌ 無法查詢擁有者詳細資訊`);
+      console.log(`\n💡 解決方案:`);
+      console.log(`1. 聯絡 Google Workspace 管理員查詢用戶 ID: ${course.ownerId}`);
+      console.log(`2. 請管理員直接執行老師新增作業`);
+
+      return {
+        hasPermission: false,
+        role: 'UNKNOWN',
+        ownerUserId: course.ownerId,
+        recommendations: [
+          '聯絡 Google Workspace 管理員',
+          '請管理員查詢擁有者身份',
+          '請管理員執行批次操作',
+        ],
+      };
+    }
+  } catch (error) {
+    console.log(`❌ 課程查詢失敗: ${error.message}`);
+    return {
+      hasPermission: false,
+      error: error.message,
+      recommendations: [
+        '檢查課程 ID 是否正確',
+        '確認您有課程存取權限',
+        '聯絡 Google Workspace 管理員',
+      ],
+    };
+  }
+}
+
+// =============================================
+// UI 介面函數 - 為選單項目提供用戶界面
+// =============================================
+
+/**
+ * 列出課程 UI
+ */
+function listCoursesUI() {
+  const ui = SpreadsheetApp.getUi();
+  const result = ui.prompt(
+    '📋 列出所有課程',
+    '請輸入要寫入課程清單的工作表名稱（預設：課程清單）',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const sheetName = result.getResponseText() || '課程清單';
+
+  try {
+    ui.alert('處理中', '正在載入課程清單，請稍候...', ui.ButtonSet.OK);
+    listCourses(sheetName);
+    ui.alert('✅ 成功', `課程清單已成功寫入 "${sheetName}" 工作表。`, ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 查詢課程師生 UI
+ */
+function listMembersUI() {
+  const ui = SpreadsheetApp.getUi();
+  const result = ui.prompt(
+    '🔍 查詢課程師生',
+    '請輸入要查詢師生的工作表名稱（預設：課程清單）',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const sheetName = result.getResponseText() || '課程清單';
+
+  try {
+    listCourseMembers(sheetName);
+    ui.alert('✅ 成功', `師生清單已成功更新於 "${sheetName}" 工作表。`, ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 建立課程 UI
+ */
+function createCoursesUI() {
+  const ui = SpreadsheetApp.getUi();
+
+  const sheetNameResult = ui.prompt(
+    '📚 建立新課程 - 步驟 1/2',
+    '請輸入包含課程名稱的工作表名稱（預設：新課程）',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (sheetNameResult.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const sheetName = sheetNameResult.getResponseText() || '新課程';
+
+  const ownerIdResult = ui.prompt(
+    '📚 建立新課程 - 步驟 2/2',
+    '請輸入新課程的擁有者 ID。留空則預設為您自己 (me)',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (ownerIdResult.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const ownerId = ownerIdResult.getResponseText() || 'me';
+
+  try {
+    createCourses(sheetName, ownerId);
+    ui.alert('✅ 成功', `新課程已成功建立，詳情請見 "${sheetName}" 工作表。`, ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 新增老師 UI
+ */
+function addTeachersUI() {
+  const ui = SpreadsheetApp.getUi();
+  const result = ui.prompt(
+    '👨‍🏫 新增老師',
+    '請輸入要處理新增老師的工作表名稱（預設：新增老師）',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const sheetName = result.getResponseText() || '新增老師';
+
+  try {
+    // 這裡可以添加批次新增老師的邏輯
+    ui.alert(
+      '🚧 功能開發中',
+      '批次新增老師功能正在開發中，請使用 addTeachersFromExternalSheet() 功能。',
+      ui.ButtonSet.OK
+    );
+  } catch (error) {
+    ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 新增學生 UI
+ */
+function addStudentsUI() {
+  const ui = SpreadsheetApp.getUi();
+  const result = ui.prompt(
+    '👨‍🎓 新增學生',
+    '請輸入要處理新增學生的工作表名稱（預設：新增學生）',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const sheetName = result.getResponseText() || '新增學生';
+
+  try {
+    ui.alert('🚧 功能開發中', '批次新增學生功能正在開發中。', ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 更新課程名稱 UI
+ */
+function updateCoursesUI() {
+  const ui = SpreadsheetApp.getUi();
+  const result = ui.prompt(
+    '✏️ 更新課程名稱',
+    '請輸入包含課程名稱更新資料的工作表名稱（預設：更新課程）',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const sheetName = result.getResponseText() || '更新課程';
+
+  try {
+    updateCourses(sheetName);
+    ui.alert('✅ 成功', `課程名稱已成功更新，詳情請見 "${sheetName}" 工作表。`, ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 封存課程 UI
+ */
+function archiveCoursesUI() {
+  const ui = SpreadsheetApp.getUi();
+  const result = ui.prompt(
+    '📦 封存課程',
+    '請輸入包含要封存課程資料的工作表名稱（預設：封存課程）',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const sheetName = result.getResponseText() || '封存課程';
+
+  try {
+    archiveCourses(sheetName);
+    ui.alert('✅ 成功', `課程已成功封存，詳情請見 "${sheetName}" 工作表。`, ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 新增單一學生到課程 UI
+ */
+function addSingleStudentToCourseUI() {
+  const ui = SpreadsheetApp.getUi();
+  ui.alert('🚧 功能開發中', '此功能正在開發中。', ui.ButtonSet.OK);
+}
+
+/**
+ * 從課程移除單一學生 UI
+ */
+function removeSingleStudentFromCourseUI() {
+  const ui = SpreadsheetApp.getUi();
+  ui.alert('🚧 功能開發中', '此功能正在開發中。', ui.ButtonSet.OK);
+}
+
+/**
+ * 設定預設工作表名稱 UI
+ */
+function configureDefaultSheetsUI() {
+  const ui = SpreadsheetApp.getUi();
+  ui.alert('🚧 功能開發中', '此功能正在開發中。', ui.ButtonSet.OK);
+}
+
+/**
+ * 系統狀態 UI
+ */
+function showSystemStatusUI() {
+  const ui = SpreadsheetApp.getUi();
+
+  let statusMessage = '📊 系統狀態報告\n\n';
+
+  try {
+    // 檢查當前用戶
+    const currentUser = Session.getActiveUser().getEmail();
+    statusMessage += `👤 當前用戶: ${currentUser}\n`;
+  } catch (e) {
+    statusMessage += `👤 當前用戶: 無法獲取\n`;
+  }
+
+  try {
+    // 檢查課程數量
+    const courses = Classroom.Courses.list({ courseStates: ['ACTIVE'] });
+    const courseCount = courses.courses ? courses.courses.length : 0;
+    statusMessage += `📚 可存取課程數: ${courseCount}\n`;
+  } catch (e) {
+    statusMessage += `📚 課程檢查: 失敗 (${e.message})\n`;
+  }
+
+  statusMessage += `\n⏰ 檢查時間: ${new Date().toLocaleString()}`;
+
+  ui.alert('📊 系統狀態', statusMessage, ui.ButtonSet.OK);
+}
+
+/**
+ * 清除快取 UI
+ */
+function clearCacheUI() {
+  const ui = SpreadsheetApp.getUi();
+  const confirm = ui.alert(
+    '🗑️ 清除快取',
+    '您確定要清除所有快取嗎？\n\n注意：這會清除腳本儲存的所有設定值。',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm === ui.Button.YES) {
+    try {
+      PropertiesService.getScriptProperties().deleteAll();
+      ui.alert('✅ 成功', '快取已清除', ui.ButtonSet.OK);
+    } catch (error) {
+      ui.alert('❌ 錯誤', `清除失敗：${error.message}`, ui.ButtonSet.OK);
+    }
   }
 }

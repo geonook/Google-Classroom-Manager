@@ -265,10 +265,11 @@ class ClassroomService {
 
     // 檢查老師是否已經存在
     const teachers = teachersResult.result || [];
-    const teacherExists = teachers.some(teacher => 
-        teacher && 
-        teacher.profile && 
-        teacher.profile.emailAddress && 
+    const teacherExists = teachers.some(
+      (teacher) =>
+        teacher &&
+        teacher.profile &&
+        teacher.profile.emailAddress &&
         teacher.profile.emailAddress.toLowerCase() === teacherEmail.toLowerCase()
     );
 
@@ -281,12 +282,11 @@ class ClassroomService {
     console.log(`正在將老師 ${teacherEmail} 新增到課程 ${courseId}...`);
     const addResult = await this.addSingleMember(courseId, teacherEmail, 'TEACHER');
     if (addResult.success) {
-        return { success: true, status: 'ADDED' };
+      return { success: true, status: 'ADDED' };
     } else {
-        return { success: false, error: addResult.error };
+      return { success: false, error: addResult.error };
     }
   }
-
 
   /**
    * 更新課程

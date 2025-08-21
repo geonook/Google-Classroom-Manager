@@ -98,6 +98,7 @@
     },
     "globals": {
       "Classroom": "readonly",
+      "AdminDirectory": "readonly",
       "PropertiesService": "readonly",
       "Utilities": "readonly",
       "SpreadsheetApp": "readonly",
@@ -118,7 +119,7 @@
       "no-unused-vars": [
         "warn",
         {
-          "varsIgnorePattern": "^(onOpen|.*UI|.*Service|.*Handler|.*Tracker|.*Limiter|classroomService|rateLimiter|ErrorHandler|ProgressTracker|RateLimiter|setScriptProperty|listCourses|listCourseMembers|createCourses|addMembers|rowIndex)$",
+          "varsIgnorePattern": "^(onOpen|.*UI|.*Service|.*Handler|.*Tracker|.*Limiter|.*Permission.*|.*Teacher.*|.*Course.*|.*Owner.*|.*Diagnosis|.*External.*|.*Lookup.*|.*Transfer.*|.*Test.*|.*Property|.*Sheet.*|.*Log|classroomService|rateLimiter|ErrorHandler|ProgressTracker|RateLimiter|setScriptProperty|listCourses|listCourseMembers|createCourses|addMembers|rowIndex|sheetName|updatedCourse|teachers|populate.*)$",
           "argsIgnorePattern": "^(index|rowIndex|_)$"
         }
       ],
