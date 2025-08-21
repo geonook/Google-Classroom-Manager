@@ -75,6 +75,7 @@ function onOpen() {
     .addSeparator()
     .addItem('👨‍🏫 4. 新增老師', 'addTeachersUI')
     .addItem('👨‍🎓 5. 新增學生', 'addStudentsUI')
+    .addItem('🎯 5B. 智能學生分配', 'distributeStudentsUI')
     .addSeparator()
     .addItem('✏️ 6. 更新課程名稱', 'updateCoursesUI')
     .addItem('📦 7. 封存課程', 'archiveCoursesUI')
@@ -2746,7 +2747,7 @@ function addTeachersUI() {
 }
 
 /**
- * 新增學生 UI
+ * 新增學生 UI (一般批次新增)
  */
 function addStudentsUI() {
   const ui = SpreadsheetApp.getUi();
@@ -2763,9 +2764,608 @@ function addStudentsUI() {
   const sheetName = result.getResponseText() || '新增學生';
 
   try {
-    ui.alert('🚧 功能開發中', '批次新增學生功能正在開發中。', ui.ButtonSet.OK);
+    ui.alert('🚧 功能開發中', '一般批次新增學生功能正在開發中。\n\n💡 建議使用：「🎯 智能學生分配」功能，可自動為班級分配到對應課程。', ui.ButtonSet.OK);
   } catch (error) {
     ui.alert('❌ 錯誤', `操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 🎯 智能學生分配系統 UI
+ * 自動為每個班級的學生分配到對應的3門課程
+ */
+function distributeStudentsUI() {
+  const ui = SpreadsheetApp.getUi();
+  
+  // 步驟1: 獲取工作表名稱
+  const sheetNameResult = ui.prompt(
+    '🎯 智能學生分配 - 步驟 1/2',
+    '請輸入包含學生資料的工作表名稱（預設：學生分配）\n格式需包含：學生Email | 班級名稱 | 狀態',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (sheetNameResult.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const sheetName = sheetNameResult.getResponseText() || '學生分配';
+
+  // 步驟2: 選擇分配模式
+  const modeResult = ui.alert(
+    '🎯 智能學生分配 - 步驟 2/2',
+    '請選擇學生分配模式：\n\n✅ 確定：自動配對模式（推薦）\n系統會自動為每個班級匹配對應的3門課程\n\n❌ 取消：自訂配對模式（進階）\n需要手動指定課程配對規則',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  const isAutoMode = modeResult === ui.Button.OK;
+
+  try {
+    // 執行權限預檢
+    console.log('🔍 執行權限預檢...');
+    const currentUser = Session.getActiveUser().getEmail();
+    
+    // 使用 Promise 處理異步操作
+    performPermissionPrecheck(currentUser).then(permissionCheck => {
+      if (!permissionCheck.canProceed) {
+        const continueResult = ui.alert(
+          '⚠️ 權限檢查',
+          `權限檢查發現問題：\n${permissionCheck.issue}\n\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續執行？`,
+          ui.ButtonSet.YES_NO
+        );
+        
+        if (continueResult !== ui.Button.YES) {
+          ui.alert('操作已取消', '建議先解決權限問題後再執行分配功能。', ui.ButtonSet.OK);
+          return;
+        }
+      }
+
+      // 執行智能分配
+      console.log(`🚀 開始執行智能學生分配 (模式: ${isAutoMode ? '自動配對' : '自訂配對'})`);
+      distributeStudentsToCourses(sheetName, isAutoMode).then(result => {
+        handleDistributionResult(result, ui);
+      }).catch(error => {
+        console.log(`[ERROR] 智能學生分配失敗: ${error.message}`);
+        ui.alert('❌ 系統錯誤', `智能分配系統發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
+      });
+      
+    }).catch(error => {
+      console.log(`[ERROR] 權限檢查失敗: ${error.message}`);
+      ui.alert('❌ 權限檢查錯誤', `權限檢查發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
+    });
+    
+  } catch (error) {
+    console.log(`[ERROR] 智能學生分配失敗: ${error.message}`);
+    ui.alert('❌ 系統錯誤', `智能分配系統發生錯誤：\n${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 🎯 處理智能分配結果
+ */
+function handleDistributionResult(result, ui) {
+  if (result.success) {
+    const summary = result.summary;
+    const message = `🎉 智能學生分配完成！\n\n` +
+      `📊 處理統計：\n` +
+      `• 總分配任務：${result.totalAssignments || 0}\n` +
+      `• 已處理：${result.processedCount || 0}\n` +
+      `• 成功分配：${summary.statistics.successful}\n` +
+      `• 失敗項目：${summary.statistics.failed}\n` +
+      `• 處理時間：${summary.statistics.duration}ms\n\n` +
+      `📈 分配到課程：${result.distributedCourses || 0} 門\n` +
+      `⏱️ 平均處理時間：${Math.round(summary.statistics.averageTime)}ms/任務\n\n` +
+      `📊 詳細報告已保存至「智能分配報告」工作表`;
+    
+    ui.alert('✅ 分配完成', message, ui.ButtonSet.OK);
+  } else {
+    // 顯示部分成功的情況
+    if (result.processedCount && result.processedCount > 0) {
+      const message = `⚠️ 分配部分完成\n\n` +
+        `📊 處理統計：\n` +
+        `• 總任務：${result.totalAssignments || 0}\n` +
+        `• 已處理：${result.processedCount || 0}\n` +
+        `• 剩餘未處理：${(result.totalAssignments || 0) - (result.processedCount || 0)}\n\n` +
+        `❌ 主要錯誤：${result.error || '未知錯誤'}\n\n` +
+        `💡 建議：檢查「智能分配報告」工作表查看詳細結果`;
+      
+      ui.alert('⚠️ 部分完成', message, ui.ButtonSet.OK);
+    } else {
+      ui.alert('❌ 分配失敗', `分配過程中發生錯誤：\n${result.error || '未知錯誤'}`, ui.ButtonSet.OK);
+    }
+  }
+}
+
+/**
+ * 🎯 智能學生分配系統 - 核心分配函數
+ * 自動為每個班級的學生分配到對應的3門課程
+ */
+async function distributeStudentsToCourses(sheetName, isAutoMode = true) {
+  console.log(`🚀 開始智能學生分配: ${sheetName} (模式: ${isAutoMode ? '自動配對' : '自訂配對'})`);
+  
+  try {
+    // 步驟1: 驗證和讀取學生資料
+    const studentData = await readStudentDataFromSheet(sheetName);
+    if (!studentData.success) {
+      return { success: false, error: studentData.error };
+    }
+
+    // 步驟2: 獲取所有活動課程
+    console.log('📚 載入活動課程清單...');
+    const coursesResult = await classroomService.listAllCourses();
+    if (!coursesResult.success) {
+      return { success: false, error: '無法載入課程清單: ' + coursesResult.error };
+    }
+
+    // 步驟3: 執行課程匹配算法
+    console.log('🧠 執行智能課程匹配...');
+    const matchingResult = await performCourseMatching(studentData.students, coursesResult.data, isAutoMode);
+    if (!matchingResult.success) {
+      return { success: false, error: matchingResult.error };
+    }
+
+    // 步驟4: 執行批次學生分配
+    console.log('⚡ 開始批次學生分配...');
+    const distributionResult = await executeBatchDistribution(matchingResult.assignments);
+    
+    // 步驟5: 生成和保存詳細報告
+    if (distributionResult.processedCount > 0) {
+      console.log('📈 生成分配報告...');
+      const report = generateDistributionReport(distributionResult, matchingResult.assignments);
+      const saveResult = saveDistributionReportToSheet(report);
+      
+      if (saveResult.success) {
+        console.log(`📊 詳細報告已保存至 "${saveResult.sheetName}" 工作表`);
+      }
+    }
+    
+    return {
+      success: distributionResult.success,
+      summary: distributionResult.summary,
+      distributedCourses: matchingResult.totalCourses,
+      error: distributionResult.error,
+      processedCount: distributionResult.processedCount,
+      totalAssignments: matchingResult.assignments.length
+    };
+
+  } catch (error) {
+    console.log(`[ERROR] 智能分配系統錯誤: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 📊 從工作表讀取學生資料
+ */
+async function readStudentDataFromSheet(sheetName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      return { success: false, error: `找不到名為 "${sheetName}" 的工作表` };
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, error: '工作表中沒有學生資料' };
+    }
+
+    // 讀取資料 (跳過標題行)
+    const range = sheet.getRange(2, 1, lastRow - 1, 3);
+    const data = range.getValues();
+
+    const students = [];
+    const classGroups = new Map();
+
+    data.forEach((row, index) => {
+      const [email, className, status] = row;
+      
+      if (!email || !className) {
+        console.log(`[WARN] 第 ${index + 2} 行資料不完整，跳過`);
+        return;
+      }
+
+      // 跳過已處理的學生
+      if (status && status.toString().trim()) {
+        console.log(`[INFO] 學生 ${email} 已處理，跳過`);
+        return;
+      }
+
+      const student = {
+        email: email.toString().trim(),
+        className: className.toString().trim(),
+        rowIndex: index + 2
+      };
+
+      students.push(student);
+
+      // 按班級分組
+      if (!classGroups.has(student.className)) {
+        classGroups.set(student.className, []);
+      }
+      classGroups.get(student.className).push(student);
+    });
+
+    console.log(`📊 讀取完成: ${students.length} 名學生，${classGroups.size} 個班級`);
+    return { 
+      success: true, 
+      students, 
+      classGroups,
+      totalStudents: students.length,
+      totalClasses: classGroups.size
+    };
+
+  } catch (error) {
+    return { success: false, error: `讀取學生資料失敗: ${error.message}` };
+  }
+}
+
+/**
+ * 🧠 執行智能課程匹配算法
+ * 為每個班級自動匹配對應的3門課程
+ */
+async function performCourseMatching(students, allCourses, isAutoMode) {
+  console.log(`🧠 開始課程匹配 (共 ${allCourses.length} 門課程)`);
+  
+  try {
+    // 課程結構常數 (從現有系統提取)
+    const SUBJECTS = ['LT', 'IT', 'KCFS'];  // 三門主要課程
+    const GRADES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'];
+    const CLASS_NAMES = ['Achievers', 'Discoverers', 'Voyagers', 'Explorers', 'Navigators'];
+
+    // 建立課程索引
+    const courseIndex = new Map();
+    allCourses.forEach(course => {
+      courseIndex.set(course.name, course);
+    });
+
+    // 按班級分組學生
+    const classGroups = new Map();
+    students.forEach(student => {
+      if (!classGroups.has(student.className)) {
+        classGroups.set(student.className, []);
+      }
+      classGroups.get(student.className).push(student);
+    });
+
+    const assignments = [];
+    let totalCourses = 0;
+
+    // 為每個班級匹配課程
+    for (const [className, classStudents] of classGroups) {
+      console.log(`🎯 為班級 "${className}" 匹配課程 (${classStudents.length} 名學生)`);
+      
+      const matchedCourses = await findMatchingCourses(className, courseIndex, SUBJECTS, GRADES, CLASS_NAMES, isAutoMode);
+      
+      if (matchedCourses.length === 0) {
+        console.log(`[WARN] 班級 "${className}" 找不到匹配的課程`);
+        continue;
+      }
+
+      console.log(`✅ 班級 "${className}" 匹配到 ${matchedCourses.length} 門課程`);
+      totalCourses += matchedCourses.length;
+
+      // 為該班級的每個學生建立分配記錄
+      for (const student of classStudents) {
+        for (const course of matchedCourses) {
+          assignments.push({
+            studentEmail: student.email,
+            courseId: course.id,
+            courseName: course.name,
+            className: student.className,
+            rowIndex: student.rowIndex
+          });
+        }
+      }
+    }
+
+    console.log(`🎯 匹配完成: ${assignments.length} 項分配任務，涵蓋 ${totalCourses} 門課程`);
+    
+    return { 
+      success: true, 
+      assignments,
+      totalCourses,
+      classCount: classGroups.size
+    };
+
+  } catch (error) {
+    return { success: false, error: `課程匹配失敗: ${error.message}` };
+  }
+}
+
+/**
+ * 🔍 為班級尋找匹配的課程
+ */
+async function findMatchingCourses(className, courseIndex, subjects, grades, classNames, isAutoMode) {
+  const matchedCourses = [];
+  
+  if (isAutoMode) {
+    // 自動模式: 根據課程命名規則匹配
+    
+    // 嘗試解析班級名稱 (例如: "G3 Explorers" -> G3, Explorers)
+    let grade = null;
+    let classType = null;
+    
+    // 檢查是否包含年級信息
+    for (const g of grades) {
+      if (className.includes(g)) {
+        grade = g;
+        break;
+      }
+    }
+    
+    // 檢查是否包含班級類型
+    for (const ct of classNames) {
+      if (className.includes(ct)) {
+        classType = ct;
+        break;
+      }
+    }
+    
+    console.log(`🔍 班級解析: "${className}" -> 年級: ${grade || '未知'}, 類型: ${classType || '未知'}`);
+    
+    // 為每個科目尋找對應課程
+    for (const subject of subjects) {
+      if (grade && classType) {
+        // 完整匹配: 科目-年級 班級類型 (例如: "LT-G3 Explorers")
+        const exactCourseName = `${subject}-${grade} ${classType}`;
+        if (courseIndex.has(exactCourseName)) {
+          matchedCourses.push(courseIndex.get(exactCourseName));
+          console.log(`  ✅ 精確匹配: ${exactCourseName}`);
+          continue;
+        }
+      }
+      
+      // 模糊匹配: 尋找包含班級名稱的課程
+      for (const [courseName, course] of courseIndex) {
+        if (courseName.includes(subject) && 
+            (courseName.includes(className) || 
+             (grade && courseName.includes(grade)) ||
+             (classType && courseName.includes(classType)))) {
+          matchedCourses.push(course);
+          console.log(`  ✅ 模糊匹配: ${courseName}`);
+          break;
+        }
+      }
+    }
+    
+  } else {
+    // 自訂模式: 需要用戶手動指定匹配規則 (暫時使用自動模式邏輯)
+    console.log(`[INFO] 自訂模式尚未實作，暫時使用自動模式`);
+    return await findMatchingCourses(className, courseIndex, subjects, grades, classNames, true);
+  }
+  
+  return matchedCourses;
+}
+
+/**
+ * ⚡ 執行批次學生分配 (含時間管理和進度追蹤)
+ */
+async function executeBatchDistribution(assignments) {
+  const totalAssignments = assignments.length;
+  console.log(`⚡ 開始批次分配: ${totalAssignments} 項任務`);
+  
+  const progress = new ProgressTracker(totalAssignments, '智能學生分配');
+  const BATCH_SIZE = 20; // 每批處理20個分配
+  const REST_INTERVAL = 1000; // 每批之間休息1秒
+  const MAX_EXECUTION_TIME = 300000; // 5分鐘執行限制 (留1分鐘緩衝)
+  
+  const startTime = Date.now();
+  let processedCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
+  const errors = [];
+
+  try {
+    // 分批處理
+    for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
+      // 檢查執行時間
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+        console.log(`[WARN] 接近執行時間限制，停止處理。已處理 ${processedCount}/${totalAssignments}`);
+        break;
+      }
+
+      const batch = assignments.slice(i, i + BATCH_SIZE);
+      console.log(`📦 處理批次 ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} 項任務`);
+
+      // 處理當前批次
+      for (const assignment of batch) {
+        try {
+          const result = await classroomService.addSingleMember(
+            assignment.courseId, 
+            assignment.studentEmail, 
+            'STUDENT'
+          );
+
+          if (result.success) {
+            progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName}`);
+            successCount++;
+            
+            // 更新學生處理狀態 (斷點續傳支援)
+            await updateStudentStatus(assignment, 'success');
+          } else {
+            progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, result.error);
+            errors.push({ assignment, error: result.error });
+            errorCount++;
+            
+            // 記錄失敗狀態
+            await updateStudentStatus(assignment, 'failed', result.error);
+          }
+
+        } catch (error) {
+          progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, error);
+          errors.push({ assignment, error: error.message });
+          errorCount++;
+        }
+
+        processedCount++;
+      }
+
+      // 批次間休息
+      if (i + BATCH_SIZE < assignments.length) {
+        console.log(`⏳ 批次完成，休息 ${REST_INTERVAL}ms...`);
+        await Utilities.sleep(REST_INTERVAL);
+      }
+    }
+
+    const summary = progress.complete();
+    
+    console.log(`📊 分配完成統計:`);
+    console.log(`  總任務: ${totalAssignments}`);
+    console.log(`  已處理: ${processedCount}`);
+    console.log(`  成功: ${successCount}`);
+    console.log(`  失敗: ${errorCount}`);
+    console.log(`  執行時間: ${Date.now() - startTime}ms`);
+
+    return {
+      success: errorCount === 0,
+      summary,
+      processedCount,
+      successCount,
+      errorCount,
+      errors,
+      totalTime: Date.now() - startTime
+    };
+
+  } catch (error) {
+    console.log(`[ERROR] 批次分配系統錯誤: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🔄 更新學生處理狀態 (斷點續傳支援)
+ */
+async function updateStudentStatus(assignment, status, error = null) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetName = '學生分配'; // 預設工作表名稱
+    const sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet || !assignment.rowIndex) {
+      return; // 如果沒有工作表或行索引，跳過狀態更新
+    }
+
+    // 準備狀態訊息
+    let statusMessage = '';
+    const timestamp = new Date().toLocaleString('zh-TW');
+    
+    switch (status) {
+      case 'success':
+        statusMessage = `✅ 已分配到 ${assignment.courseName} (${timestamp})`;
+        break;
+      case 'failed':
+        statusMessage = `❌ 分配失敗: ${error || '未知錯誤'} (${timestamp})`;
+        break;
+      case 'processing':
+        statusMessage = `⏳ 處理中... (${timestamp})`;
+        break;
+      default:
+        statusMessage = `${status} (${timestamp})`;
+    }
+
+    // 更新狀態列 (假設第3列是狀態列)
+    sheet.getRange(assignment.rowIndex, 3).setValue(statusMessage);
+    
+    console.log(`[STATUS] 已更新學生 ${assignment.studentEmail} 狀態: ${statusMessage}`);
+    
+  } catch (error) {
+    console.log(`[WARN] 無法更新學生狀態: ${error.message}`);
+  }
+}
+
+/**
+ * 📈 生成詳細分配報告
+ */
+function generateDistributionReport(distributionResult, assignments) {
+  const report = {
+    timestamp: new Date().toISOString(),
+    summary: {
+      totalAssignments: assignments.length,
+      processedCount: distributionResult.processedCount,
+      successCount: distributionResult.successCount,
+      errorCount: distributionResult.errorCount,
+      successRate: Math.round((distributionResult.successCount / distributionResult.processedCount) * 100),
+      totalTime: distributionResult.totalTime,
+      averageTimePerAssignment: Math.round(distributionResult.totalTime / distributionResult.processedCount)
+    },
+    performance: {
+      assignmentsPerSecond: Math.round(distributionResult.processedCount / (distributionResult.totalTime / 1000)),
+      timeEfficiency: distributionResult.totalTime < 300000 ? 'excellent' : 'acceptable',
+      memoryUsage: 'within_limits' // Apps Script 自動管理
+    },
+    errors: distributionResult.errors || [],
+    recommendations: []
+  };
+
+  // 生成建議
+  if (report.summary.errorCount > 0) {
+    report.recommendations.push('檢查失敗的分配項目，可能需要手動處理');
+    
+    if (report.summary.successRate < 80) {
+      report.recommendations.push('成功率較低，建議檢查權限設定或課程配對規則');
+    }
+  }
+
+  if (report.performance.assignmentsPerSecond < 1) {
+    report.recommendations.push('處理速度較慢，考慮優化批次大小或減少API呼叫頻率');
+  }
+
+  if (report.summary.totalAssignments > distributionResult.processedCount) {
+    report.recommendations.push('部分任務因執行時間限制未完成，建議分批執行');
+  }
+
+  console.log('📈 分配報告生成完成:');
+  console.log(`  成功率: ${report.summary.successRate}%`);
+  console.log(`  處理速度: ${report.performance.assignmentsPerSecond} 分配/秒`);
+  console.log(`  建議數量: ${report.recommendations.length}`);
+
+  return report;
+}
+
+/**
+ * 💾 保存分配報告到工作表
+ */
+function saveDistributionReportToSheet(report) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const reportSheetName = '智能分配報告';
+    
+    let reportSheet = ss.getSheetByName(reportSheetName);
+    if (!reportSheet) {
+      reportSheet = ss.insertSheet(reportSheetName);
+      
+      // 建立標題行
+      const headers = [
+        '時間戳記', '總任務數', '已處理', '成功數', '失敗數', 
+        '成功率(%)', '總時間(ms)', '平均時間(ms)', '處理速度(/秒)', '建議'
+      ];
+      reportSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      reportSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+
+    // 新增報告記錄
+    const newRow = [
+      report.timestamp,
+      report.summary.totalAssignments,
+      report.summary.processedCount,
+      report.summary.successCount,
+      report.summary.errorCount,
+      report.summary.successRate,
+      report.summary.totalTime,
+      report.summary.averageTimePerAssignment,
+      report.performance.assignmentsPerSecond,
+      report.recommendations.join('; ')
+    ];
+
+    reportSheet.appendRow(newRow);
+    console.log(`📊 報告已保存到 "${reportSheetName}" 工作表`);
+    
+    return { success: true, sheetName: reportSheetName };
+    
+  } catch (error) {
+    console.log(`[ERROR] 保存報告失敗: ${error.message}`);
+    return { success: false, error: error.message };
   }
 }
 
