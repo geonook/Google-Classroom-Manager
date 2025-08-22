@@ -3228,11 +3228,32 @@ function saveBatchAddReportToSheet(report) {
 }
 
 /**
- * 🎯 智能學生分配系統 UI
+ * 🎯 智能學生分配系統 UI - 支援編輯器環境檢測
  * 自動為每個班級的學生分配到對應的3門課程
  */
 async function distributeStudentsUI() {
-  const ui = SpreadsheetApp.getUi();
+  // 檢測執行環境：Sheets UI vs Apps Script 編輯器
+  let ui;
+  let isInEditor = false;
+  
+  try {
+    ui = SpreadsheetApp.getUi();
+  } catch (e) {
+    // 在 Apps Script 編輯器中執行，無法使用 UI 組件
+    console.log('🔧 檢測到在 Apps Script 編輯器中執行');
+    console.log('⚡ 將使用預設參數執行測試模式...');
+    isInEditor = true;
+  }
+  
+  // 如果在編輯器中，直接調用測試函數
+  if (isInEditor) {
+    console.log('📋 編輯器模式 - 使用預設參數:');
+    console.log('  - 工作表: "學生分配"');
+    console.log('  - 模式: 自動配對');
+    console.log('  - 跳過權限檢查');
+    
+    return await testDistributeStudents('學生分配', true);
+  }
   
   try {
     // 步驟1: 獲取工作表名稱
@@ -3416,6 +3437,67 @@ function handleDistributionResult(result, ui) {
     
     ui.alert('❌ 執行失敗', message, ui.ButtonSet.OK);
   }
+}
+
+/**
+ * 🧪 測試函數 - 專門用於 Apps Script 編輯器測試
+ * 跳過 UI 組件，直接測試智能學生分配核心功能
+ */
+async function testDistributeStudents(sheetName = '學生分配', isAutoMode = true) {
+  console.log('🧪 開始測試智能學生分配功能...');
+  console.log(`📊 測試參數: 工作表="${sheetName}", 自動模式=${isAutoMode}`);
+  
+  try {
+    // 記錄開始時間
+    const startTime = Date.now();
+    
+    // 跳過權限檢查，直接執行核心分配功能
+    console.log('⚡ 跳過權限檢查，直接執行核心分配...');
+    
+    const result = await distributeStudentsToCourses(sheetName, isAutoMode);
+    
+    // 計算執行時間
+    const executionTime = Date.now() - startTime;
+    
+    // 顯示測試結果
+    console.log('\n🎉 測試完成！');
+    console.log(`⏱️ 執行時間: ${executionTime}ms (${Math.round(executionTime/1000)}秒)`);
+    console.log('📊 測試結果摘要:');
+    console.log(`  - 成功: ${result.success}`);
+    console.log(`  - 總任務: ${result.totalAssignments || 0}`);
+    console.log(`  - 已處理: ${result.processedCount || 0}`);
+    console.log(`  - 分配課程: ${result.distributedCourses || 0}`);
+    
+    if (result.error) {
+      console.log(`  - 錯誤: ${result.error}`);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.log('\n❌ 測試失敗!');
+    console.log(`🔍 錯誤詳情: ${error.message}`);
+    console.log(`📋 錯誤堆疊: ${error.stack}`);
+    
+    // 提供調試建議
+    if (error.message.includes('工作表')) {
+      console.log('💡 建議: 檢查工作表名稱是否正確，格式是否為 "學生Email | 班級名稱 | 狀態"');
+    } else if (error.message.includes('權限')) {
+      console.log('💡 建議: 檢查 Google Classroom API 權限');
+    } else if (error.message.includes('課程')) {
+      console.log('💡 建議: 確認課程存在且有操作權限');
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * 🧪 簡化測試函數 - 使用預設參數快速測試
+ */
+async function quickTestDistribution() {
+  console.log('🚀 快速測試智能學生分配...');
+  return await testDistributeStudents();
 }
 
 /**
