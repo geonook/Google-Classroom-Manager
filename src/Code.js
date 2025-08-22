@@ -5714,3 +5714,119 @@ function testStuCourseBatchAdd() {
     };
   }
 }
+
+/**
+ * 🔧 創建小規模測試資料工作表
+ * 使用真實的 Google Classroom 課程 ID 進行測試
+ */
+function createTestDataSheet() {
+  console.log("🚀 開始創建測試資料工作表");
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 檢查是否已有測試工作表，如有則刪除重建
+    let testSheet = spreadsheet.getSheetByName("test_stu_course");
+    if (testSheet) {
+      console.log("🔄 刪除現有測試工作表");
+      spreadsheet.deleteSheet(testSheet);
+    }
+    
+    // 創建新的測試工作表
+    testSheet = spreadsheet.insertSheet("test_stu_course");
+    console.log("✅ 已創建測試工作表：test_stu_course");
+    
+    // 設定標題行
+    const headers = [
+      ["學生Email", "課程ID", "狀態"]
+    ];
+    testSheet.getRange(1, 1, 1, 3).setValues(headers);
+    testSheet.getRange(1, 1, 1, 3).setFontWeight("bold").setBackground("#E8F5E8");
+    
+    // 創建測試資料（使用真實的課程 ID）
+    const testData = [
+      // 使用一些測試 Email 和真實的課程 ID
+      ["test1@kcislk.ntpc.edu.tw", "779922029471", "未處理"],  // LT-G1 Achievers
+      ["test2@kcislk.ntpc.edu.tw", "779921968089", "未處理"],  // IT-G1 Achievers  
+      ["test3@kcislk.ntpc.edu.tw", "779921948860", "未處理"],  // LT-G1 Adventurers
+      ["test4@kcislk.ntpc.edu.tw", "779922024070", "未處理"],  // LT-G1 Discoverers
+      ["test5@kcislk.ntpc.edu.tw", "779922003016", "未處理"],  // KCFS-G1 Achievers
+    ];
+    
+    // 寫入測試資料
+    testSheet.getRange(2, 1, testData.length, 3).setValues(testData);
+    
+    // 格式化工作表
+    testSheet.autoResizeColumns(1, 3);
+    testSheet.setFrozenRows(1);
+    
+    console.log(`✅ 已創建 ${testData.length} 筆測試資料`);
+    console.log("📋 測試資料課程對應：");
+    console.log("  • 779922029471: LT-G1 Achievers");
+    console.log("  • 779921968089: IT-G1 Achievers");
+    console.log("  • 779921948860: LT-G1 Adventurers"); 
+    console.log("  • 779922024070: LT-G1 Discoverers");
+    console.log("  • 779922003016: KCFS-G1 Achievers");
+    
+    return {
+      success: true,
+      sheetName: "test_stu_course",
+      dataCount: testData.length,
+      message: "測試資料工作表創建成功，可執行 testSmallScaleBatch() 進行測試"
+    };
+    
+  } catch (error) {
+    console.log(`❌ 創建測試資料失敗: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 🧪 小規模批次測試函數
+ * 專門測試 test_stu_course 工作表的真實課程 ID
+ */
+function testSmallScaleBatch() {
+  console.log("🧪 開始小規模批次學生新增測試");
+  console.log("📊 目標工作表：test_stu_course");
+  console.log("🎯 測試目標：驗證真實課程 ID 和修復效果");
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const testSheet = spreadsheet.getSheetByName("test_stu_course");
+    
+    if (!testSheet) {
+      console.log("❌ 找不到測試工作表，請先執行 createTestDataSheet()");
+      return { 
+        success: false, 
+        error: "測試工作表不存在，請先執行 createTestDataSheet() 創建測試資料" 
+      };
+    }
+    
+    console.log(`✅ 找到測試工作表，資料行數：${testSheet.getLastRow()}`);
+    
+    // 執行小規模批次測試
+    const result = batchAddStudentsFromSheet("test_stu_course");
+    
+    console.log("✅ 小規模測試執行完成");
+    console.log(`📊 測試結果：`, JSON.stringify({
+      success: result?.success || false,
+      processed: result?.processedCount || 0,
+      errors: result?.errors?.length || 0
+    }));
+    
+    return result;
+    
+  } catch (error) {
+    console.log(`❌ 小規模測試失敗: ${error.message}`);
+    console.log(`🔍 錯誤詳情: ${error.stack}`);
+    
+    return {
+      success: false,
+      error: error.message,
+      context: "小規模批次測試"
+    };
+  }
+}
