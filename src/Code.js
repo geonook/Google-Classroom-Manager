@@ -5660,3 +5660,22 @@ function clearCacheUI() {
     }
   }
 }
+
+/**
+ * 🧪 stu_course 工作表批次學生新增測試函數
+ * 專為 Google Apps Script 編輯器執行設計，無需參數
+ */
+function testStuCourseBatchAdd() {
+  console.log("🚀 開始測試 stu_course 工作表的批次學生新增");
+  console.log("📊 讀取工作表：stu_course");
+  
+  try {
+    const result = batchAddStudentsFromSheet("stu_course");
+    console.log("✅ 測試函數執行完成");
+    return result;
+  } catch (error) {
+    console.log(`❌ 測試執行失敗: ${error.message}`);
+    console.log(`🔍 錯誤堆疊: ${error.stack}`);
+    throw error;
+  }
+}
