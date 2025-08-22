@@ -5956,6 +5956,11 @@ function getCourseIdFromName(courseName) {
       'LT': '779922007326',
       'IT': '779921996536',
       'KCFS': '779922037060'
+    },
+    'G1 Inventors': {
+      'LT': '779922048392',
+      'IT': '779922040087',
+      'KCFS': '779921999592'
     }
   };
 
