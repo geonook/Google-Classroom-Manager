@@ -5830,3 +5830,45 @@ function testSmallScaleBatch() {
     };
   }
 }
+
+/**
+ * 🎯 執行真實學生批次新增 - 無參數版本，直接可執行
+ */
+function executeRealStudentBatch() {
+  console.log('🎯 開始執行真實學生批次新增');
+  console.log('📊 目標工作表：stu_course');
+  console.log('🚀 使用所有已修復的系統組件');
+  
+  try {
+    // 檢查工作表是否存在
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName('stu_course');
+    
+    if (!sheet) {
+      console.log('❌ 找不到工作表 stu_course');
+      console.log('💡 請確認工作表名稱是否正確');
+      return { success: false, error: '找不到指定工作表' };
+    }
+    
+    const numRows = sheet.getLastRow();
+    console.log(`✅ 找到目標工作表，資料行數：${numRows}`);
+    
+    // 執行真實批次新增
+    console.log('⏳ 正在執行批次新增學生操作...');
+    const result = batchAddStudentsFromSheet('stu_course');
+    
+    console.log('🎉 真實批次新增執行完成');
+    console.log('📊 最終結果：', JSON.stringify({
+      success: result?.success || false,
+      processed: result?.processedCount || 0,
+      successful: result?.successfulCount || 0,
+      errors: result?.errors?.length || 0
+    }));
+    
+    return result;
+    
+  } catch (error) {
+    console.log(`❌ 執行真實批次新增失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
