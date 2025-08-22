@@ -76,6 +76,7 @@ function onOpen() {
     .addItem('👨‍🏫 4. 新增老師', 'addTeachersUI')
     .addItem('👨‍🎓 5. 新增學生', 'addStudentsUI')
     .addItem('🎯 5B. 智能學生分配', 'distributeStudentsUI')
+    .addItem('🧹 5C. 清除學生狀態', 'clearStudentStatusColumn')
     .addSeparator()
     .addItem('✏️ 6. 更新課程名稱', 'updateCoursesUI')
     .addItem('📦 7. 封存課程', 'archiveCoursesUI')
@@ -3559,6 +3560,50 @@ async function distributeStudentsToCourses(sheetName, isAutoMode = true) {
 }
 
 /**
+ * 🧹 清除工作表狀態列 - 重置所有學生處理狀態
+ */
+function clearStudentStatusColumn(sheetName = 'stu_course') {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      throw new Error(`找不到名為 "${sheetName}" 的工作表`);
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      SpreadsheetApp.getUi().alert('提示', '工作表中沒有學生資料。', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+
+    // 確認清除操作
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert(
+      '⚠️ 確認清除狀態',
+      `即將清除 "${sheetName}" 工作表中所有學生的處理狀態。\n\n這將允許重新處理所有學生。\n\n確定要繼續嗎？`,
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      ui.alert('操作已取消', '狀態清除已取消。', ui.ButtonSet.OK);
+      return;
+    }
+
+    // 清除狀態列 (第3列)
+    const statusRange = sheet.getRange(2, 3, lastRow - 1, 1);
+    statusRange.clearContent();
+
+    console.log(`✅ 已清除 ${lastRow - 1} 行學生的處理狀態`);
+    ui.alert('✅ 狀態已清除', `已成功清除 ${lastRow - 1} 名學生的處理狀態。\n\n現在可以重新執行智能學生分配功能。`, ui.ButtonSet.OK);
+
+  } catch (error) {
+    console.log(`[ERROR] 清除狀態失敗: ${error.message}`);
+    SpreadsheetApp.getUi().alert('錯誤', `清除狀態失敗：${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
  * 📊 從工作表讀取學生資料
  */
 async function readStudentDataFromSheet(sheetName) {
@@ -3581,6 +3626,7 @@ async function readStudentDataFromSheet(sheetName) {
 
     const students = [];
     const classGroups = new Map();
+    let skippedCount = 0;
 
     data.forEach((row, index) => {
       const [email, className, status] = row;
@@ -3590,16 +3636,18 @@ async function readStudentDataFromSheet(sheetName) {
         return;
       }
 
-      // 跳過已處理的學生
-      if (status && status.toString().trim()) {
-        console.log(`[INFO] 學生 ${email} 已處理，跳過`);
+      // 跳過已處理的學生 (只跳過有 ✅ 符號的)
+      if (status && status.toString().includes('✅')) {
+        console.log(`[INFO] 學生 ${email} 已成功處理 (${status})，跳過`);
+        skippedCount++;
         return;
       }
 
       const student = {
         email: email.toString().trim(),
         className: className.toString().trim(),
-        rowIndex: index + 2
+        rowIndex: index + 2,
+        currentStatus: status ? status.toString().trim() : ''
       };
 
       students.push(student);
@@ -3611,13 +3659,14 @@ async function readStudentDataFromSheet(sheetName) {
       classGroups.get(student.className).push(student);
     });
 
-    console.log(`📊 讀取完成: ${students.length} 名學生，${classGroups.size} 個班級`);
+    console.log(`📊 讀取完成: ${students.length} 名學生，${classGroups.size} 個班級 (跳過 ${skippedCount} 名已完成學生)`);
     return { 
       success: true, 
       students, 
       classGroups,
       totalStudents: students.length,
-      totalClasses: classGroups.size
+      totalClasses: classGroups.size,
+      skippedCount
     };
 
   } catch (error) {
