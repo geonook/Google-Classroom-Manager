@@ -96,7 +96,10 @@ const ValidationUtils = {
     const courseIdRegex = /^[0-9]{10,15}$/;
     
     if (!courseIdRegex.test(trimmedId)) {
-      return { valid: false, error: '無效的課程 ID 格式（應為 10-15 位數字）' };
+      return { 
+        valid: false, 
+        error: `無效的課程 ID 格式。收到："${trimmedId}"，應為 10-15 位純數字（例如：123456789012）。請檢查工作表中的課程 ID 是否為 Google Classroom 的實際課程編號。` 
+      };
     }
     
     return { valid: true, courseId: trimmedId };
@@ -5664,18 +5667,50 @@ function clearCacheUI() {
 /**
  * 🧪 stu_course 工作表批次學生新增測試函數
  * 專為 Google Apps Script 編輯器執行設計，無需參數
+ * 修正版本：避免所有 UI 相關錯誤，適合編輯器執行
  */
 function testStuCourseBatchAdd() {
   console.log("🚀 開始測試 stu_course 工作表的批次學生新增");
   console.log("📊 讀取工作表：stu_course");
+  console.log("⚙️ 執行環境：Google Apps Script 編輯器（無UI模式）");
   
   try {
+    // 提前檢查工作表是否存在
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName("stu_course");
+    
+    if (!sheet) {
+      console.log("❌ 錯誤：找不到 stu_course 工作表");
+      return { success: false, error: "工作表 'stu_course' 不存在" };
+    }
+    
+    console.log(`✅ 找到工作表：${sheet.getName()}`);
+    console.log(`📏 工作表資料行數：${sheet.getLastRow()}`);
+    
+    // 執行批次新增（使用 await，確保是異步函數）
     const result = batchAddStudentsFromSheet("stu_course");
     console.log("✅ 測試函數執行完成");
+    console.log(`📊 執行結果摘要：`, JSON.stringify({
+      success: result?.success || false,
+      processed: result?.processedCount || 0,
+      errors: result?.errors?.length || 0
+    }));
+    
     return result;
   } catch (error) {
     console.log(`❌ 測試執行失敗: ${error.message}`);
+    console.log(`🔍 錯誤類型: ${error.name}`);
     console.log(`🔍 錯誤堆疊: ${error.stack}`);
-    throw error;
+    
+    // 如果是 UI 相關錯誤，給出特別說明
+    if (error.message.includes("getUi")) {
+      console.log("💡 這是 UI 相關錯誤，在 Apps Script 編輯器執行時是正常的");
+    }
+    
+    return { 
+      success: false, 
+      error: error.message, 
+      context: "Google Apps Script 編輯器執行" 
+    };
   }
 }

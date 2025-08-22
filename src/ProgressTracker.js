@@ -256,11 +256,15 @@ class ProgressTracker {
     const summary = this.generateSummary(Date.now() - this.startTime);
     summary.userMessage = `處理被中斷：${reason}\n\n` + summary.userMessage;
 
-    SpreadsheetApp.getUi().alert(
-      '處理中斷',
-      summary.userMessage,
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
+    try {
+      SpreadsheetApp.getUi().alert(
+        '處理中斷',
+        summary.userMessage,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    } catch (uiError) {
+      console.log(`[WARN] 無法顯示中斷訊息UI（可能在Apps Script編輯器中執行）: ${summary.userMessage}`);
+    }
 
     return summary;
   }

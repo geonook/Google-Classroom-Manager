@@ -16,9 +16,13 @@ class ErrorHandler {
       console.log(`[ERROR] Stack: ${error.stack}`);
     }
 
-    // 通知使用者
+    // 通知使用者（避免在非UI環境中呼叫）
     if (showToUser) {
-      SpreadsheetApp.getUi().alert('錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
+      try {
+        SpreadsheetApp.getUi().alert('錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
+      } catch (uiError) {
+        console.log(`[WARN] 無法顯示UI錯誤訊息（可能在Apps Script編輯器中執行）: ${message}`);
+      }
     }
 
     return {
@@ -43,7 +47,11 @@ class ErrorHandler {
     }
 
     const message = `${operation}失敗：${errorInfo.userMessage}`;
-    SpreadsheetApp.getUi().alert('API 錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    try {
+      SpreadsheetApp.getUi().alert('API 錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    } catch (uiError) {
+      console.log(`[WARN] 無法顯示API錯誤訊息（可能在Apps Script編輯器中執行）: ${message}`);
+    }
 
     return {
       success: false,
@@ -199,7 +207,11 @@ class ErrorHandler {
     if (missing.length > 0) {
       const message = `缺少必要參數：${missing.join(', ')}`;
       console.log(`[ERROR] 參數驗證失敗: 缺少 ${missing.join(', ')}`);
-      SpreadsheetApp.getUi().alert('參數錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
+      try {
+        SpreadsheetApp.getUi().alert('參數錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
+      } catch (uiError) {
+        console.log(`[WARN] 無法顯示參數錯誤訊息（可能在Apps Script編輯器中執行）: ${message}`);
+      }
       return false;
     }
 
