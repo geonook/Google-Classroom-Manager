@@ -6238,7 +6238,7 @@ function testCourseIdMapping() {
 /**
  * 🧪 小批次學生新增測試 - 驗證修復效果
  */
-function testSmallBatchStudentAddition() {
+async function testSmallBatchStudentAddition() {
   console.log('🧪 開始小批次學生新增測試');
   console.log('📊 目標：驗證課程映射和錯誤處理改善');
   
@@ -6328,6 +6328,629 @@ function testSmallBatchStudentAddition() {
     
   } catch (error) {
     console.log(`❌ 小批次測試失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+// ========================== 智能課程發現系統 ==========================
+
+/**
+ * 🔍 獲取所有 Google Classroom 課程
+ * 使用 ClassroomService 獲取所有活動課程
+ */
+async function getAllClassroomCourses(options = {}) {
+  console.log('🚀 開始獲取所有 Google Classroom 課程...');
+  
+  try {
+    const result = await classroomService.listAllCourses(options);
+    
+    if (!result.success) {
+      console.log(`❌ 獲取課程列表失敗：${result.error}`);
+      return { success: false, error: result.error };
+    }
+    
+    const courses = result.data || [];
+    console.log(`✅ 成功獲取 ${courses.length} 個課程`);
+    
+    return {
+      success: true,
+      courses: courses,
+      count: courses.length,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.log(`❌ 獲取課程列表異常：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🎯 模糊匹配課程名稱
+ * 支援多種課程命名格式的智能匹配
+ */
+function findCourseByPattern(className, subject, courses) {
+  if (!className || !subject || !courses || courses.length === 0) {
+    return { success: false, error: '缺少必要參數' };
+  }
+  
+  console.log(`🔍 搜索課程：${className} - ${subject}`);
+  
+  // 定義可能的課程名稱模式
+  const patterns = [
+    // 標準格式：G1 Achievers - LT
+    `${className} - ${subject}`,
+    `${className}-${subject}`,
+    // 前綴格式：LT-G1 Achievers
+    `${subject}-${className}`,
+    `${subject} - ${className}`,
+    // 後綴格式：G1 Achievers (LT)
+    `${className} (${subject})`,
+    `${className}(${subject})`,
+    // 中文格式
+    `${className} ${subject}課程`,
+    `${subject} ${className}`,
+    // 簡化格式
+    `${className} ${subject}`,
+    `${subject} ${className}`
+  ];
+  
+  // 完全匹配
+  for (const pattern of patterns) {
+    const exactMatch = courses.find(course => 
+      course.name && course.name.trim() === pattern
+    );
+    
+    if (exactMatch) {
+      console.log(`✅ 完全匹配找到：${exactMatch.name} (ID: ${exactMatch.id})`);
+      return {
+        success: true,
+        course: exactMatch,
+        matchType: 'EXACT',
+        pattern: pattern
+      };
+    }
+  }
+  
+  // 模糊匹配
+  const fuzzyMatches = [];
+  
+  for (const course of courses) {
+    if (!course.name) continue;
+    
+    const courseName = course.name.toLowerCase();
+    const classNameLower = className.toLowerCase();
+    const subjectLower = subject.toLowerCase();
+    
+    // 檢查是否包含班級名稱和科目
+    if (courseName.includes(classNameLower) && courseName.includes(subjectLower)) {
+      // 計算匹配度分數
+      let score = 0;
+      
+      // 班級名稱完整匹配加分
+      if (courseName.includes(classNameLower)) score += 50;
+      
+      // 科目完整匹配加分
+      if (courseName.includes(subjectLower)) score += 30;
+      
+      // 位置相近加分
+      const classIndex = courseName.indexOf(classNameLower);
+      const subjectIndex = courseName.indexOf(subjectLower);
+      if (Math.abs(classIndex - subjectIndex) < 10) score += 20;
+      
+      fuzzyMatches.push({
+        course: course,
+        score: score,
+        matchType: 'FUZZY'
+      });
+    }
+  }
+  
+  // 按分數排序，取最高分
+  if (fuzzyMatches.length > 0) {
+    fuzzyMatches.sort((a, b) => b.score - a.score);
+    const bestMatch = fuzzyMatches[0];
+    
+    console.log(`🎯 模糊匹配找到：${bestMatch.course.name} (ID: ${bestMatch.course.id}, 分數: ${bestMatch.score})`);
+    
+    return {
+      success: true,
+      course: bestMatch.course,
+      matchType: 'FUZZY',
+      score: bestMatch.score,
+      alternatives: fuzzyMatches.slice(1, 3) // 提供前2個備選
+    };
+  }
+  
+  console.log(`❌ 找不到匹配的課程：${className} - ${subject}`);
+  return {
+    success: false,
+    error: `找不到匹配的課程：${className} - ${subject}`,
+    searchPatterns: patterns
+  };
+}
+
+/**
+ * 🚀 創建完整課程映射（主要函數）
+ * 掃描並創建 82 個班級 × 3 個科目 = 246 個課程的完整映射
+ */
+async function createCompleteCourseMapping(options = {}) {
+  console.log('🚀 開始創建完整課程映射系統...');
+  
+  // 定義班級列表
+  const classNames = {
+    G1: ['Achievers', 'Discoverers', 'Voyagers', 'Explorers', 'Navigators', 'Adventurers', 'Guardians', 'Pioneers', 'Innovators', 'Visionaries', 'Pathfinders', 'Seekers', 'Trailblazers', 'Inventors'],
+    G2: ['Pioneers', 'Explorers', 'Inventors', 'Achievers', 'Voyagers', 'Adventurers', 'Innovators', 'Guardians', 'Pathfinders', 'Visionaries', 'Navigators', 'Discoverers', 'Seekers', 'Trailblazers'],
+    G3: ['Inventors', 'Innovators', 'Guardians', 'Achievers', 'Voyagers', 'Visionaries', 'Trailblazers', 'Discoverers', 'Explorers', 'Navigators', 'Adventurers', 'Seekers', 'Pathfinders', 'Pioneers'],
+    G4: ['Seekers', 'Voyagers', 'Visionaries', 'Achievers', 'Navigators', 'Trailblazers', 'Pathfinders', 'Explorers', 'Adventurers', 'Innovators', 'Discoverers', 'Guardians', 'Inventors', 'Pioneers'],
+    G5: ['Adventurers', 'Navigators', 'Pioneers', 'Inventors', 'Seekers', 'Discoverers', 'Guardians', 'Pathfinders', 'Explorers', 'Achievers', 'Voyagers', 'Trailblazers', 'Innovators', 'Visionaries'],
+    G6: ['Explorers', 'Inventors', 'Adventurers', 'Achievers', 'Voyagers', 'Discoverers', 'Innovators', 'Guardians', 'Pathfinders', 'Seekers', 'Visionaries', 'Pioneers', 'Trailblazers', 'Navigators']
+  };
+  
+  const subjects = ['LT', 'IT', 'KCFS'];
+  
+  // 計算總課程數
+  const totalClasses = Object.values(classNames).reduce((sum, classes) => sum + classes.length, 0);
+  const expectedCourses = totalClasses * subjects.length;
+  
+  console.log(`📊 預期映射課程數量：${totalClasses} 個班級 × ${subjects.length} 個科目 = ${expectedCourses} 個課程`);
+  
+  try {
+    // 1. 獲取所有 Classroom 課程
+    console.log('🔍 步驟 1：獲取所有 Google Classroom 課程...');
+    const coursesResult = await getAllClassroomCourses(options);
+    
+    if (!coursesResult.success) {
+      return { success: false, error: `獲取課程失敗：${coursesResult.error}` };
+    }
+    
+    const allCourses = coursesResult.courses;
+    console.log(`✅ 獲取到 ${allCourses.length} 個 Classroom 課程`);
+    
+    // 2. 初始化進度追蹤器
+    const progress = new ProgressTracker(expectedCourses, '課程映射發現');
+    
+    // 3. 構建課程映射資料
+    const mappingData = [];
+    const foundCourses = new Set();
+    const missingCourses = [];
+    
+    console.log('🎯 步驟 2：開始智能課程匹配...');
+    
+    // 遍歷所有年級
+    for (const [grade, classes] of Object.entries(classNames)) {
+      console.log(`\n📚 處理 ${grade} 年級 (${classes.length} 個班級)...`);
+      
+      // 遍歷每個班級
+      for (const className of classes) {
+        const fullClassName = `${grade} ${className}`;
+        
+        // 遍歷每個科目
+        for (const subject of subjects) {
+          const searchKey = `${fullClassName}-${subject}`;
+          
+          try {
+            // 查找匹配的課程
+            const matchResult = findCourseByPattern(fullClassName, subject, allCourses);
+            
+            if (matchResult.success) {
+              const course = matchResult.course;
+              
+              // 避免重複映射
+              if (!foundCourses.has(course.id)) {
+                mappingData.push({
+                  courseName: fullClassName,
+                  subject: subject,
+                  courseId: course.id,
+                  status: 'ACTIVE',
+                  originalName: course.name,
+                  matchType: matchResult.matchType,
+                  score: matchResult.score || 100,
+                  discoveredAt: new Date().toISOString()
+                });
+                
+                foundCourses.add(course.id);
+                progress.addSuccess(searchKey, `找到：${course.name}`);
+              } else {
+                progress.addWarning(searchKey, `課程重複：${course.name}`);
+              }
+            } else {
+              missingCourses.push({
+                className: fullClassName,
+                subject: subject,
+                error: matchResult.error
+              });
+              progress.addError(searchKey, matchResult.error);
+            }
+            
+            // API 限速控制
+            if (options.respectRateLimit !== false) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+          } catch (error) {
+            missingCourses.push({
+              className: fullClassName,
+              subject: subject,
+              error: error.message
+            });
+            progress.addError(searchKey, error.message);
+          }
+        }
+      }
+    }
+    
+    const summary = progress.complete();
+    
+    console.log('\n📊 步驟 3：更新課程映射工作表...');
+    
+    // 4. 更新工作表
+    const updateResult = await updateCourseMappingSheet(mappingData, {
+      clearExisting: options.clearExisting || false,
+      backupExisting: options.backupExisting !== false
+    });
+    
+    if (!updateResult.success) {
+      return { success: false, error: `更新工作表失敗：${updateResult.error}` };
+    }
+    
+    // 5. 生成報告
+    const report = {
+      summary: {
+        totalExpected: expectedCourses,
+        totalFound: mappingData.length,
+        totalMissing: missingCourses.length,
+        completionRate: Math.round((mappingData.length / expectedCourses) * 100),
+        classroomCoursesScanned: allCourses.length
+      },
+      foundCourses: mappingData,
+      missingCourses: missingCourses,
+      statistics: summary.statistics,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('\n✅ 課程映射創建完成！');
+    console.log(`📈 完成率：${report.summary.completionRate}% (${report.summary.totalFound}/${report.summary.totalExpected})`);
+    console.log(`🎯 找到課程：${report.summary.totalFound} 個`);
+    console.log(`❌ 缺失課程：${report.summary.totalMissing} 個`);
+    
+    return {
+      success: true,
+      report: report,
+      mappingData: mappingData,
+      updateResult: updateResult
+    };
+    
+  } catch (error) {
+    console.log(`❌ 創建課程映射失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 📝 更新課程映射工作表
+ * 將發現的課程映射資料更新到工作表中
+ */
+async function updateCourseMappingSheet(mappingData, options = {}) {
+  console.log(`📝 開始更新課程映射工作表，共 ${mappingData.length} 條記錄...`);
+  
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = spreadsheet.getSheetByName('course_mapping');
+    
+    // 如果工作表不存在，創建它
+    if (!sheet) {
+      console.log('🏗️ course_mapping 工作表不存在，正在創建...');
+      const createResult = createCourseMappingSheet();
+      if (!createResult.success) {
+        return { success: false, error: createResult.error };
+      }
+      sheet = createResult.sheet;
+    }
+    
+    // 備份現有資料
+    if (options.backupExisting) {
+      console.log('💾 備份現有映射資料...');
+      const backupResult = backupCourseMappingSheet();
+      if (backupResult.success) {
+        console.log(`✅ 備份完成：${backupResult.backupSheetName}`);
+      }
+    }
+    
+    // 清除現有資料（保留標題行）
+    if (options.clearExisting) {
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.getRange(2, 1, lastRow - 1, 4).clear();
+        console.log('🧹 已清除現有映射資料');
+      }
+    }
+    
+    // 準備寫入資料
+    if (mappingData.length === 0) {
+      console.log('⚠️ 沒有要更新的映射資料');
+      return { success: true, updatedRows: 0 };
+    }
+    
+    // 轉換資料格式
+    const writeData = mappingData.map(item => [
+      item.courseName || '',
+      item.subject || '',
+      item.courseId || '',
+      item.status || 'ACTIVE'
+    ]);
+    
+    // 批次寫入資料
+    const startRow = options.clearExisting ? 2 : sheet.getLastRow() + 1;
+    const range = sheet.getRange(startRow, 1, writeData.length, 4);
+    range.setValues(writeData);
+    
+    // 設定資料格式
+    range.setWrap(false);
+    range.setHorizontalAlignment('left');
+    
+    // 為新資料設定條件格式
+    if (writeData.length > 0) {
+      // ACTIVE 狀態設為綠色
+      const statusRange = sheet.getRange(startRow, 4, writeData.length, 1);
+      const activeRule = SpreadsheetApp.newConditionalFormatRule()
+        .whenTextEqualTo('ACTIVE')
+        .setBackground('#d9ead3')
+        .setRanges([statusRange])
+        .build();
+      
+      const rules = sheet.getConditionalFormatRules();
+      rules.push(activeRule);
+      sheet.setConditionalFormatRules(rules);
+    }
+    
+    // 自動調整欄寬
+    sheet.autoResizeColumns(1, 4);
+    
+    console.log(`✅ 成功更新 ${writeData.length} 條課程映射記錄`);
+    
+    return {
+      success: true,
+      updatedRows: writeData.length,
+      startRow: startRow,
+      sheetName: 'course_mapping',
+      totalRows: sheet.getLastRow()
+    };
+    
+  } catch (error) {
+    console.log(`❌ 更新課程映射工作表失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 💾 備份課程映射工作表
+ */
+function backupCourseMappingSheet() {
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sourceSheet = spreadsheet.getSheetByName('course_mapping');
+    
+    if (!sourceSheet) {
+      return { success: false, error: 'course_mapping 工作表不存在' };
+    }
+    
+    // 生成備份工作表名稱
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+    const backupName = `course_mapping_backup_${timestamp}`;
+    
+    // 複製工作表
+    const backupSheet = sourceSheet.copyTo(spreadsheet);
+    backupSheet.setName(backupName);
+    
+    // 添加備份資訊
+    const lastRow = backupSheet.getLastRow();
+    backupSheet.getRange(lastRow + 2, 1, 1, 2).setValues([[
+      '備份時間:', new Date().toLocaleString('zh-TW')
+    ]]);
+    
+    console.log(`✅ 課程映射備份完成：${backupName}`);
+    
+    return {
+      success: true,
+      backupSheetName: backupName,
+      originalRows: lastRow
+    };
+    
+  } catch (error) {
+    console.log(`❌ 備份課程映射工作表失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 📊 課程映射統計報告
+ */
+function generateCourseMappingReport() {
+  console.log('📊 生成課程映射統計報告...');
+  
+  try {
+    const mappingResult = readCourseMappingFromSheet();
+    
+    if (!mappingResult.success) {
+      return { success: false, error: mappingResult.error };
+    }
+    
+    const courses = mappingResult.courses;
+    
+    // 按年級統計
+    const gradeStats = {};
+    // 按科目統計
+    const subjectStats = {};
+    // 狀態統計
+    const statusStats = {};
+    
+    courses.forEach(course => {
+      // 解析年級
+      const gradeMatch = course.courseName.match(/G(\d)/);
+      const grade = gradeMatch ? `G${gradeMatch[1]}` : 'Unknown';
+      
+      // 年級統計
+      if (!gradeStats[grade]) gradeStats[grade] = 0;
+      gradeStats[grade]++;
+      
+      // 科目統計
+      const subject = course.subject || 'Unknown';
+      if (!subjectStats[subject]) subjectStats[subject] = 0;
+      subjectStats[subject]++;
+      
+      // 狀態統計
+      const status = course.status || 'Unknown';
+      if (!statusStats[status]) statusStats[status] = 0;
+      statusStats[status]++;
+    });
+    
+    // 完成度分析
+    const expectedPerGrade = 14; // 每年級 14 個班級
+    const expectedPerSubject = 3; // 每個科目 3 個
+    const totalExpected = 82 * 3; // 82 個班級 × 3 個科目
+    
+    const completionRate = Math.round((courses.length / totalExpected) * 100);
+    
+    const report = {
+      summary: {
+        totalMapped: courses.length,
+        totalExpected: totalExpected,
+        completionRate: completionRate,
+        timestamp: new Date().toISOString()
+      },
+      byGrade: gradeStats,
+      bySubject: subjectStats,
+      byStatus: statusStats,
+      missingAnalysis: {
+        expectedPerGrade: expectedPerGrade,
+        expectedPerSubject: expectedPerSubject
+      }
+    };
+    
+    console.log('📈 課程映射統計報告：');
+    console.log(`   總課程數：${report.summary.totalMapped}/${report.summary.totalExpected}`);
+    console.log(`   完成率：${report.summary.completionRate}%`);
+    console.log(`   年級分佈：`, gradeStats);
+    console.log(`   科目分佈：`, subjectStats);
+    console.log(`   狀態分佈：`, statusStats);
+    
+    return {
+      success: true,
+      report: report
+    };
+    
+  } catch (error) {
+    console.log(`❌ 生成統計報告失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🔄 重新同步課程映射
+ * 檢查映射的課程是否仍然存在和活躍
+ */
+async function resyncCourseMappings(options = {}) {
+  console.log('🔄 開始重新同步課程映射...');
+  
+  try {
+    // 讀取現有映射
+    const mappingResult = readCourseMappingFromSheet();
+    if (!mappingResult.success) {
+      return { success: false, error: mappingResult.error };
+    }
+    
+    const currentMappings = mappingResult.courses;
+    console.log(`📋 現有映射記錄：${currentMappings.length} 個`);
+    
+    // 獲取最新課程列表
+    const coursesResult = await getAllClassroomCourses({ forceRefresh: true });
+    if (!coursesResult.success) {
+      return { success: false, error: coursesResult.error };
+    }
+    
+    const latestCourses = coursesResult.courses;
+    const activeCourseIds = new Set(latestCourses.map(c => c.id));
+    
+    // 檢查映射狀態
+    const progress = new ProgressTracker(currentMappings.length, '同步課程映射');
+    const syncResults = [];
+    
+    for (const mapping of currentMappings) {
+      try {
+        const courseId = mapping.courseId;
+        const currentCourse = latestCourses.find(c => c.id === courseId);
+        
+        let newStatus = mapping.status;
+        let syncType = 'UNCHANGED';
+        
+        if (!activeCourseIds.has(courseId)) {
+          // 課程不存在或已封存
+          newStatus = 'ARCHIVED';
+          syncType = 'ARCHIVED';
+          progress.addWarning(`${mapping.courseName} (${mapping.subject})`, '課程已封存');
+        } else if (currentCourse) {
+          // 檢查課程狀態
+          if (currentCourse.courseState === 'ARCHIVED') {
+            newStatus = 'ARCHIVED';
+            syncType = 'ARCHIVED';
+          } else {
+            newStatus = 'ACTIVE';
+            syncType = 'ACTIVE';
+          }
+          progress.addSuccess(`${mapping.courseName} (${mapping.subject})`, `狀態：${syncType}`);
+        }
+        
+        syncResults.push({
+          ...mapping,
+          status: newStatus,
+          syncType: syncType,
+          lastSyncAt: new Date().toISOString()
+        });
+        
+      } catch (error) {
+        progress.addError(`${mapping.courseName} (${mapping.subject})`, error.message);
+        syncResults.push({
+          ...mapping,
+          syncType: 'ERROR',
+          syncError: error.message
+        });
+      }
+    }
+    
+    const summary = progress.complete();
+    
+    // 更新工作表
+    if (options.updateSheet !== false) {
+      const updateResult = await updateCourseMappingSheet(syncResults, {
+        clearExisting: true,
+        backupExisting: true
+      });
+      
+      if (!updateResult.success) {
+        return { success: false, error: `更新工作表失敗：${updateResult.error}` };
+      }
+    }
+    
+    const syncStats = {
+      total: syncResults.length,
+      active: syncResults.filter(r => r.status === 'ACTIVE').length,
+      archived: syncResults.filter(r => r.status === 'ARCHIVED').length,
+      errors: syncResults.filter(r => r.syncType === 'ERROR').length
+    };
+    
+    console.log('✅ 課程映射同步完成');
+    console.log(`📊 同步統計：活躍 ${syncStats.active}、封存 ${syncStats.archived}、錯誤 ${syncStats.errors}`);
+    
+    return {
+      success: true,
+      syncResults: syncResults,
+      statistics: syncStats,
+      summary: summary
+    };
+    
+  } catch (error) {
+    console.log(`❌ 重新同步課程映射失敗：${error.message}`);
     return { success: false, error: error.message };
   }
 }
