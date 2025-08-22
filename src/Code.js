@@ -1483,6 +1483,23 @@ function testClassroomPermissions(courseId = '779922029471') {
 function reauthorizePermissions() {
   console.log('=== 🔄 重新授權權限設定 ===');
   
+  // 顯示友善的 UI 提示
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert(
+      '🔄 重新授權權限',
+      '即將開始重新授權流程，這將確保所有 API 權限正確配置。\n\n此過程包括：\n• Google Classroom 課程管理\n• Google Spreadsheets 操作\n• Admin Directory 用戶查詢\n\n是否要開始重新授權？',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (response !== ui.Button.YES) {
+      ui.alert('操作已取消', '重新授權已取消。', ui.ButtonSet.OK);
+      return;
+    }
+  } catch (e) {
+    console.log('🔧 在 Apps Script 編輯器中執行重新授權');
+  }
+  
   console.log('📋 當前需要的權限範圍:');
   const requiredScopes = [
     'https://www.googleapis.com/auth/classroom.courses',
@@ -1503,9 +1520,9 @@ function reauthorizePermissions() {
   });
   
   console.log('\n🔧 重新授權步驟：');
-  console.log('1. 在 Google Apps Script 編輯器中點擊「執行」按鈕');
+  console.log('1. 系統會自動觸發授權對話框');
   console.log('2. 在彈出的授權對話框中點擊「檢查權限」');
-  console.log('3. 選擇正確的 Google 帳戶');
+  console.log('3. 選擇正確的 Google 帳戶（需要管理員權限）');
   console.log('4. 仔細檢查所有權限請求，確保包含：');
   console.log('   • Google Classroom 課程和名冊管理');
   console.log('   • Google Spreadsheets 讀寫');
@@ -1518,30 +1535,83 @@ function reauthorizePermissions() {
   console.log('• 如果仍然失敗，請聯絡 IT 管理員檢查域安全設定');
   
   // 嘗試觸發權限請求
-  console.log('\n🎯 嘗試觸發權限檢查...');
+  console.log('\n🎯 開始權限檢查和授權...');
+  let authSuccess = true;
+  let authResults = [];
+  
   try {
-    // 嘗試訪問需要權限的 API
+    // 1. 檢查用戶資訊權限
     Session.getActiveUser().getEmail();
     console.log('✅ 用戶資訊權限正常');
+    authResults.push('✅ 用戶資訊權限');
     
+    // 2. 檢查 Classroom 權限
     Classroom.Courses.list({ pageSize: 1 });
     console.log('✅ Classroom 課程權限正常');
+    authResults.push('✅ Classroom 課程權限');
     
+    // 3. 檢查 Spreadsheet 權限
     SpreadsheetApp.getActiveSpreadsheet().getId();
     console.log('✅ Spreadsheets 權限正常');
+    authResults.push('✅ Spreadsheets 權限');
     
-    AdminDirectory.Users.get('me');
-    console.log('✅ Admin Directory 權限正常');
+    // 4. 檢查 Admin Directory 權限
+    try {
+      AdminDirectory.Users.get('me');
+      console.log('✅ Admin Directory 權限正常');
+      authResults.push('✅ Admin Directory 權限');
+    } catch (adminError) {
+      console.log('⚠️ Admin Directory 權限需要授權');
+      authResults.push('⚠️ Admin Directory 權限需要授權');
+      authSuccess = false;
+    }
     
-    console.log('\n🎉 所有權限檢查通過！可以嘗試執行教師新增功能。');
+    // 顯示最終結果
+    console.log('\n📊 權限檢查結果:');
+    authResults.forEach(result => console.log(`  ${result}`));
+    
+    if (authSuccess) {
+      console.log('\n🎉 所有權限檢查通過！可以正常使用所有功能。');
+      try {
+        SpreadsheetApp.getUi().alert(
+          '✅ 授權成功',
+          '所有權限檢查通過！\n\n現在可以正常使用：\n• Google Classroom 管理\n• 智能學生分配\n• 批次操作功能\n\n如有需要，可隨時重新執行此授權檢查。',
+          SpreadsheetApp.getUi().ButtonSet.OK
+        );
+      } catch (e) {
+        console.log('🎉 授權完成，可開始使用所有功能');
+      }
+    } else {
+      console.log('\n⚠️ 部分權限需要進一步授權，但基本功能仍可正常使用。');
+      try {
+        SpreadsheetApp.getUi().alert(
+          '⚠️ 部分授權完成',
+          '基本權限已授權，但 Admin Directory 權限仍需要完整授權。\n\n可用功能：\n• Google Classroom 基本操作\n• 學生課程管理\n\n如需完整功能，請聯絡 IT 管理員。',
+          SpreadsheetApp.getUi().ButtonSet.OK
+        );
+      } catch (e) {
+        console.log('⚠️ 部分授權完成，基本功能可用');
+      }
+    }
     
   } catch (error) {
+    authSuccess = false;
     console.log(`\n❌ 權限檢查失敗: ${error.message}`);
     console.log('\n💡 解決方案：');
     console.log('1. 重新運行此函數以觸發授權流程');
     console.log('2. 檢查 Google Workspace 管理控制台的應用程式設定');
     console.log('3. 確認當前帳戶有適當的管理員權限');
     console.log('4. 聯絡 IT 支援檢查域安全政策');
+    
+    try {
+      SpreadsheetApp.getUi().alert(
+        '❌ 授權失敗',
+        `授權過程中發生錯誤：\n${error.message}\n\n請嘗試：\n1. 重新執行此功能\n2. 檢查網路連線\n3. 聯絡 IT 支援`,
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    } catch (e) {
+      console.log('❌ 授權失敗，請檢查權限設定');
+    }
   }
   
   return {
@@ -2107,10 +2177,10 @@ async function performPermissionPrecheck(currentUser) {
       }
       
     } catch (adminError) {
-      result.canProceed = false;
+      result.canProceed = true; // 允許繼續執行，但提供建議
       result.userLevel = '無法確認';
       result.issue = '無法檢查管理員權限，可能缺少 Admin Directory API 存取權';
-      result.recommendation = '請檢查 OAuth 權限設定或使用管理員帳戶';
+      result.recommendation = '建議執行「🔄 重新授權權限」功能以完整授權，或繼續執行並觀察結果';
       result.alternativeAccounts = ['tsehunhchen@kcislk.ntpc.edu.tw'];
     }
     
@@ -2789,12 +2859,12 @@ async function addStudentsUI() {
     if (!permissionCheck.canProceed) {
       const continueResult = ui.alert(
         '⚠️ 權限檢查',
-        `權限檢查發現問題：\n${permissionCheck.issue}\n\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續執行？`,
+        `權限檢查發現問題：\n${permissionCheck.issue}\n\n💡 解決方法：\n1. 選擇選單「診斷工具」→「🔄 重新授權權限」\n2. 完成重新授權後重新執行此功能\n3. 或者繼續執行，大部分功能仍可正常運作\n\n是否要繼續執行？`,
         ui.ButtonSet.YES_NO
       );
       
       if (continueResult !== ui.Button.YES) {
-        ui.alert('操作已取消', '建議先解決權限問題後再執行批次新增功能。', ui.ButtonSet.OK);
+        ui.alert('操作已取消', '建議先執行重新授權後再使用批次新增功能。', ui.ButtonSet.OK);
         return;
       }
     }
@@ -3300,12 +3370,12 @@ async function distributeStudentsUI() {
     if (!permissionCheck.canProceed) {
       const continueResult = ui.alert(
         '⚠️ 權限檢查',
-        `權限檢查發現問題：\n${permissionCheck.issue}\n\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續執行？`,
+        `權限檢查發現問題：\n${permissionCheck.issue}\n\n💡 解決方法：\n1. 選擇選單「診斷工具」→「🔄 重新授權權限」\n2. 完成重新授權後重新執行此功能\n3. 或者繼續執行，智能分配功能仍可正常運作\n\n是否要繼續執行？`,
         ui.ButtonSet.YES_NO
       );
       
       if (continueResult !== ui.Button.YES) {
-        ui.alert('操作已取消', '建議先解決權限問題後再執行分配功能。', ui.ButtonSet.OK);
+        ui.alert('操作已取消', '建議先執行重新授權後再使用智能分配功能。', ui.ButtonSet.OK);
         return;
       }
     }
