@@ -4248,26 +4248,47 @@ async function readStudentCourseDataFromSheet(sheetName) {
     const assignments = [];
 
     data.forEach((row, index) => {
-      const [email, courseId, status] = row;
+      const [email, courseIdOrName, status] = row;
       
-      if (!email || !courseId) {
-        console.log(`[WARN] 第 ${index + 2} 行資料不完整，跳過 (Email: ${email}, CourseID: ${courseId})`);
+      if (!email || !courseIdOrName) {
+        console.log(`[WARN] 第 ${index + 2} 行資料不完整，跳過 (Email: ${email}, Course: ${courseIdOrName})`);
         return;
       }
 
       // 跳過已處理的項目
       if (status && status.toString().trim()) {
-        console.log(`[INFO] 學生 ${email} → 課程 ${courseId} 已處理，跳過`);
+        console.log(`[INFO] 學生 ${email} → 課程 ${courseIdOrName} 已處理，跳過`);
+        return;
+      }
+
+      // 🔄 使用課程映射功能轉換課程名稱為 ID
+      const courseOriginal = courseIdOrName.toString().trim();
+      const mappingResult = getCourseIdFromName(courseOriginal);
+      
+      if (!mappingResult.success) {
+        console.log(`[ERROR] 第 ${index + 2} 行課程映射失敗：${mappingResult.error}`);
+        // 仍然加入到任務列表中，但會在後續處理時失敗
+        assignments.push({
+          studentEmail: email.toString().trim(),
+          courseId: courseOriginal, // 保留原始值
+          originalCourseName: courseOriginal,
+          rowIndex: index + 2,
+          courseName: courseOriginal,
+          mappingError: mappingResult.error
+        });
         return;
       }
 
       const assignment = {
         studentEmail: email.toString().trim(),
-        courseId: courseId.toString().trim(),
+        courseId: mappingResult.courseId, // 使用轉換後的數字 ID
+        originalCourseName: courseOriginal, // 保留原始課程名稱
         rowIndex: index + 2,
-        courseName: `課程 ${courseId}` // 簡化的課程名稱
+        courseName: `${courseOriginal} (${mappingResult.courseId})`, // 顯示原名稱和 ID
+        subject: mappingResult.subject // 如果有的話
       };
 
+      console.log(`🔄 課程映射：第 ${index + 2} 行 "${courseOriginal}" → ID: ${mappingResult.courseId}`);
       assignments.push(assignment);
     });
 
@@ -5871,4 +5892,142 @@ function executeRealStudentBatch() {
     console.log(`❌ 執行真實批次新增失敗：${error.message}`);
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * 🔄 課程名稱到課程 ID 映射系統
+ * 基於之前成功執行記錄中的真實課程 ID 建立完整映射表
+ */
+function getCourseIdFromName(courseName) {
+  // 完整的課程映射表 - 基於實際執行成功的記錄
+  const courseMapping = {
+    // G1 年級課程
+    'G1 Achievers': {
+      'LT': '779922029471',
+      'IT': '779921968089', 
+      'KCFS': '779922003016'
+    },
+    'G1 Discoverers': {
+      'LT': '779922024070',
+      'IT': '779922045964',
+      'KCFS': '779922047333'
+    },
+    'G1 Voyagers': {
+      'LT': '779922000504',
+      'IT': '779921963954',
+      'KCFS': '779922050446'
+    },
+    'G1 Explorers': {
+      'LT': '779922034354',
+      'IT': '779921930383',
+      'KCFS': '779922065235'
+    },
+    'G1 Navigators': {
+      'LT': '779922057508',
+      'IT': '779921999359',
+      'KCFS': '779921986009'
+    },
+    'G1 Adventurers': {
+      'LT': '779921948860',
+      'IT': '779921980356',
+      'KCFS': '779921972429'
+    },
+    'G1 Guardians': {
+      'LT': '779922003082',
+      'IT': '779921980390',
+      'KCFS': '779922046054'
+    },
+    'G1 Pioneers': {
+      'LT': '779922021273',
+      'IT': '779922050570',
+      'KCFS': '779922046073'
+    },
+    'G1 Innovators': {
+      'LT': '779922008329',
+      'IT': '779922021811',
+      'KCFS': '779922057889'
+    },
+    'G1 Visionaries': {
+      'LT': '779922034584',
+      'IT': '779921968221',
+      'KCFS': '779922011931'
+    },
+    'G1 Pathfinders': {
+      'LT': '779922007326',
+      'IT': '779921996536',
+      'KCFS': '779922037060'
+    }
+  };
+
+  console.log(`🔍 查詢課程映射：${courseName}`);
+  
+  // 如果已經是數字 ID，直接返回
+  if (/^\d{10,15}$/.test(courseName)) {
+    console.log(`✅ 已是數字課程 ID：${courseName}`);
+    return { success: true, courseId: courseName, originalName: courseName };
+  }
+
+  // 查找對應的課程組
+  const courseGroup = courseMapping[courseName];
+  if (!courseGroup) {
+    console.log(`❌ 找不到課程映射：${courseName}`);
+    return { 
+      success: false, 
+      error: `找不到課程 "${courseName}" 的 ID 映射。請檢查課程名稱是否正確。`,
+      originalName: courseName 
+    };
+  }
+
+  // 如果有多個科目，返回所有選項（通常需要進一步指定科目）
+  const subjects = Object.keys(courseGroup);
+  if (subjects.length > 1) {
+    console.log(`⚠️ 課程 "${courseName}" 有多個科目版本：${subjects.join(', ')}`);
+    console.log(`💡 請在工作表中指定具體科目，或使用預設的第一個科目：${subjects[0]}`);
+  }
+
+  // 使用第一個可用的科目 ID
+  const selectedSubject = subjects[0];
+  const courseId = courseGroup[selectedSubject];
+
+  console.log(`✅ 課程映射成功：${courseName} (${selectedSubject}) → ${courseId}`);
+  
+  return { 
+    success: true, 
+    courseId: courseId,
+    originalName: courseName,
+    subject: selectedSubject,
+    availableSubjects: subjects
+  };
+}
+
+/**
+ * 🧪 測試課程 ID 映射功能
+ */
+function testCourseIdMapping() {
+  console.log('🧪 開始測試課程 ID 映射功能');
+  
+  const testCases = [
+    'G1 Achievers',
+    'G1 Discoverers', 
+    'G1 Adventurers',
+    '779922029471', // 已經是數字 ID
+    'Unknown Course' // 不存在的課程
+  ];
+
+  testCases.forEach(courseName => {
+    console.log(`\n📝 測試課程：${courseName}`);
+    const result = getCourseIdFromName(courseName);
+    
+    if (result.success) {
+      console.log(`✅ 映射成功：${result.originalName} → ${result.courseId}`);
+      if (result.subject) {
+        console.log(`📚 科目：${result.subject}`);
+      }
+    } else {
+      console.log(`❌ 映射失敗：${result.error}`);
+    }
+  });
+
+  console.log('\n🎉 課程 ID 映射測試完成');
+  return true;
 }
