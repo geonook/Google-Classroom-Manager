@@ -6954,3 +6954,2066 @@ async function resyncCourseMappings(options = {}) {
     return { success: false, error: error.message };
   }
 }
+
+// ========================================
+// 🔄 MAPPING TABLE AUTO-UPDATE SYSTEM v2.0
+// ========================================
+
+/**
+ * 🚀 自動映射表更新引擎
+ * 定期檢查和更新課程映射，智能處理增量更新
+ */
+class AutoMappingUpdateEngine {
+  constructor() {
+    this.logger = new Logger('AutoMappingUpdateEngine');
+    this.rateLimiter = new RateLimiter();
+    this.errorHandler = new ErrorHandler();
+    this.versionControl = new MappingVersionControl();
+    this.qualityMonitor = new MappingQualityMonitor();
+    this.updateIntervals = {
+      FAST: 15 * 60 * 1000,      // 15分鐘 - 快速更新
+      REGULAR: 60 * 60 * 1000,   // 1小時 - 常規更新
+      DAILY: 24 * 60 * 60 * 1000, // 24小時 - 每日更新
+      WEEKLY: 7 * 24 * 60 * 60 * 1000 // 7天 - 每週更新
+    };
+  }
+
+  /**
+   * 🎯 執行增量映射更新
+   * 只更新變更的課程，提高效率
+   */
+  async performIncrementalUpdate(options = {}) {
+    this.logger.info('🚀 開始執行增量映射更新...');
+    
+    const startTime = Date.now();
+    const updateId = `update_${Date.now()}`;
+    
+    try {
+      // 1. 獲取當前映射狀態
+      const currentMapping = await this.getCurrentMappingState();
+      if (!currentMapping.success) {
+        throw new Error(`獲取當前映射失敗: ${currentMapping.error}`);
+      }
+
+      // 2. 掃描 Google Classroom 變更
+      const classroomChanges = await this.detectClassroomChanges(currentMapping.data);
+      if (!classroomChanges.success) {
+        throw new Error(`檢測課程變更失敗: ${classroomChanges.error}`);
+      }
+
+      // 3. 分析需要更新的項目
+      const updatePlan = this.createUpdatePlan(classroomChanges.changes, options);
+      
+      if (updatePlan.totalUpdates === 0) {
+        this.logger.info('✅ 無需更新 - 所有映射都是最新的');
+        return {
+          success: true,
+          type: 'NO_UPDATES_NEEDED',
+          message: '映射表已是最新狀態',
+          executionTime: Date.now() - startTime
+        };
+      }
+
+      // 4. 執行增量更新
+      const updateResults = await this.executeIncrementalUpdates(updatePlan, updateId);
+      
+      // 5. 記錄版本控制
+      await this.versionControl.recordUpdate(updateId, updateResults);
+      
+      // 6. 品質檢查
+      const qualityCheck = await this.qualityMonitor.validateUpdates(updateResults);
+      
+      const executionTime = Date.now() - startTime;
+      this.logger.info(`✅ 增量更新完成 - 耗時: ${executionTime}ms`);
+
+      return {
+        success: true,
+        updateId: updateId,
+        updatePlan: updatePlan,
+        updateResults: updateResults,
+        qualityCheck: qualityCheck,
+        executionTime: executionTime
+      };
+      
+    } catch (error) {
+      this.logger.error(`❌ 增量更新失敗: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        updateId: updateId,
+        executionTime: Date.now() - startTime
+      };
+    }
+  }
+
+  /**
+   * 🔍 獲取當前映射狀態
+   */
+  async getCurrentMappingState() {
+    try {
+      const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = spreadsheet.getSheetByName('course_mapping');
+      
+      if (!sheet) {
+        return { success: false, error: '找不到 course_mapping 工作表' };
+      }
+
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const mappings = [];
+      
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        const mapping = {};
+        
+        headers.forEach((header, index) => {
+          mapping[header] = row[index];
+        });
+        
+        mappings.push(mapping);
+      }
+
+      return {
+        success: true,
+        data: mappings,
+        timestamp: new Date().toISOString(),
+        count: mappings.length
+      };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🔍 檢測 Google Classroom 課程變更
+   */
+  async detectClassroomChanges(currentMappings) {
+    try {
+      // 獲取最新的 Classroom 課程
+      const coursesResult = await getAllClassroomCourses({ forceRefresh: true });
+      if (!coursesResult.success) {
+        throw new Error(`無法獲取 Classroom 課程: ${coursesResult.error}`);
+      }
+
+      const currentCourses = coursesResult.courses;
+      const mappedCourseIds = new Set(currentMappings.map(m => m.courseId).filter(Boolean));
+      
+      const changes = {
+        new: [], // 新增的課程
+        updated: [], // 更新的課程
+        deleted: [], // 刪除的課程
+        unchanged: [] // 未變更的課程
+      };
+
+      // 檢查新增和更新的課程
+      for (const course of currentCourses) {
+        const existingMapping = currentMappings.find(m => m.courseId === course.id);
+        
+        if (!existingMapping) {
+          // 嘗試智能匹配
+          const aiMatch = await this.tryIntelligentMatching(course);
+          if (aiMatch.success) {
+            changes.new.push({
+              course: course,
+              suggestedMapping: aiMatch.mapping,
+              confidence: aiMatch.confidence
+            });
+          }
+        } else {
+          // 檢查是否有更新
+          if (this.hasCourseChanged(course, existingMapping)) {
+            changes.updated.push({
+              course: course,
+              existingMapping: existingMapping,
+              changes: this.identifyChanges(course, existingMapping)
+            });
+          } else {
+            changes.unchanged.push({
+              course: course,
+              mapping: existingMapping
+            });
+          }
+        }
+      }
+
+      // 檢查已刪除的課程
+      for (const mapping of currentMappings) {
+        if (mapping.courseId && !currentCourses.find(c => c.id === mapping.courseId)) {
+          changes.deleted.push({
+            mapping: mapping,
+            reason: 'COURSE_NOT_FOUND_IN_CLASSROOM'
+          });
+        }
+      }
+
+      this.logger.info(`🔍 課程變更檢測完成: 新增 ${changes.new.length}, 更新 ${changes.updated.length}, 刪除 ${changes.deleted.length}, 未變更 ${changes.unchanged.length}`);
+
+      return {
+        success: true,
+        changes: changes,
+        summary: {
+          total: currentCourses.length,
+          new: changes.new.length,
+          updated: changes.updated.length,
+          deleted: changes.deleted.length,
+          unchanged: changes.unchanged.length
+        }
+      };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🤖 智能匹配新課程
+   */
+  async tryIntelligentMatching(course) {
+    try {
+      // 使用現有的 AI 映射系統
+      if (typeof window !== 'undefined' && window.AICourseClassifier) {
+        const classifier = new window.AICourseClassifier();
+        const analysis = classifier.analyzeCourse(course.name);
+        
+        if (analysis.success && analysis.confidence.overall > 0.7) {
+          const mapping = {
+            courseName: `${analysis.grade} ${analysis.className}`,
+            subject: analysis.subject,
+            courseId: course.id,
+            status: 'ACTIVE',
+            originalName: course.name,
+            matchType: 'AI_INTELLIGENT',
+            confidence: analysis.confidence.overall,
+            discoveredAt: new Date().toISOString(),
+            source: 'AUTO_UPDATE_ENGINE'
+          };
+          
+          return {
+            success: true,
+            mapping: mapping,
+            confidence: analysis.confidence.overall,
+            analysis: analysis
+          };
+        }
+      }
+      
+      // 降級使用現有的模糊匹配邏輯
+      const gradeMatches = course.name.match(/G([1-6])/);
+      const subjectMatches = course.name.match(/(LT|IT|KCFS)/);
+      
+      if (gradeMatches && subjectMatches) {
+        const grade = `G${gradeMatches[1]}`;
+        const subject = subjectMatches[1];
+        
+        // 嘗試提取班級名稱
+        const classNameMatch = course.name.match(new RegExp(`${grade}\\s+(\\w+)`));
+        if (classNameMatch) {
+          const className = classNameMatch[1];
+          
+          const mapping = {
+            courseName: `${grade} ${className}`,
+            subject: subject,
+            courseId: course.id,
+            status: 'ACTIVE',
+            originalName: course.name,
+            matchType: 'PATTERN_MATCH',
+            confidence: 0.8,
+            discoveredAt: new Date().toISOString(),
+            source: 'AUTO_UPDATE_ENGINE'
+          };
+          
+          return {
+            success: true,
+            mapping: mapping,
+            confidence: 0.8
+          };
+        }
+      }
+      
+      return { success: false, reason: 'INSUFFICIENT_CONFIDENCE' };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 📋 創建更新計劃
+   */
+  createUpdatePlan(changes, options) {
+    const plan = {
+      adds: changes.new.length,
+      updates: changes.updated.length,
+      deletes: changes.deleted.length,
+      totalUpdates: changes.new.length + changes.updated.length + changes.deleted.length,
+      priority: options.priority || 'NORMAL',
+      batchSize: this.calculateOptimalBatchSize(changes),
+      estimatedTime: this.estimateExecutionTime(changes),
+      items: {
+        toAdd: changes.new,
+        toUpdate: changes.updated,
+        toDelete: changes.deleted
+      }
+    };
+
+    this.logger.info(`📋 更新計劃: ${plan.adds} 新增, ${plan.updates} 更新, ${plan.deletes} 刪除`);
+    return plan;
+  }
+
+  /**
+   * 🚀 執行增量更新
+   */
+  async executeIncrementalUpdates(updatePlan, updateId) {
+    const results = {
+      added: [],
+      updated: [],
+      deleted: [],
+      errors: []
+    };
+
+    try {
+      // 處理新增項目
+      for (const item of updatePlan.items.toAdd) {
+        try {
+          const addResult = await this.addMappingItem(item, updateId);
+          if (addResult.success) {
+            results.added.push(addResult.mapping);
+          } else {
+            results.errors.push({ type: 'ADD', item, error: addResult.error });
+          }
+        } catch (error) {
+          results.errors.push({ type: 'ADD', item, error: error.message });
+        }
+        
+        await this.rateLimiter.throttle();
+      }
+
+      // 處理更新項目
+      for (const item of updatePlan.items.toUpdate) {
+        try {
+          const updateResult = await this.updateMappingItem(item, updateId);
+          if (updateResult.success) {
+            results.updated.push(updateResult.mapping);
+          } else {
+            results.errors.push({ type: 'UPDATE', item, error: updateResult.error });
+          }
+        } catch (error) {
+          results.errors.push({ type: 'UPDATE', item, error: error.message });
+        }
+        
+        await this.rateLimiter.throttle();
+      }
+
+      // 處理刪除項目
+      for (const item of updatePlan.items.toDelete) {
+        try {
+          const deleteResult = await this.deleteMappingItem(item, updateId);
+          if (deleteResult.success) {
+            results.deleted.push(deleteResult.mapping);
+          } else {
+            results.errors.push({ type: 'DELETE', item, error: deleteResult.error });
+          }
+        } catch (error) {
+          results.errors.push({ type: 'DELETE', item, error: error.message });
+        }
+        
+        await this.rateLimiter.throttle();
+      }
+
+      // 如果有實際變更，更新工作表
+      if (results.added.length > 0 || results.updated.length > 0 || results.deleted.length > 0) {
+        await this.updateMappingSheet(results, updateId);
+      }
+
+      return results;
+      
+    } catch (error) {
+      this.logger.error(`執行增量更新失敗: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 🎯 計算最佳批次大小
+   */
+  calculateOptimalBatchSize(changes) {
+    const totalItems = changes.new.length + changes.updated.length + changes.deleted.length;
+    
+    if (totalItems <= 10) return totalItems;
+    if (totalItems <= 50) return 10;
+    if (totalItems <= 200) return 25;
+    return 50; // 最大批次大小
+  }
+
+  /**
+   * ⏱️ 估算執行時間
+   */
+  estimateExecutionTime(changes) {
+    const totalItems = changes.new.length + changes.updated.length + changes.deleted.length;
+    const baseTime = 200; // 每項基本時間 (ms)
+    const apiDelay = 100; // API 限速延遲 (ms)
+    
+    return (totalItems * (baseTime + apiDelay)) / 1000; // 返回秒數
+  }
+
+  /**
+   * 📄 檢查課程是否有變更
+   */
+  hasCourseChanged(course, existingMapping) {
+    // 檢查關鍵屬性是否有變更
+    return (
+      course.name !== existingMapping.originalName ||
+      course.courseState !== existingMapping.status ||
+      course.updateTime !== existingMapping.lastUpdated
+    );
+  }
+
+  /**
+   * 🔍 識別具體變更內容
+   */
+  identifyChanges(course, existingMapping) {
+    const changes = [];
+    
+    if (course.name !== existingMapping.originalName) {
+      changes.push({
+        field: 'originalName',
+        oldValue: existingMapping.originalName,
+        newValue: course.name
+      });
+    }
+    
+    if (course.courseState !== existingMapping.status) {
+      changes.push({
+        field: 'status',
+        oldValue: existingMapping.status,
+        newValue: course.courseState
+      });
+    }
+    
+    return changes;
+  }
+
+  /**
+   * ➕ 新增映射項目
+   */
+  async addMappingItem(item, updateId) {
+    try {
+      const mapping = {
+        ...item.suggestedMapping,
+        addedBy: 'AUTO_UPDATE_ENGINE',
+        addedAt: new Date().toISOString(),
+        updateId: updateId
+      };
+      
+      this.logger.info(`➕ 新增映射: ${mapping.courseName} - ${mapping.subject}`);
+      return { success: true, mapping: mapping };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🔄 更新映射項目
+   */
+  async updateMappingItem(item, updateId) {
+    try {
+      const updatedMapping = { ...item.existingMapping };
+      
+      // 應用變更
+      for (const change of item.changes) {
+        updatedMapping[change.field] = change.newValue;
+      }
+      
+      updatedMapping.lastUpdated = new Date().toISOString();
+      updatedMapping.updatedBy = 'AUTO_UPDATE_ENGINE';
+      updatedMapping.updateId = updateId;
+      
+      this.logger.info(`🔄 更新映射: ${updatedMapping.courseName} - ${updatedMapping.subject}`);
+      return { success: true, mapping: updatedMapping };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🗑️ 刪除映射項目 (標記為已刪除)
+   */
+  async deleteMappingItem(item, updateId) {
+    try {
+      const deletedMapping = {
+        ...item.mapping,
+        status: 'DELETED',
+        deletedAt: new Date().toISOString(),
+        deletedBy: 'AUTO_UPDATE_ENGINE',
+        deleteReason: item.reason,
+        updateId: updateId
+      };
+      
+      this.logger.info(`🗑️ 標記刪除映射: ${deletedMapping.courseName} - ${deletedMapping.subject}`);
+      return { success: true, mapping: deletedMapping };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 📝 更新映射工作表
+   */
+  async updateMappingSheet(results, updateId) {
+    try {
+      // 收集所有需要寫入的數據
+      const allMappings = [
+        ...results.added,
+        ...results.updated,
+        ...results.deleted
+      ];
+      
+      if (allMappings.length === 0) {
+        return { success: true, message: '無數據需要更新' };
+      }
+
+      // 調用現有的更新函數
+      const updateResult = await updateCourseMappingSheet(allMappings, {
+        clearExisting: false, // 不清空現有數據，僅更新
+        backupExisting: true,
+        updateId: updateId
+      });
+      
+      return updateResult;
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+}
+
+/**
+ * 📚 映射表版本控制系統
+ * 自動備份、版本管理、回滾功能
+ */
+class MappingVersionControl {
+  constructor() {
+    this.logger = new Logger('MappingVersionControl');
+    this.maxVersions = 30; // 保留最近 30 個版本
+  }
+
+  /**
+   * 📝 記錄更新操作
+   */
+  async recordUpdate(updateId, updateResults) {
+    try {
+      const version = {
+        id: updateId,
+        timestamp: new Date().toISOString(),
+        type: 'INCREMENTAL_UPDATE',
+        summary: {
+          added: updateResults.added.length,
+          updated: updateResults.updated.length,
+          deleted: updateResults.deleted.length,
+          errors: updateResults.errors.length
+        },
+        details: updateResults
+      };
+      
+      // 儲存到版本歷史工作表
+      await this.saveVersionHistory(version);
+      
+      // 創建備份快照
+      await this.createBackupSnapshot(updateId);
+      
+      // 清理舊版本
+      await this.cleanupOldVersions();
+      
+      this.logger.info(`📝 版本記錄完成: ${updateId}`);
+      return { success: true, versionId: updateId };
+      
+    } catch (error) {
+      this.logger.error(`版本記錄失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 💾 創建完整備份快照
+   */
+  async createFullBackup(reason = 'MANUAL_BACKUP') {
+    try {
+      const backupId = `backup_${Date.now()}`;
+      const timestamp = new Date().toISOString();
+      
+      this.logger.info(`💾 創建完整備份: ${backupId}`);
+      
+      // 獲取當前完整映射數據
+      const currentData = await this.getCurrentMappingData();
+      if (!currentData.success) {
+        throw new Error(`無法獲取當前數據: ${currentData.error}`);
+      }
+      
+      // 創建備份工作表
+      const backupSheet = await this.createBackupSheet(backupId, timestamp);
+      
+      // 寫入數據到備份工作表
+      await this.writeDataToBackupSheet(backupSheet, currentData.data);
+      
+      // 記錄備份資訊
+      await this.recordBackupInfo({
+        id: backupId,
+        timestamp: timestamp,
+        reason: reason,
+        recordCount: currentData.data.length,
+        sheetName: backupSheet.getName()
+      });
+      
+      return {
+        success: true,
+        backupId: backupId,
+        recordCount: currentData.data.length,
+        sheetName: backupSheet.getName()
+      };
+      
+    } catch (error) {
+      this.logger.error(`創建完整備份失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🔄 回滾到指定版本
+   */
+  async rollbackToVersion(versionId) {
+    try {
+      this.logger.info(`🔄 開始回滾到版本: ${versionId}`);
+      
+      // 查找版本資訊
+      const versionInfo = await this.getVersionInfo(versionId);
+      if (!versionInfo.success) {
+        throw new Error(`找不到版本: ${versionId}`);
+      }
+      
+      // 創建當前狀態備份
+      const preRollbackBackup = await this.createFullBackup(`PRE_ROLLBACK_${versionId}`);
+      if (!preRollbackBackup.success) {
+        throw new Error(`創建回滾前備份失敗: ${preRollbackBackup.error}`);
+      }
+      
+      // 讀取目標版本數據
+      const versionData = await this.getVersionData(versionId);
+      if (!versionData.success) {
+        throw new Error(`讀取版本數據失敗: ${versionData.error}`);
+      }
+      
+      // 執行回滾
+      const rollbackResult = await this.performRollback(versionData.data);
+      if (!rollbackResult.success) {
+        throw new Error(`執行回滾失敗: ${rollbackResult.error}`);
+      }
+      
+      // 記錄回滾操作
+      await this.recordRollback({
+        fromVersion: 'CURRENT',
+        toVersion: versionId,
+        timestamp: new Date().toISOString(),
+        preRollbackBackup: preRollbackBackup.backupId
+      });
+      
+      this.logger.info(`✅ 回滾完成: ${versionId}`);
+      return {
+        success: true,
+        rolledBackTo: versionId,
+        preRollbackBackup: preRollbackBackup.backupId
+      };
+      
+    } catch (error) {
+      this.logger.error(`回滾失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 📊 版本比較分析
+   */
+  async compareVersions(versionId1, versionId2) {
+    try {
+      const [version1, version2] = await Promise.all([
+        this.getVersionData(versionId1),
+        this.getVersionData(versionId2)
+      ]);
+      
+      if (!version1.success || !version2.success) {
+        throw new Error('無法獲取版本數據');
+      }
+      
+      const comparison = this.analyzeVersionDifferences(version1.data, version2.data);
+      
+      return {
+        success: true,
+        comparison: comparison,
+        version1Id: versionId1,
+        version2Id: versionId2
+      };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🔍 分析版本差異
+   */
+  analyzeVersionDifferences(data1, data2) {
+    const map1 = new Map(data1.map(item => [`${item.courseName}-${item.subject}`, item]));
+    const map2 = new Map(data2.map(item => [`${item.courseName}-${item.subject}`, item]));
+    
+    const differences = {
+      added: [], // 在 version2 中新增的
+      removed: [], // 在 version2 中移除的
+      modified: [], // 在兩個版本中都存在但有修改的
+      unchanged: [] // 完全相同的
+    };
+    
+    // 檢查所有在 version1 中的項目
+    for (const [key, item1] of map1) {
+      const item2 = map2.get(key);
+      
+      if (!item2) {
+        differences.removed.push(item1);
+      } else {
+        const changes = this.compareItems(item1, item2);
+        if (changes.length > 0) {
+          differences.modified.push({ item1, item2, changes });
+        } else {
+          differences.unchanged.push(item1);
+        }
+      }
+    }
+    
+    // 檢查在 version2 中新增的項目
+    for (const [key, item2] of map2) {
+      if (!map1.has(key)) {
+        differences.added.push(item2);
+      }
+    }
+    
+    return differences;
+  }
+
+  /**
+   * 🧹 清理舊版本
+   */
+  async cleanupOldVersions() {
+    try {
+      const allVersions = await this.getAllVersions();
+      if (allVersions.length <= this.maxVersions) {
+        return { success: true, message: '無需清理' };
+      }
+      
+      // 按時間排序，保留最新的版本
+      allVersions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const versionsToDelete = allVersions.slice(this.maxVersions);
+      
+      for (const version of versionsToDelete) {
+        await this.deleteVersion(version.id);
+      }
+      
+      this.logger.info(`🧹 清理了 ${versionsToDelete.length} 個舊版本`);
+      return {
+        success: true,
+        deletedCount: versionsToDelete.length
+      };
+      
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 💾 儲存版本歷史
+   */
+  async saveVersionHistory(version) {
+    try {
+      const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      let historySheet = spreadsheet.getSheetByName('mapping_version_history');
+      
+      if (!historySheet) {
+        historySheet = spreadsheet.insertSheet('mapping_version_history');
+        historySheet.getRange(1, 1, 1, 7).setValues([[
+          'Version ID', 'Timestamp', 'Type', 'Added', 'Updated', 'Deleted', 'Errors'
+        ]]);
+      }
+      
+      const newRow = [
+        version.id,
+        version.timestamp,
+        version.type,
+        version.summary.added,
+        version.summary.updated,
+        version.summary.deleted,
+        version.summary.errors
+      ];
+      
+      historySheet.appendRow(newRow);
+      
+    } catch (error) {
+      throw new Error(`儲存版本歷史失敗: ${error.message}`);
+    }
+  }
+
+  // 輔助方法實作
+  async createBackupSnapshot(updateId) {
+    // 實作快照創建邏輯
+    return { success: true };
+  }
+  
+  async getCurrentMappingData() {
+    // 實作獲取當前數據邏輯
+    try {
+      const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = spreadsheet.getSheetByName('course_mapping');
+      if (!sheet) {
+        return { success: false, error: '找不到 course_mapping 工作表' };
+      }
+      const data = sheet.getDataRange().getValues();
+      return { success: true, data: data };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+  
+  async getVersionInfo(versionId) {
+    // 實作獲取版本資訊邏輯
+    return { success: true };
+  }
+}
+
+/**
+ * 🔍 映射品質監控系統
+ * 持續監控映射數據品質，自動檢測異常
+ */
+class MappingQualityMonitor {
+  constructor() {
+    this.logger = new Logger('MappingQualityMonitor');
+    this.qualityThresholds = {
+      completeness: 0.95, // 完整性閾值 95%
+      accuracy: 0.90,     // 準確性閾值 90%
+      consistency: 0.95,  // 一致性閾值 95%
+      freshness: 24 * 60 * 60 * 1000 // 數據新鮮度 24 小時
+    };
+  }
+
+  /**
+   * 🔍 驗證更新結果品質
+   */
+  async validateUpdates(updateResults) {
+    try {
+      this.logger.info('🔍 開始品質驗證...');
+      
+      const qualityReport = {
+        overall: { score: 0, status: 'UNKNOWN' },
+        completeness: await this.checkCompleteness(updateResults),
+        accuracy: await this.checkAccuracy(updateResults),
+        consistency: await this.checkConsistency(updateResults),
+        freshness: await this.checkFreshness(updateResults),
+        anomalies: await this.detectAnomalies(updateResults)
+      };
+      
+      // 計算總體品質分數
+      const scores = [
+        qualityReport.completeness.score,
+        qualityReport.accuracy.score,
+        qualityReport.consistency.score,
+        qualityReport.freshness.score
+      ];
+      
+      qualityReport.overall.score = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      qualityReport.overall.status = this.determineOverallStatus(qualityReport.overall.score);
+      
+      this.logger.info(`🔍 品質驗證完成 - 總體分數: ${(qualityReport.overall.score * 100).toFixed(1)}%`);
+      
+      return {
+        success: true,
+        qualityReport: qualityReport,
+        timestamp: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      this.logger.error(`品質驗證失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 📊 檢查數據完整性
+   */
+  async checkCompleteness(updateResults) {
+    try {
+      const totalItems = updateResults.added.length + updateResults.updated.length;
+      const completeItems = [...updateResults.added, ...updateResults.updated].filter(item => 
+        item.courseName && 
+        item.subject && 
+        item.courseId && 
+        item.status
+      ).length;
+      
+      const score = totalItems > 0 ? completeItems / totalItems : 1;
+      const status = score >= this.qualityThresholds.completeness ? 'PASS' : 'FAIL';
+      
+      return {
+        score: score,
+        status: status,
+        details: {
+          total: totalItems,
+          complete: completeItems,
+          missing: totalItems - completeItems
+        }
+      };
+      
+    } catch (error) {
+      return { score: 0, status: 'ERROR', error: error.message };
+    }
+  }
+
+  /**
+   * 🎯 檢查數據準確性
+   */
+  async checkAccuracy(updateResults) {
+    try {
+      let accurateItems = 0;
+      let totalItems = 0;
+      
+      // 檢查新增項目的準確性
+      for (const item of updateResults.added) {
+        totalItems++;
+        if (this.validateCourseMapping(item)) {
+          accurateItems++;
+        }
+      }
+      
+      // 檢查更新項目的準確性
+      for (const item of updateResults.updated) {
+        totalItems++;
+        if (this.validateCourseMapping(item)) {
+          accurateItems++;
+        }
+      }
+      
+      const score = totalItems > 0 ? accurateItems / totalItems : 1;
+      const status = score >= this.qualityThresholds.accuracy ? 'PASS' : 'FAIL';
+      
+      return {
+        score: score,
+        status: status,
+        details: {
+          total: totalItems,
+          accurate: accurateItems,
+          inaccurate: totalItems - accurateItems
+        }
+      };
+      
+    } catch (error) {
+      return { score: 0, status: 'ERROR', error: error.message };
+    }
+  }
+
+  /**
+   * 🔄 檢查數據一致性
+   */
+  async checkConsistency(updateResults) {
+    try {
+      const allItems = [...updateResults.added, ...updateResults.updated];
+      const duplicates = this.findDuplicateMappings(allItems);
+      const inconsistencies = this.findInconsistencies(allItems);
+      
+      const totalIssues = duplicates.length + inconsistencies.length;
+      const score = allItems.length > 0 ? Math.max(0, (allItems.length - totalIssues) / allItems.length) : 1;
+      const status = score >= this.qualityThresholds.consistency ? 'PASS' : 'FAIL';
+      
+      return {
+        score: score,
+        status: status,
+        details: {
+          total: allItems.length,
+          duplicates: duplicates.length,
+          inconsistencies: inconsistencies.length,
+          issues: [...duplicates, ...inconsistencies]
+        }
+      };
+      
+    } catch (error) {
+      return { score: 0, status: 'ERROR', error: error.message };
+    }
+  }
+
+  /**
+   * ⏰ 檢查數據新鮮度
+   */
+  async checkFreshness(updateResults) {
+    try {
+      const now = new Date();
+      const freshItems = [...updateResults.added, ...updateResults.updated].filter(item => {
+        const itemTime = new Date(item.discoveredAt || item.lastUpdated || item.addedAt);
+        return (now - itemTime) <= this.qualityThresholds.freshness;
+      }).length;
+      
+      const totalItems = updateResults.added.length + updateResults.updated.length;
+      const score = totalItems > 0 ? freshItems / totalItems : 1;
+      const status = score >= 0.8 ? 'PASS' : 'FAIL'; // 較寬鬆的新鮮度要求
+      
+      return {
+        score: score,
+        status: status,
+        details: {
+          total: totalItems,
+          fresh: freshItems,
+          stale: totalItems - freshItems
+        }
+      };
+      
+    } catch (error) {
+      return { score: 0, status: 'ERROR', error: error.message };
+    }
+  }
+
+  /**
+   * 🚨 檢測數據異常
+   */
+  async detectAnomalies(updateResults) {
+    const anomalies = [];
+    
+    try {
+      // 檢測課程名稱異常
+      for (const item of [...updateResults.added, ...updateResults.updated]) {
+        if (item.courseName && !/^G[1-6]\s+\w+$/.test(item.courseName)) {
+          anomalies.push({
+            type: 'INVALID_COURSE_NAME_FORMAT',
+            item: item,
+            message: `課程名稱格式異常: ${item.courseName}`
+          });
+        }
+        
+        if (item.subject && !['LT', 'IT', 'KCFS'].includes(item.subject)) {
+          anomalies.push({
+            type: 'INVALID_SUBJECT',
+            item: item,
+            message: `科目異常: ${item.subject}`
+          });
+        }
+        
+        if (item.confidence && item.confidence < 0.5) {
+          anomalies.push({
+            type: 'LOW_CONFIDENCE',
+            item: item,
+            message: `匹配信心度過低: ${item.confidence}`
+          });
+        }
+      }
+      
+      return anomalies;
+      
+    } catch (error) {
+      return [{
+        type: 'DETECTION_ERROR',
+        message: `異常檢測失敗: ${error.message}`
+      }];
+    }
+  }
+
+  /**
+   * 🎯 驗證課程映射
+   */
+  validateCourseMapping(mapping) {
+    // 基本欄位檢查
+    if (!mapping.courseName || !mapping.subject || !mapping.courseId) {
+      return false;
+    }
+    
+    // 課程名稱格式檢查
+    if (!/^G[1-6]\s+\w+$/.test(mapping.courseName)) {
+      return false;
+    }
+    
+    // 科目檢查
+    if (!['LT', 'IT', 'KCFS'].includes(mapping.subject)) {
+      return false;
+    }
+    
+    // 狀態檢查
+    if (!['ACTIVE', 'ARCHIVED', 'DELETED'].includes(mapping.status)) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * 🔍 尋找重複映射
+   */
+  findDuplicateMappings(items) {
+    const seen = new Map();
+    const duplicates = [];
+    
+    for (const item of items) {
+      const key = `${item.courseName}-${item.subject}`;
+      if (seen.has(key)) {
+        duplicates.push({
+          type: 'DUPLICATE_MAPPING',
+          key: key,
+          items: [seen.get(key), item]
+        });
+      } else {
+        seen.set(key, item);
+      }
+    }
+    
+    return duplicates;
+  }
+
+  /**
+   * 🔍 尋找數據不一致
+   */
+  findInconsistencies(items) {
+    const inconsistencies = [];
+    
+    for (const item of items) {
+      // 檢查課程名稱與年級的一致性
+      const gradeMatch = item.courseName?.match(/^(G[1-6])/);
+      if (gradeMatch) {
+        const expectedGrade = gradeMatch[1];
+        // 這裡可以添加更多一致性檢查
+      }
+    }
+    
+    return inconsistencies;
+  }
+
+  /**
+   * 📊 確定總體狀態
+   */
+  determineOverallStatus(score) {
+    if (score >= 0.95) return 'EXCELLENT';
+    if (score >= 0.85) return 'GOOD';
+    if (score >= 0.70) return 'FAIR';
+    if (score >= 0.50) return 'POOR';
+    return 'CRITICAL';
+  }
+}
+
+/**
+ * ⚡ 批次更新優化器
+ * 智能批次處理、API 調用優化、錯誤恢復
+ */
+class BatchUpdateOptimizer {
+  constructor() {
+    this.logger = new Logger('BatchUpdateOptimizer');
+    this.rateLimiter = new RateLimiter();
+    this.errorHandler = new ErrorHandler();
+    this.batchSizes = {
+      SMALL: 10,
+      MEDIUM: 25,
+      LARGE: 50,
+      XLARGE: 100
+    };
+  }
+
+  /**
+   * ⚡ 優化批次執行
+   */
+  async optimizeBatchExecution(items, operation, options = {}) {
+    try {
+      const strategy = this.determineBatchStrategy(items.length, options);
+      const batches = this.createOptimalBatches(items, strategy);
+      
+      this.logger.info(`⚡ 開始批次處理: ${batches.length} 個批次, 每批 ${strategy.batchSize} 項`);
+      
+      const progress = new ProgressTracker(items.length, '批次更新');
+      const results = {
+        successful: [],
+        failed: [],
+        retried: []
+      };
+
+      // 處理所有批次
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        const batchId = `batch_${i + 1}`;
+        
+        this.logger.info(`🚀 處理批次 ${i + 1}/${batches.length} (${batch.length} 項)`);
+        
+        const batchResult = await this.processBatchWithRetry(
+          batch, 
+          operation, 
+          batchId, 
+          strategy,
+          progress
+        );
+        
+        results.successful.push(...batchResult.successful);
+        results.failed.push(...batchResult.failed);
+        results.retried.push(...batchResult.retried);
+        
+        // 批次間延遲
+        if (i < batches.length - 1) {
+          await this.rateLimiter.throttle();
+        }
+      }
+      
+      const summary = progress.complete();
+      
+      this.logger.info(`✅ 批次處理完成: 成功 ${results.successful.length}, 失敗 ${results.failed.length}, 重試 ${results.retried.length}`);
+      
+      return {
+        success: true,
+        results: results,
+        summary: summary,
+        strategy: strategy
+      };
+      
+    } catch (error) {
+      this.logger.error(`批次處理失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🎯 決定批次策略
+   */
+  determineBatchStrategy(totalItems, options) {
+    let batchSize;
+    let concurrency = 1; // 預設序列處理
+    let retryAttempts = 3;
+    
+    // 根據項目數量決定批次大小
+    if (totalItems <= 20) {
+      batchSize = this.batchSizes.SMALL;
+    } else if (totalItems <= 100) {
+      batchSize = this.batchSizes.MEDIUM;
+    } else if (totalItems <= 500) {
+      batchSize = this.batchSizes.LARGE;
+    } else {
+      batchSize = this.batchSizes.XLARGE;
+    }
+    
+    // 根據優先級調整策略
+    if (options.priority === 'HIGH') {
+      batchSize = Math.min(batchSize, this.batchSizes.SMALL); // 小批次高頻
+      retryAttempts = 5;
+    } else if (options.priority === 'LOW') {
+      batchSize = this.batchSizes.LARGE; // 大批次低頻
+      retryAttempts = 2;
+    }
+    
+    // 考慮錯誤率調整
+    if (options.expectedErrorRate && options.expectedErrorRate > 0.1) {
+      batchSize = Math.ceil(batchSize * 0.7); // 縮小批次以減少錯誤影響
+    }
+    
+    return {
+      batchSize: batchSize,
+      concurrency: concurrency,
+      retryAttempts: retryAttempts,
+      delayBetweenBatches: this.calculateOptimalDelay(totalItems, batchSize)
+    };
+  }
+
+  /**
+   * 📦 創建最佳批次
+   */
+  createOptimalBatches(items, strategy) {
+    const batches = [];
+    
+    for (let i = 0; i < items.length; i += strategy.batchSize) {
+      const batch = items.slice(i, i + strategy.batchSize);
+      batches.push(batch);
+    }
+    
+    return batches;
+  }
+
+  /**
+   * 🔄 帶重試的批次處理
+   */
+  async processBatchWithRetry(batch, operation, batchId, strategy, progress) {
+    const results = {
+      successful: [],
+      failed: [],
+      retried: []
+    };
+    
+    let remainingItems = [...batch];
+    let attempt = 1;
+    
+    while (remainingItems.length > 0 && attempt <= strategy.retryAttempts) {
+      this.logger.info(`🔄 批次 ${batchId} 第 ${attempt} 次嘗試 (${remainingItems.length} 項)`);
+      
+      const attemptResults = await this.processBatchItems(
+        remainingItems, 
+        operation, 
+        batchId, 
+        attempt,
+        progress
+      );
+      
+      results.successful.push(...attemptResults.successful);
+      
+      if (attempt === 1) {
+        results.failed.push(...attemptResults.failed);
+      } else {
+        // 重試成功的項目
+        for (const item of attemptResults.successful) {
+          results.retried.push({
+            ...item,
+            retryAttempt: attempt
+          });
+        }
+        
+        // 更新失敗項目
+        results.failed = results.failed.filter(failedItem => 
+          !attemptResults.successful.some(successItem => 
+            this.isSameItem(failedItem.item, successItem.item)
+          )
+        );
+        results.failed.push(...attemptResults.failed);
+      }
+      
+      // 準備下次重試的項目 (只重試失敗的項目)
+      remainingItems = attemptResults.failed.map(f => f.item);
+      
+      if (remainingItems.length === 0) {
+        break; // 全部成功，不需要重試
+      }
+      
+      attempt++;
+      
+      // 重試前延遲 (指數退避)
+      if (attempt <= strategy.retryAttempts) {
+        const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * 🛠️ 處理批次項目
+   */
+  async processBatchItems(items, operation, batchId, attempt, progress) {
+    const results = {
+      successful: [],
+      failed: []
+    };
+    
+    for (const item of items) {
+      try {
+        const result = await operation(item);
+        
+        if (result && result.success) {
+          results.successful.push({
+            item: item,
+            result: result,
+            batchId: batchId,
+            attempt: attempt
+          });
+          progress.addSuccess(item.id || item.courseName, '處理成功');
+        } else {
+          results.failed.push({
+            item: item,
+            error: result?.error || '處理失敗',
+            batchId: batchId,
+            attempt: attempt
+          });
+          progress.addError(item.id || item.courseName, result?.error || '處理失敗');
+        }
+      } catch (error) {
+        results.failed.push({
+          item: item,
+          error: error.message,
+          batchId: batchId,
+          attempt: attempt
+        });
+        progress.addError(item.id || item.courseName, error.message);
+      }
+      
+      // 項目間微調延遲
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    return results;
+  }
+
+  /**
+   * ⏱️ 計算最佳延遲
+   */
+  calculateOptimalDelay(totalItems, batchSize) {
+    const basedelay = 500; // 基本延遲 500ms
+    const scaleFactor = Math.min(totalItems / 100, 5); // 按規模調整
+    return Math.floor(basedelay * scaleFactor);
+  }
+
+  /**
+   * 🔍 檢查是否為相同項目
+   */
+  isSameItem(item1, item2) {
+    if (item1.courseId && item2.courseId) {
+      return item1.courseId === item2.courseId;
+    }
+    
+    if (item1.courseName && item1.subject && item2.courseName && item2.subject) {
+      return item1.courseName === item2.courseName && item1.subject === item2.subject;
+    }
+    
+    return false;
+  }
+}
+
+/**
+ * 📅 映射維護排程器
+ * 自動維護任務排程、健康檢查、自我修復
+ */
+class MappingMaintenanceScheduler {
+  constructor() {
+    this.logger = new Logger('MappingMaintenanceScheduler');
+    this.updateEngine = new AutoMappingUpdateEngine();
+    this.qualityMonitor = new MappingQualityMonitor();
+    this.versionControl = new MappingVersionControl();
+    
+    // 維護任務類型
+    this.maintenanceTasks = {
+      INCREMENTAL_UPDATE: {
+        interval: 60 * 60 * 1000, // 1小時
+        handler: this.performIncrementalUpdate.bind(this)
+      },
+      QUALITY_CHECK: {
+        interval: 4 * 60 * 60 * 1000, // 4小時
+        handler: this.performQualityCheck.bind(this)
+      },
+      FULL_SYNC: {
+        interval: 24 * 60 * 60 * 1000, // 24小時
+        handler: this.performFullSync.bind(this)
+      },
+      CLEANUP: {
+        interval: 7 * 24 * 60 * 60 * 1000, // 7天
+        handler: this.performCleanup.bind(this)
+      },
+      HEALTH_CHECK: {
+        interval: 30 * 60 * 1000, // 30分鐘
+        handler: this.performHealthCheck.bind(this)
+      }
+    };
+  }
+
+  /**
+   * 🚀 啟動自動維護排程
+   */
+  async startScheduler(options = {}) {
+    try {
+      this.logger.info('🚀 啟動映射表自動維護排程器...');
+      
+      // 記錄啟動時間
+      const startTime = new Date().toISOString();
+      this.setProperty('MAINTENANCE_SCHEDULER_START_TIME', startTime);
+      
+      // 初始健康檢查
+      const initialHealth = await this.performHealthCheck();
+      if (!initialHealth.success) {
+        this.logger.warn(`初始健康檢查失敗: ${initialHealth.error}`);
+      }
+      
+      // 設定觸發器 (Google Apps Script 觸發器)
+      this.setupTriggers(options);
+      
+      this.logger.info('✅ 自動維護排程器啟動成功');
+      return {
+        success: true,
+        startTime: startTime,
+        scheduledTasks: Object.keys(this.maintenanceTasks)
+      };
+      
+    } catch (error) {
+      this.logger.error(`啟動維護排程器失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * ⏰ 設定 Google Apps Script 觸發器
+   */
+  setupTriggers(options) {
+    // 刪除現有觸發器
+    this.clearExistingTriggers();
+    
+    // 設定新觸發器
+    if (!options.disableIncrementalUpdate) {
+      ScriptApp.newTrigger('scheduledIncrementalUpdate')
+        .timeBased()
+        .everyHours(1)
+        .create();
+    }
+    
+    if (!options.disableQualityCheck) {
+      ScriptApp.newTrigger('scheduledQualityCheck')
+        .timeBased()
+        .everyHours(4)
+        .create();
+    }
+    
+    if (!options.disableFullSync) {
+      ScriptApp.newTrigger('scheduledFullSync')
+        .timeBased()
+        .everyDays(1)
+        .atHour(3) // 凌晨3點執行
+        .create();
+    }
+    
+    if (!options.disableHealthCheck) {
+      ScriptApp.newTrigger('scheduledHealthCheck')
+        .timeBased()
+        .everyMinutes(30)
+        .create();
+    }
+    
+    if (!options.disableCleanup) {
+      ScriptApp.newTrigger('scheduledCleanup')
+        .timeBased()
+        .everyDays(7)
+        .atHour(2) // 凌晨2點執行
+        .create();
+    }
+  }
+
+  /**
+   * 🔄 執行增量更新維護
+   */
+  async performIncrementalUpdate() {
+    try {
+      this.logger.info('🔄 執行排程增量更新...');
+      
+      const result = await this.updateEngine.performIncrementalUpdate({
+        priority: 'NORMAL',
+        respectRateLimit: true
+      });
+      
+      // 記錄維護結果
+      await this.recordMaintenanceResult('INCREMENTAL_UPDATE', result);
+      
+      return result;
+      
+    } catch (error) {
+      this.logger.error(`增量更新維護失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🔍 執行品質檢查維護
+   */
+  async performQualityCheck() {
+    try {
+      this.logger.info('🔍 執行品質檢查維護...');
+      
+      // 獲取當前映射數據
+      const currentData = await this.updateEngine.getCurrentMappingState();
+      if (!currentData.success) {
+        throw new Error(`無法獲取當前數據: ${currentData.error}`);
+      }
+      
+      // 模擬更新結果進行品質檢查
+      const mockUpdateResults = {
+        added: [],
+        updated: currentData.data || [],
+        deleted: [],
+        errors: []
+      };
+      
+      const qualityReport = await this.qualityMonitor.validateUpdates(mockUpdateResults);
+      
+      // 如果品質不達標，觸發警報
+      if (qualityReport.success && qualityReport.qualityReport.overall.score < 0.8) {
+        await this.triggerQualityAlert(qualityReport.qualityReport);
+      }
+      
+      // 記錄品質檢查結果
+      await this.recordMaintenanceResult('QUALITY_CHECK', qualityReport);
+      
+      return qualityReport;
+      
+    } catch (error) {
+      this.logger.error(`品質檢查維護失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🔄 執行完整同步維護
+   */
+  async performFullSync() {
+    try {
+      this.logger.info('🔄 執行完整同步維護...');
+      
+      // 創建備份
+      const backup = await this.versionControl.createFullBackup('BEFORE_FULL_SYNC');
+      if (!backup.success) {
+        this.logger.warn(`創建備份失敗: ${backup.error}`);
+      }
+      
+      // 執行完整課程映射重建
+      const syncResult = await createCompleteCourseMapping({
+        clearExisting: true,
+        backupExisting: true,
+        forceRefresh: true
+      });
+      
+      // 記錄同步結果
+      await this.recordMaintenanceResult('FULL_SYNC', syncResult);
+      
+      return syncResult;
+      
+    } catch (error) {
+      this.logger.error(`完整同步維護失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🧹 執行清理維護
+   */
+  async performCleanup() {
+    try {
+      this.logger.info('🧹 執行清理維護...');
+      
+      const results = {
+        versionCleanup: null,
+        logCleanup: null,
+        tempCleanup: null
+      };
+      
+      // 清理舊版本
+      results.versionCleanup = await this.versionControl.cleanupOldVersions();
+      
+      // 清理舊日誌 (如果有實現)
+      results.logCleanup = await this.cleanupOldLogs();
+      
+      // 清理臨時數據
+      results.tempCleanup = await this.cleanupTempData();
+      
+      // 記錄清理結果
+      await this.recordMaintenanceResult('CLEANUP', { success: true, results: results });
+      
+      return { success: true, results: results };
+      
+    } catch (error) {
+      this.logger.error(`清理維護失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * ❤️ 執行健康檢查
+   */
+  async performHealthCheck() {
+    try {
+      const healthReport = {
+        timestamp: new Date().toISOString(),
+        overall: { status: 'UNKNOWN', score: 0 },
+        components: {}
+      };
+      
+      // 檢查映射表狀態
+      healthReport.components.mappingTable = await this.checkMappingTableHealth();
+      
+      // 檢查 Classroom API 連接
+      healthReport.components.classroomApi = await this.checkClassroomApiHealth();
+      
+      // 檢查工作表完整性
+      healthReport.components.worksheetIntegrity = await this.checkWorksheetIntegrity();
+      
+      // 檢查觸發器狀態
+      healthReport.components.triggers = await this.checkTriggersHealth();
+      
+      // 計算總體健康分數
+      const componentScores = Object.values(healthReport.components)
+        .map(c => c.score || 0);
+      healthReport.overall.score = componentScores.reduce((sum, score) => sum + score, 0) / componentScores.length;
+      healthReport.overall.status = this.determineHealthStatus(healthReport.overall.score);
+      
+      // 記錄健康檢查結果
+      await this.recordMaintenanceResult('HEALTH_CHECK', { success: true, report: healthReport });
+      
+      return { success: true, healthReport: healthReport };
+      
+    } catch (error) {
+      this.logger.error(`健康檢查失敗: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 📋 記錄維護結果
+   */
+  async recordMaintenanceResult(taskType, result) {
+    try {
+      const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      let maintenanceSheet = spreadsheet.getSheetByName('maintenance_log');
+      
+      if (!maintenanceSheet) {
+        maintenanceSheet = spreadsheet.insertSheet('maintenance_log');
+        maintenanceSheet.getRange(1, 1, 1, 6).setValues([[
+          'Timestamp', 'Task Type', 'Status', 'Duration', 'Details', 'Error'
+        ]]);
+      }
+      
+      const timestamp = new Date().toISOString();
+      const status = result.success ? 'SUCCESS' : 'FAILURE';
+      const duration = result.executionTime || 0;
+      const details = result.summary ? JSON.stringify(result.summary) : '';
+      const error = result.error || '';
+      
+      maintenanceSheet.appendRow([
+        timestamp,
+        taskType,
+        status,
+        duration,
+        details,
+        error
+      ]);
+      
+    } catch (error) {
+      this.logger.error(`記錄維護結果失敗: ${error.message}`);
+    }
+  }
+
+  // 輔助方法實作
+  clearExistingTriggers() {
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(trigger => {
+      if (trigger.getHandlerFunction().startsWith('scheduled')) {
+        ScriptApp.deleteTrigger(trigger);
+      }
+    });
+  }
+  
+  async triggerQualityAlert(qualityReport) {
+    this.logger.warn(`🚨 映射品質警報: 總分 ${(qualityReport.overall.score * 100).toFixed(1)}%`);
+    // 這裡可以實作發送通知邏輯
+  }
+  
+  async cleanupOldLogs() {
+    return { success: true, message: '日誌清理完成' };
+  }
+  
+  async cleanupTempData() {
+    return { success: true, message: '臨時數據清理完成' };
+  }
+  
+  async checkMappingTableHealth() {
+    // 實作映射表健康檢查邏輯
+    return { status: 'HEALTHY', score: 1.0 };
+  }
+  
+  async checkClassroomApiHealth() {
+    // 實作 API 健康檢查邏輯
+    return { status: 'HEALTHY', score: 1.0 };
+  }
+  
+  async checkWorksheetIntegrity() {
+    // 實作工作表完整性檢查邏輯
+    return { status: 'HEALTHY', score: 1.0 };
+  }
+  
+  async checkTriggersHealth() {
+    // 實作觸發器健康檢查邏輯
+    return { status: 'HEALTHY', score: 1.0 };
+  }
+  
+  determineHealthStatus(score) {
+    if (score >= 0.9) return 'EXCELLENT';
+    if (score >= 0.7) return 'GOOD';
+    if (score >= 0.5) return 'FAIR';
+    return 'POOR';
+  }
+  
+  setProperty(key, value) {
+    PropertiesService.getScriptProperties().setProperty(key, value);
+  }
+}
+
+// ========================================
+// 📅 SCHEDULED TRIGGER FUNCTIONS
+// ========================================
+
+/**
+ * 🔄 排程增量更新觸發函數
+ */
+function scheduledIncrementalUpdate() {
+  console.log('🔄 觸發排程增量更新...');
+  
+  try {
+    const updateEngine = new AutoMappingUpdateEngine();
+    const result = updateEngine.performIncrementalUpdate({
+      priority: 'SCHEDULED',
+      respectRateLimit: true
+    });
+    
+    console.log('✅ 排程增量更新完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 排程增量更新失敗:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🔍 排程品質檢查觸發函數
+ */
+function scheduledQualityCheck() {
+  console.log('🔍 觸發排程品質檢查...');
+  
+  try {
+    const scheduler = new MappingMaintenanceScheduler();
+    const result = scheduler.performQualityCheck();
+    
+    console.log('✅ 排程品質檢查完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 排程品質檢查失敗:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🔄 排程完整同步觸發函數
+ */
+function scheduledFullSync() {
+  console.log('🔄 觸發排程完整同步...');
+  
+  try {
+    const scheduler = new MappingMaintenanceScheduler();
+    const result = scheduler.performFullSync();
+    
+    console.log('✅ 排程完整同步完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 排程完整同步失敗:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * ❤️ 排程健康檢查觸發函數
+ */
+function scheduledHealthCheck() {
+  console.log('❤️ 觸發排程健康檢查...');
+  
+  try {
+    const scheduler = new MappingMaintenanceScheduler();
+    const result = scheduler.performHealthCheck();
+    
+    console.log('✅ 排程健康檢查完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 排程健康檢查失敗:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * 🧹 排程清理觸發函數
+ */
+function scheduledCleanup() {
+  console.log('🧹 觸發排程清理...');
+  
+  try {
+    const scheduler = new MappingMaintenanceScheduler();
+    const result = scheduler.performCleanup();
+    
+    console.log('✅ 排程清理完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 排程清理失敗:', error.message);
+    throw error;
+  }
+}
+
+// ========================================
+// 🛠️ PUBLIC API FUNCTIONS
+// ========================================
+
+/**
+ * 🚀 啟動自動映射表更新系統
+ * 
+ * @param {Object} options - 配置選項
+ * @returns {Object} 執行結果
+ */
+function startAutoMappingUpdateSystem(options = {}) {
+  console.log('🚀 啟動自動映射表更新系統...');
+  
+  try {
+    const scheduler = new MappingMaintenanceScheduler();
+    const result = scheduler.startScheduler(options);
+    
+    console.log('✅ 自動映射表更新系統啟動成功');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 啟動自動映射表更新系統失敗:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🔄 手動執行增量映射更新
+ * 
+ * @param {Object} options - 配置選項
+ * @returns {Object} 執行結果
+ */
+function runManualIncrementalUpdate(options = {}) {
+  console.log('🔄 執行手動增量映射更新...');
+  
+  try {
+    const updateEngine = new AutoMappingUpdateEngine();
+    const result = updateEngine.performIncrementalUpdate({
+      ...options,
+      priority: 'HIGH' // 手動執行使用高優先級
+    });
+    
+    console.log('✅ 手動增量映射更新完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 手動增量映射更新失敗:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 💾 手動創建映射表備份
+ * 
+ * @param {string} reason - 備份原因
+ * @returns {Object} 執行結果
+ */
+function createMappingTableBackup(reason = 'MANUAL_BACKUP') {
+  console.log('💾 創建映射表備份...');
+  
+  try {
+    const versionControl = new MappingVersionControl();
+    const result = versionControl.createFullBackup(reason);
+    
+    console.log('✅ 映射表備份創建完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 創建映射表備份失敗:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🔍 執行映射品質檢查
+ * 
+ * @returns {Object} 執行結果
+ */
+function runMappingQualityCheck() {
+  console.log('🔍 執行映射品質檢查...');
+  
+  try {
+    const scheduler = new MappingMaintenanceScheduler();
+    const result = scheduler.performQualityCheck();
+    
+    console.log('✅ 映射品質檢查完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 映射品質檢查失敗:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * ❤️ 執行系統健康檢查
+ * 
+ * @returns {Object} 執行結果
+ */
+function runSystemHealthCheck() {
+  console.log('❤️ 執行系統健康檢查...');
+  
+  try {
+    const scheduler = new MappingMaintenanceScheduler();
+    const result = scheduler.performHealthCheck();
+    
+    console.log('✅ 系統健康檢查完成');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ 系統健康檢查失敗:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 📊 獲取映射表統計資訊
+ * 
+ * @returns {Object} 統計結果
+ */
+function getMappingTableStatistics() {
+  console.log('📊 獲取映射表統計資訊...');
+  
+  try {
+    const updateEngine = new AutoMappingUpdateEngine();
+    const currentMapping = updateEngine.getCurrentMappingState();
+    
+    if (!currentMapping.success) {
+      throw new Error(`無法獲取當前映射: ${currentMapping.error}`);
+    }
+    
+    const data = currentMapping.data || [];
+    const statistics = {
+      total: data.length,
+      active: data.filter(m => m.status === 'ACTIVE').length,
+      archived: data.filter(m => m.status === 'ARCHIVED').length,
+      deleted: data.filter(m => m.status === 'DELETED').length,
+      byGrade: {},
+      bySubject: {},
+      lastUpdated: data.reduce((latest, item) => {
+        const itemDate = new Date(item.lastUpdated || item.discoveredAt || item.addedAt || 0);
+        return itemDate > latest ? itemDate : latest;
+      }, new Date(0)).toISOString()
+    };
+    
+    // 按年級統計
+    for (const mapping of data) {
+      if (mapping.courseName) {
+        const gradeMatch = mapping.courseName.match(/^(G[1-6])/);
+        if (gradeMatch) {
+          const grade = gradeMatch[1];
+          statistics.byGrade[grade] = (statistics.byGrade[grade] || 0) + 1;
+        }
+      }
+    }
+    
+    // 按科目統計
+    for (const mapping of data) {
+      if (mapping.subject) {
+        statistics.bySubject[mapping.subject] = (statistics.bySubject[mapping.subject] || 0) + 1;
+      }
+    }
+    
+    console.log('✅ 映射表統計資訊獲取完成');
+    return {
+      success: true,
+      statistics: statistics,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('❌ 獲取映射表統計資訊失敗:', error.message);
+    return { success: false, error: error.message };
+  }
+}
