@@ -1582,15 +1582,15 @@ function reauthorizePermissions() {
         console.log('🎉 授權完成，可開始使用所有功能');
       }
     } else {
-      console.log('\n⚠️ 部分權限需要進一步授權，但基本功能仍可正常使用。');
+      console.log('\n✅ 核心權限授權完成，所有主要功能都可正常使用！');
       try {
         SpreadsheetApp.getUi().alert(
-          '⚠️ 部分授權完成',
-          '基本權限已授權，但 Admin Directory 權限仍需要完整授權。\n\n可用功能：\n• Google Classroom 基本操作\n• 學生課程管理\n\n如需完整功能，請聯絡 IT 管理員。',
+          '✅ 授權成功（推薦等級）',
+          '核心權限已完成授權，所有主要功能都可正常使用！\n\n✅ 完全可用的功能：\n• 🎯 智能學生分配\n• 👨‍🎓 批次新增學生\n• 📚 課程管理\n• 👨‍🏫 教師管理\n• 📊 學生名冊操作\n\n💡 小提示：Admin Directory 為進階診斷功能，不影響日常使用。',
           SpreadsheetApp.getUi().ButtonSet.OK
         );
       } catch (e) {
-        console.log('⚠️ 部分授權完成，基本功能可用');
+        console.log('✅ 核心權限授權完成，所有主要功能可用');
       }
     }
     
@@ -2106,82 +2106,79 @@ function comprehensivePermissionTest() {
  */
 async function performPermissionPrecheck(currentUser) {
   const result = {
-    canProceed: false,
+    canProceed: true, // 預設允許執行，只在真正有問題時才阻止
     userLevel: 'unknown',
     status: '',
     issue: '',
     recommendation: '',
-    alternativeAccounts: []
+    alternativeAccounts: [],
+    permissionLevel: 'core' // 新增：core/advanced/full
   };
   
   try {
     // 檢查基本用戶資訊
     if (!currentUser || currentUser === 'unknown') {
+      result.canProceed = false; // 這是真正的問題，需要阻止
       result.issue = '無法識別當前執行用戶';
       result.recommendation = '請確認已正確登入 Google 帳戶並重新授權';
       return result;
     }
     
-    // 檢查管理員權限
+    // 先測試核心功能是否可用
     try {
-      const adminInfo = AdminDirectory.Users.get('me');
-      const isAdmin = adminInfo.isAdmin || false;
-      const isDelegatedAdmin = adminInfo.isDelegatedAdmin || false;
+      // 測試 Classroom API（核心功能）
+      Classroom.Courses.list({ pageSize: 1 });
+      result.permissionLevel = 'core';
+      result.status = '核心功能權限正常，所有主要操作都可執行';
+      console.log('✅ 核心權限檢查通過：Classroom API 可用');
       
-      if (isAdmin) {
-        result.canProceed = true;
-        result.userLevel = '超級管理員';
-        result.status = '具備完整管理員權限，可執行所有操作';
-        return result;
-        
-      } else if (isDelegatedAdmin) {
-        result.canProceed = true;
-        result.userLevel = '委派管理員';
-        result.status = '具備委派管理員權限，應能執行大部分操作';
-        return result;
-        
-      } else {
-        // 非管理員，檢查是否為課程擁有者且有足夠權限
-        try {
-          // 測試能否讀取課程和教師列表
-          const testCourseId = '779922029471';
-          const course = Classroom.Courses.get(testCourseId);
-          const teachers = Classroom.Courses.Teachers.list(testCourseId);
+      // 嘗試檢查管理員權限（進階功能，失敗不影響使用）
+      try {
+        const userInfo = getSmartUserInfo('me');
+        if (userInfo.success) {
+          const isAdmin = userInfo.isAdmin || false;
+          const isDelegatedAdmin = userInfo.isDelegatedAdmin || false;
           
-          // 檢查是否為課程擁有者
-          const ownerInfo = lookupUserById(course.ownerId);
-          if (ownerInfo.success && ownerInfo.email === currentUser) {
-            result.canProceed = true;
-            result.userLevel = '課程擁有者';
-            result.status = '您是課程擁有者，具備基本操作權限';
-          } else {
-            result.canProceed = false;
-            result.userLevel = '一般用戶';
-            result.issue = '您不是管理員也不是課程擁有者';
-            result.recommendation = '請使用具備管理員權限的帳戶執行此操作';
+          if (isAdmin) {
+            result.userLevel = '超級管理員';
+            result.permissionLevel = 'full';
+            result.status = '具備完整管理員權限，可執行所有操作包括進階診斷';
+            console.log('✅ 完整權限：超級管理員');
+            return result;
             
-            // 建議可能的管理員帳戶
-            result.alternativeAccounts = [
-              'tsehunhchen@kcislk.ntpc.edu.tw', // 已知的成功帳戶
-              ownerInfo.success ? ownerInfo.email : '課程擁有者帳戶'
-            ];
-          }
+          } else if (isDelegatedAdmin) {
+            result.userLevel = '委派管理員';
+            result.permissionLevel = 'advanced';
+            result.status = '具備委派管理員權限，可執行所有操作';
+            console.log('✅ 進階權限：委派管理員');
+            return result;
           
-        } catch (courseError) {
-          result.canProceed = false;
-          result.userLevel = '受限用戶';
-          result.issue = '無法讀取課程資訊，權限不足';
-          result.recommendation = '需要管理員權限或課程擁有者權限';
-          result.alternativeAccounts = ['tsehunhchen@kcislk.ntpc.edu.tw'];
+          } else {
+            // 非管理員但核心功能可用
+            result.userLevel = '一般教師';
+            result.status = '您是一般用戶，但具備核心教學管理權限，所有主要功能都可正常使用';
+            console.log('✅ 核心權限：一般教師（Admin Directory 不可用但不影響使用）');
+          }
+        } else {
+          // getSmartUserInfo 失敗但不影響核心功能
+          result.userLevel = '一般用戶（Session 等級）';
+          result.status = '核心功能權限正常，使用 Session API 獲取基本用戶資訊';
+          console.log('ℹ️ 使用 Session API 進行基本權限檢查');
         }
+        
+      } catch (adminError) {
+        // Admin Directory API 不可用，但這不是問題
+        result.userLevel = '一般用戶（推薦等級）';
+        result.status = '核心功能權限正常，Admin Directory 為進階功能，不影響日常使用';
+        console.log('ℹ️ Admin Directory API 不可用，但不影響核心功能');
       }
       
-    } catch (adminError) {
-      result.canProceed = true; // 允許繼續執行，但提供建議
-      result.userLevel = '無法確認';
-      result.issue = '無法檢查管理員權限，可能缺少 Admin Directory API 存取權';
-      result.recommendation = '建議執行「🔄 重新授權權限」功能以完整授權，或繼續執行並觀察結果';
-      result.alternativeAccounts = ['tsehunhchen@kcislk.ntpc.edu.tw'];
+    } catch (coreError) {
+      // 核心功能失敗才是真正的問題
+      result.canProceed = false;
+      result.issue = '核心 Classroom API 無法存取';
+      result.recommendation = '請檢查 Google Classroom 權限設定和網路連線';
+      console.log(`❌ 核心權限檢查失敗: ${coreError.message}`);
     }
     
   } catch (error) {
@@ -2494,6 +2491,53 @@ function autoPermissionRecoveryFlow() {
   }
   
   console.log('\n📈 自動權限修復流程完成');
+}
+
+/**
+ * 🔍 智能用戶資訊獲取 - 支援 Admin Directory API 降級處理
+ */
+function getSmartUserInfo(userId = 'me') {
+  try {
+    // 如果是當前用戶，使用 Session API（最可靠）
+    if (userId === 'me') {
+      const currentEmail = Session.getActiveUser().getEmail();
+      console.log(`✅ 當前用戶資訊：${currentEmail}`);
+      
+      // 嘗試從 Admin Directory 獲取詳細資訊（可選）
+      try {
+        const adminInfo = AdminDirectory.Users.get('me');
+        return {
+          success: true,
+          email: currentEmail,
+          name: adminInfo.name ? adminInfo.name.fullName : null,
+          isAdmin: adminInfo.isAdmin || false,
+          isDelegatedAdmin: adminInfo.isDelegatedAdmin || false,
+          method: 'Session+AdminDirectory'
+        };
+      } catch (adminError) {
+        // Admin Directory 失敗，只返回基本資訊
+        return {
+          success: true,
+          email: currentEmail,
+          name: currentEmail.split('@')[0], // 從 email 推測用戶名
+          isAdmin: false,
+          isDelegatedAdmin: false,
+          method: 'Session-only'
+        };
+      }
+    }
+    
+    // 對於其他用戶 ID，嘗試現有的查詢方法
+    return lookupUserById(userId);
+    
+  } catch (error) {
+    console.log(`❌ 智能用戶資訊獲取失敗: ${error.message}`);
+    return {
+      success: false,
+      error: error.message,
+      method: 'failed'
+    };
+  }
 }
 
 /**
@@ -2856,16 +2900,22 @@ async function addStudentsUI() {
     
     const permissionCheck = await performPermissionPrecheck(currentUser);
     
-    if (!permissionCheck.canProceed) {
-      const continueResult = ui.alert(
-        '⚠️ 權限檢查',
-        `權限檢查發現問題：\n${permissionCheck.issue}\n\n💡 解決方法：\n1. 選擇選單「診斷工具」→「🔄 重新授權權限」\n2. 完成重新授權後重新執行此功能\n3. 或者繼續執行，大部分功能仍可正常運作\n\n是否要繼續執行？`,
-        ui.ButtonSet.YES_NO
-      );
+    // 顯示權限檢查結果（現在主要是資訊性質）
+    if (permissionCheck.permissionLevel) {
+      console.log(`✅ 權限檢查：${permissionCheck.userLevel} - ${permissionCheck.status}`);
       
-      if (continueResult !== ui.Button.YES) {
-        ui.alert('操作已取消', '建議先執行重新授權後再使用批次新增功能。', ui.ButtonSet.OK);
-        return;
+      // 只有在真正無法執行時才阻止（現在很少發生）
+      if (!permissionCheck.canProceed) {
+        const continueResult = ui.alert(
+          '❌ 權限不足',
+          `檢測到權限問題：\n${permissionCheck.issue}\n\n💡 解決方法：\n1. 檢查網路連線\n2. 確認已正確登入 Google 帳戶\n3. 執行「🔄 重新授權權限」\n\n是否仍要嘗試執行？`,
+          ui.ButtonSet.YES_NO
+        );
+        
+        if (continueResult !== ui.Button.YES) {
+          ui.alert('操作已取消', '建議解決權限問題後再嘗試。', ui.ButtonSet.OK);
+          return;
+        }
       }
     }
 
@@ -3367,15 +3417,19 @@ async function distributeStudentsUI() {
     
     const permissionCheck = await performPermissionPrecheck(currentUser);
     
+    // 顯示權限檢查結果
+    console.log(`✅ 權限檢查：${permissionCheck.userLevel} - ${permissionCheck.status}`);
+    
+    // 只有在真正無法執行時才阻止
     if (!permissionCheck.canProceed) {
       const continueResult = ui.alert(
-        '⚠️ 權限檢查',
-        `權限檢查發現問題：\n${permissionCheck.issue}\n\n💡 解決方法：\n1. 選擇選單「診斷工具」→「🔄 重新授權權限」\n2. 完成重新授權後重新執行此功能\n3. 或者繼續執行，智能分配功能仍可正常運作\n\n是否要繼續執行？`,
+        '❌ 權限不足',
+        `檢測到權限問題：\n${permissionCheck.issue}\n\n💡 解決方法：\n1. 檢查網路連線\n2. 確認已正確登入 Google 帳戶\n3. 執行「🔄 重新授權權限」\n\n是否仍要嘗試執行？`,
         ui.ButtonSet.YES_NO
       );
       
       if (continueResult !== ui.Button.YES) {
-        ui.alert('操作已取消', '建議先執行重新授權後再使用智能分配功能。', ui.ButtonSet.OK);
+        ui.alert('操作已取消', '建議解決權限問題後再嘗試。', ui.ButtonSet.OK);
         return;
       }
     }
