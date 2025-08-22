@@ -62,9 +62,196 @@
  */
 
 /**
+ * 🔍 API 參數驗證工具集
+ */
+const ValidationUtils = {
+  /**
+   * 驗證 Email 格式
+   */
+  validateEmail(email) {
+    if (!email || typeof email !== 'string') {
+      return { valid: false, error: 'Email 不能為空或格式無效' };
+    }
+    
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    
+    if (!emailRegex.test(email.trim())) {
+      return { valid: false, error: '無效的 Email 格式' };
+    }
+    
+    return { valid: true, email: email.trim().toLowerCase() };
+  },
+  
+  /**
+   * 驗證 Google Classroom 課程 ID 格式
+   */
+  validateCourseId(courseId) {
+    if (!courseId || typeof courseId !== 'string') {
+      return { valid: false, error: '課程 ID 不能為空' };
+    }
+    
+    const trimmedId = courseId.trim();
+    
+    // Google Classroom 課程 ID 通常是數字字符串，長度 10-15 位
+    const courseIdRegex = /^[0-9]{10,15}$/;
+    
+    if (!courseIdRegex.test(trimmedId)) {
+      return { valid: false, error: '無效的課程 ID 格式（應為 10-15 位數字）' };
+    }
+    
+    return { valid: true, courseId: trimmedId };
+  },
+  
+  /**
+   * 驗證多個 Email 地址
+   */
+  validateEmailList(emails) {
+    const results = {
+      valid: [],
+      invalid: [],
+      duplicates: []
+    };
+    
+    const seen = new Set();
+    
+    for (const email of emails) {
+      const validation = this.validateEmail(email);
+      
+      if (validation.valid) {
+        if (seen.has(validation.email)) {
+          results.duplicates.push(validation.email);
+        } else {
+          seen.add(validation.email);
+          results.valid.push(validation.email);
+        }
+      } else {
+        results.invalid.push({ email, error: validation.error });
+      }
+    }
+    
+    return results;
+  },
+  
+  /**
+   * 批次驗證學生資料
+   */
+  validateStudentBatch(students) {
+    const errors = [];
+    const validStudents = [];
+    
+    for (let i = 0; i < students.length; i++) {
+      const student = students[i];
+      const rowIndex = i + 1;
+      
+      // 驗證學生 Email
+      const emailValidation = this.validateEmail(student.email);
+      if (!emailValidation.valid) {
+        errors.push({
+          row: rowIndex,
+          field: 'email',
+          value: student.email,
+          error: emailValidation.error
+        });
+        continue;
+      }
+      
+      // 驗證課程 ID
+      const courseIdValidation = this.validateCourseId(student.courseId);
+      if (!courseIdValidation.valid) {
+        errors.push({
+          row: rowIndex,
+          field: 'courseId',
+          value: student.courseId,
+          error: courseIdValidation.error
+        });
+        continue;
+      }
+      
+      // 如果兩個驗證都通過，加入有效學生列表
+      validStudents.push({
+        ...student,
+        email: emailValidation.email,
+        courseId: courseIdValidation.courseId
+      });
+    }
+    
+    return {
+      valid: validStudents,
+      errors: errors,
+      summary: {
+        total: students.length,
+        valid: validStudents.length,
+        invalid: errors.length
+      }
+    };
+  },
+  
+  /**
+   * 顯示驗證錯誤報告
+   */
+  showValidationErrors(errors, title = '資料驗證錯誤') {
+    if (errors.length === 0) return;
+    
+    let message = `發現 ${errors.length} 個資料格式錯誤：\n\n`;
+    
+    errors.slice(0, 10).forEach((error, index) => {
+      message += `${index + 1}. 第 ${error.row} 行 - ${error.field}: ${error.error}\n`;
+      if (error.value) {
+        message += `   問題值: "${error.value}"\n`;
+      }
+    });
+    
+    if (errors.length > 10) {
+      message += `\n... 以及其他 ${errors.length - 10} 個錯誤\n`;
+    }
+    
+    message += '\n請修正這些錯誤後重新執行。';
+    
+    SpreadsheetApp.getUi().alert(title, message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+};
+
+/**
+ * 🔧 系統初始化檢查 - 確保所有服務正確加載
+ */
+function initializeServices() {
+  try {
+    // 檢查核心服務是否正確初始化
+    if (typeof rateLimiter === 'undefined') {
+      throw new Error('RateLimiter 服務未正確初始化');
+    }
+    if (typeof classroomService === 'undefined') {
+      throw new Error('ClassroomService 服務未正確初始化');
+    }
+    if (typeof ErrorHandler === 'undefined') {
+      throw new Error('ErrorHandler 服務未正確初始化');
+    }
+    if (typeof ProgressTracker === 'undefined') {
+      throw new Error('ProgressTracker 服務未正確初始化');
+    }
+    
+    console.log('✅ 所有核心服務已正確初始化');
+    return { success: true, message: '系統初始化完成' };
+  } catch (error) {
+    console.error('❌ 系統初始化失敗:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * 建立選單 - 當試算表開啟時自動執行
  */
 function onOpen() {
+  // 在建立選單前進行系統初始化檢查
+  const initResult = initializeServices();
+  if (!initResult.success) {
+    SpreadsheetApp.getUi().alert(
+      '系統初始化錯誤',
+      `系統服務初始化失敗：${initResult.error}\n\n請聯絡技術支援或重新載入試算表。`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
   SpreadsheetApp.getUi()
     .createMenu('🎓 Classroom 管理工具')
     .addItem('📋 1. 列出所有課程', 'listCoursesUI')
@@ -143,22 +330,35 @@ async function addTeachersWithCheck(spreadsheetId = null) {
       continue;
     }
 
-    console.log(`正在處理課程 ${courseId} 中的老師 ${teacherEmail}...`);
-    const result = await classroomService.addTeacherIfNotExists(courseId, teacherEmail);
+    // 🔍 API 參數驗證
+    const emailValidation = ValidationUtils.validateEmail(teacherEmail);
+    if (!emailValidation.valid) {
+      console.log(`❌ 第 ${i + 2} 行 Email 格式錯誤: ${emailValidation.error}`);
+      continue;
+    }
+
+    const courseIdValidation = ValidationUtils.validateCourseId(courseId);
+    if (!courseIdValidation.valid) {
+      console.log(`❌ 第 ${i + 2} 行課程 ID 格式錯誤: ${courseIdValidation.error}`);
+      continue;
+    }
+
+    console.log(`正在處理課程 ${courseIdValidation.courseId} 中的老師 ${emailValidation.email}...`);
+    const result = await classroomService.addTeacherIfNotExists(courseIdValidation.courseId, emailValidation.email);
 
     if (result.success) {
       if (result.status === 'ADDED') {
-        console.log(`  ✅ 成功新增老師 ${teacherEmail} 到課程 ${courseId}。`);
+        console.log(`  ✅ 成功新增老師 ${emailValidation.email} 到課程 ${courseIdValidation.courseId}。`);
       } else if (result.status === 'ALREADY_EXISTS') {
-        console.log(`  ☑️ 老師 ${teacherEmail} 已存在於課程 ${courseId}。`);
+        console.log(`  ☑️ 老師 ${emailValidation.email} 已存在於課程 ${courseIdValidation.courseId}。`);
       }
       statusCell.check();
     } else {
       // 🔧 增強版智能錯誤處理與自動診斷
-      console.log(`  ❌ 新增老師失敗：${teacherEmail} -> 課程 ${courseId}`);
+      console.log(`  ❌ 新增老師失敗：${emailValidation.email} -> 課程 ${courseIdValidation.courseId}`);
       
       // 自動執行詳細錯誤分析
-      const errorAnalysis = analyzePermissionError(result.error, courseId, teacherEmail);
+      const errorAnalysis = analyzePermissionError(result.error, courseIdValidation.courseId, emailValidation.email);
       console.log(`  🔍 錯誤類型：${errorAnalysis.errorType} (嚴重程度: ${errorAnalysis.severity})`);
       console.log(`  📋 問題描述：${errorAnalysis.description}`);
       
@@ -167,7 +367,7 @@ async function addTeachersWithCheck(spreadsheetId = null) {
         
         // 自動檢查課程擁有者
         try {
-          const course = Classroom.Courses.get(courseId);
+          const course = Classroom.Courses.get(courseIdValidation.courseId);
           const currentUser = Session.getActiveUser().getEmail();
           
           console.log(`     👤 當前執行者：${currentUser}`);
@@ -206,8 +406,8 @@ async function addTeachersWithCheck(spreadsheetId = null) {
         
       } else if (errorAnalysis.errorType === 'NOT_FOUND') {
         console.log(`  \n🔍 資源檢查：`);
-        console.log(`     📧 檢查老師 Email：${teacherEmail}`);
-        console.log(`     🎓 檢查課程 ID：${courseId}`);
+        console.log(`     📧 檢查老師 Email：${emailValidation.email}`);
+        console.log(`     🎓 檢查課程 ID：${courseIdValidation.courseId}`);
         
       } else if (errorAnalysis.errorType === 'QUOTA_EXCEEDED') {
         console.log(`  \n⏱️ 配額管理建議：`);
@@ -232,7 +432,7 @@ async function addTeachersWithCheck(spreadsheetId = null) {
         console.log(`     • reauthorizePermissions() - 重新授權`);
       } else {
         console.log(`     • testClassroomPermissions() - API 權限測試`);
-        console.log(`     • enhancedPermissionDiagnosis('${courseId}') - 課程權限診斷`);
+        console.log(`     • enhancedPermissionDiagnosis('${courseIdValidation.courseId}') - 課程權限診斷`);
       }
       
       // 記錄詳細錯誤資訊（僅在高詳細度時）
@@ -2799,7 +2999,7 @@ function createRetryWorksheet(retryableErrors, operationType = '批次新增學�
 /**
  * 🔍 進階診斷和報告系統
  */
-function advancedDiagnosticsAndReporting() {
+async function advancedDiagnosticsAndReporting() {
   try {
     console.log('🔍 開始進階診斷和報告...');
     
@@ -2812,7 +3012,7 @@ function advancedDiagnosticsAndReporting() {
     };
     
     // 1. 課程容量檢查
-    diagnostics.courseCapacity = checkCourseCapacityLimits();
+    diagnostics.courseCapacity = await checkCourseCapacityLimits();
     
     // 2. 學生權限驗證
     diagnostics.studentPermissions = validateStudentPermissions();
@@ -2852,12 +3052,12 @@ function advancedDiagnosticsAndReporting() {
 /**
  * 📊 檢查課程容量限制
  */
-function checkCourseCapacityLimits() {
+async function checkCourseCapacityLimits() {
   try {
     console.log('📊 檢查課程容量限制...');
     
     // 獲取所有課程
-    const coursesResult = classroomService.listAllCourses();
+    const coursesResult = await classroomService.listAllCourses();
     if (!coursesResult.success) {
       return { error: '無法獲取課程清單', details: coursesResult.error };
     }
@@ -2875,7 +3075,7 @@ function checkCourseCapacityLimits() {
     
     for (const course of coursesToCheck) {
       try {
-        const members = classroomService.getCourseMembers(course.id);
+        const members = await classroomService.getCourseMembers(course.id);
         const studentCount = members.students ? members.students.length : 0;
         const teacherCount = members.teachers ? members.teachers.length : 0;
         
@@ -3247,7 +3447,238 @@ function createDiagnosticReport(diagnostics) {
     // 自動調整欄位寬度
     reportSheet.autoResizeColumns(1, 3);
     
-    console.log(`📋 診斷報告已建立：${reportSheetName}`);\n    return {\n      success: true,\n      sheetName: reportSheetName,\n      timestamp: timestamp\n    };\n    \n  } catch (error) {\n    console.log(`❌ 建立診斷報告失敗：${error.message}`);\n    return {\n      success: false,\n      error: error.message\n    };\n  }\n}\n\n/**\n * 📊 新增容量報告區段\n */\nfunction addCapacityReportSection(sheet, capacityData, startRow) {\n  const sectionData = [\n    ['📊 課程容量分析', ''],\n    ['檢查課程總數', capacityData.totalCourses || 0],\n    ['實際檢查數量', capacityData.checkedCourses || 0],\n    ['發現警告數量', (capacityData.warnings && capacityData.warnings.length) || 0],\n    ['']\n  ];\n  \n  sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);\n  sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#E3F2FD');\n  \n  let currentRow = startRow + sectionData.length;\n  \n  // 詳細課程資訊\n  if (capacityData.details && capacityData.details.length > 0) {\n    const detailHeaders = [['課程名稱', '學生數', '教師數', '狀態']];\n    sheet.getRange(currentRow, 1, 1, 4).setValues(detailHeaders);\n    sheet.getRange(currentRow, 1, 1, 4).setFontWeight('bold');\n    currentRow++;\n    \n    const detailData = capacityData.details.slice(0, 10).map(course => [\n      course.courseName || 'N/A',\n      course.studentCount || 0,\n      course.teacherCount || 0,\n      course.status || 'unknown'\n    ]);\n    \n    sheet.getRange(currentRow, 1, detailData.length, 4).setValues(detailData);\n    currentRow += detailData.length;\n  }\n  \n  // 警告訊息\n  if (capacityData.warnings && capacityData.warnings.length > 0) {\n    currentRow++;\n    sheet.getRange(currentRow, 1).setValue('⚠️ 警告訊息：');\n    sheet.getRange(currentRow, 1).setFontWeight('bold');\n    currentRow++;\n    \n    capacityData.warnings.forEach(warning => {\n      sheet.getRange(currentRow, 1, 1, 2).setValues([[warning, '']]);\n      currentRow++;\n    });\n  }\n  \n  return currentRow + 1;\n}\n\n/**\n * 🔐 新增權限報告區段\n */\nfunction addPermissionReportSection(sheet, permissionData, startRow) {\n  const sectionData = [\n    ['🔐 權限驗證報告', ''],\n    ['當前使用者', permissionData.currentUser],\n    ['檢查項目數', (permissionData.permissions && permissionData.permissions.length) || 0],\n    ['發現問題數', (permissionData.issues && permissionData.issues.length) || 0],\n    ['']\n  ];\n  \n  sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);\n  sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#E8F5E8');\n  \n  let currentRow = startRow + sectionData.length;\n  \n  // 權限詳細資訊\n  if (permissionData.permissions && permissionData.permissions.length > 0) {\n    const permissionHeaders = [['權限類型', '狀態', '詳細資訊']];\n    sheet.getRange(currentRow, 1, 1, 3).setValues(permissionHeaders);\n    sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');\n    currentRow++;\n    \n    const permissionDetails = permissionData.permissions.map(perm => [\n      perm.type,\n      perm.status,\n      perm.details\n    ]);\n    \n    sheet.getRange(currentRow, 1, permissionDetails.length, 3).setValues(permissionDetails);\n    currentRow += permissionDetails.length;\n  }\n  \n  // 問題列表\n  if (permissionData.issues && permissionData.issues.length > 0) {\n    currentRow++;\n    sheet.getRange(currentRow, 1).setValue('❌ 發現問題：');\n    sheet.getRange(currentRow, 1).setFontWeight('bold');\n    currentRow++;\n    \n    permissionData.issues.forEach(issue => {\n      sheet.getRange(currentRow, 1, 1, 2).setValues([[issue, '']]);\n      currentRow++;\n    });\n  }\n  \n  return currentRow + 1;\n}\n\n/**\n * 🏥 新增 API 健康報告區段\n */\nfunction addApiHealthReportSection(sheet, apiData, startRow) {\n  const sectionData = [\n    ['🏥 API 健康狀態報告', ''],\n    ['檢查時間', apiData.timestamp ? new Date(apiData.timestamp).toLocaleString('zh-TW') : 'N/A'],\n    ['整體狀態', apiData.overall],\n    ['測試項目數', (apiData.tests && apiData.tests.length) || 0],\n    ['']\n  ];\n  \n  sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);\n  sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#FFF3E0');\n  \n  let currentRow = startRow + sectionData.length;\n  \n  // API 測試詳細資訊\n  if (apiData.tests && apiData.tests.length > 0) {\n    const testHeaders = [['測試項目', '狀態', '詳細資訊']];\n    sheet.getRange(currentRow, 1, 1, 3).setValues(testHeaders);\n    sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');\n    currentRow++;\n    \n    const testDetails = apiData.tests.map(test => [\n      test.name,\n      test.status,\n      test.details\n    ]);\n    \n    sheet.getRange(currentRow, 1, testDetails.length, 3).setValues(testDetails);\n    currentRow += testDetails.length;\n  }\n  \n  return currentRow + 1;\n}\n\n/**\n * 💡 新增建議區段\n */\nfunction addRecommendationsSection(sheet, recommendations, startRow) {\n  const sectionData = [\n    ['💡 改進建議', ''],\n    ['建議項目數', recommendations.length],\n    ['']\n  ];\n  \n  sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);\n  sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#F3E5F5');\n  \n  let currentRow = startRow + sectionData.length;\n  \n  const recHeaders = [['優先級', '類型', '建議內容']];\n  sheet.getRange(currentRow, 1, 1, 3).setValues(recHeaders);\n  sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');\n  currentRow++;\n  \n  const recDetails = recommendations.map(rec => [\n    rec.priority,\n    rec.type,\n    rec.message\n  ]);\n  \n  sheet.getRange(currentRow, 1, recDetails.length, 3).setValues(recDetails);\n  currentRow += recDetails.length;\n  \n  return currentRow + 1;\n}\n\n/**\n * 📖 顯示診斷摘要\n */\nfunction showDiagnosticSummary(diagnostics, reportResult) {\n  let summary = '🔍 系統診斷完成\\n\\n';\n  \n  // 課程容量摘要\n  if (diagnostics.courseCapacity && !diagnostics.courseCapacity.error) {\n    const capacity = diagnostics.courseCapacity;\n    summary += `📊 課程容量：檢查了 ${capacity.checkedCourses}/${capacity.totalCourses} 個課程\\n`;\n    if (capacity.warnings && capacity.warnings.length > 0) {\n      summary += `⚠️ 發現 ${capacity.warnings.length} 個容量警告\\n`;\n    }\n  }\n  \n  // 權限摘要\n  if (diagnostics.studentPermissions && !diagnostics.studentPermissions.error) {\n    const permissions = diagnostics.studentPermissions;\n    summary += `🔐 權限狀態：檢查了 ${permissions.permissions ? permissions.permissions.length : 0} 個權限項目\\n`;\n    if (permissions.issues && permissions.issues.length > 0) {\n      summary += `❌ 發現 ${permissions.issues.length} 個權限問題\\n`;\n    }\n  }\n  \n  // API 健康摘要\n  if (diagnostics.apiHealth && !diagnostics.apiHealth.error) {\n    const health = diagnostics.apiHealth;\n    summary += `🏥 API 狀態：${health.overall}\\n`;\n  }\n  \n  // 建議摘要\n  if (diagnostics.recommendations && diagnostics.recommendations.length > 0) {\n    const highPriority = diagnostics.recommendations.filter(rec => rec.priority === 'high').length;\n    summary += `💡 改進建議：共 ${diagnostics.recommendations.length} 項（高優先級：${highPriority}）\\n`;\n  }\n  \n  // 報告資訊\n  if (reportResult.success) {\n    summary += `\\n📋 詳細報告已建立：${reportResult.sheetName}`;\n  }\n  \n  SpreadsheetApp.getUi().alert(\n    '🔍 系統診斷報告',\n    summary,\n    SpreadsheetApp.getUi().ButtonSet.OK\n  );\n}
+    console.log(`📋 診斷報告已建立：${reportSheetName}`);
+    return {
+      success: true,
+      sheetName: reportSheetName,
+      timestamp: timestamp
+    };
+    
+  } catch (error) {
+    console.log(`❌ 建立診斷報告失敗：${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 📊 新增容量報告區段
+ */
+function addCapacityReportSection(sheet, capacityData, startRow) {
+  const sectionData = [
+    ['📊 課程容量分析', ''],
+    ['檢查課程總數', capacityData.totalCourses || 0],
+    ['實際檢查數量', capacityData.checkedCourses || 0],
+    ['發現警告數量', (capacityData.warnings && capacityData.warnings.length) || 0],
+    ['']
+  ];
+  
+  sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);
+  sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#E3F2FD');
+  
+  let currentRow = startRow + sectionData.length;
+  
+  // 詳細課程資訊
+  if (capacityData.details && capacityData.details.length > 0) {
+    const detailHeaders = [['課程名稱', '學生數', '教師數', '狀態']];
+    sheet.getRange(currentRow, 1, 1, 4).setValues(detailHeaders);
+    sheet.getRange(currentRow, 1, 1, 4).setFontWeight('bold');
+    currentRow++;
+    
+    const detailData = capacityData.details.slice(0, 10).map(course => [
+      course.courseName || 'N/A',
+      course.studentCount || 0,
+      course.teacherCount || 0,
+      course.status || 'unknown'
+    ]);
+    
+    sheet.getRange(currentRow, 1, detailData.length, 4).setValues(detailData);
+    currentRow += detailData.length;
+  }
+  
+  // 警告訊息
+  if (capacityData.warnings && capacityData.warnings.length > 0) {
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('⚠️ 警告訊息：');
+    sheet.getRange(currentRow, 1).setFontWeight('bold');
+    currentRow++;
+    
+    capacityData.warnings.forEach(warning => {
+      sheet.getRange(currentRow, 1, 1, 2).setValues([[warning, '']]);
+      currentRow++;
+    });
+  }
+  
+  return currentRow + 1;
+}
+
+/**
+ * 🔐 新增權限報告區段
+ */
+function addPermissionReportSection(sheet, permissionData, startRow) {
+  const sectionData = [
+    ['🔐 權限驗證報告', ''],
+    ['當前使用者', permissionData.currentUser],
+    ['檢查項目數', (permissionData.permissions && permissionData.permissions.length) || 0],
+    ['發現問題數', (permissionData.issues && permissionData.issues.length) || 0],
+    ['']
+  ];
+  
+  sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);
+  sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#E8F5E8');
+  
+  let currentRow = startRow + sectionData.length;
+  
+  // 權限詳細資訊
+  if (permissionData.permissions && permissionData.permissions.length > 0) {
+    const permissionHeaders = [['權限類型', '狀態', '詳細資訊']];
+    sheet.getRange(currentRow, 1, 1, 3).setValues(permissionHeaders);
+    sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');
+    currentRow++;
+    
+    const permissionDetails = permissionData.permissions.map(perm => [
+      perm.type,
+      perm.status,
+      perm.details
+    ]);
+    
+    sheet.getRange(currentRow, 1, permissionDetails.length, 3).setValues(permissionDetails);
+    currentRow += permissionDetails.length;
+  }
+  
+  // 問題列表
+  if (permissionData.issues && permissionData.issues.length > 0) {
+    currentRow++;
+    sheet.getRange(currentRow, 1).setValue('❌ 發現問題：');
+    sheet.getRange(currentRow, 1).setFontWeight('bold');
+    currentRow++;
+    
+    permissionData.issues.forEach(issue => {
+      sheet.getRange(currentRow, 1, 1, 2).setValues([[issue, '']]);
+      currentRow++;
+    });
+  }
+  
+  return currentRow + 1;
+}
+
+/**
+ * 🏥 新增 API 健康報告區段
+ */
+function addApiHealthReportSection(sheet, apiData, startRow) {
+  const sectionData = [
+    ['🏥 API 健康狀態報告', ''],
+    ['檢查時間', apiData.timestamp ? new Date(apiData.timestamp).toLocaleString('zh-TW') : 'N/A'],
+    ['整體狀態', apiData.overall],
+    ['測試項目數', (apiData.tests && apiData.tests.length) || 0],
+    ['']
+  ];
+  
+  sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);
+  sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#FFF3E0');
+  
+  let currentRow = startRow + sectionData.length;
+  
+  // API 測試詳細資訊
+  if (apiData.tests && apiData.tests.length > 0) {
+    const testHeaders = [['測試項目', '狀態', '詳細資訊']];
+    sheet.getRange(currentRow, 1, 1, 3).setValues(testHeaders);
+    sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');
+    currentRow++;
+    
+    const testDetails = apiData.tests.map(test => [
+      test.name,
+      test.status,
+      test.details
+    ]);
+    
+    sheet.getRange(currentRow, 1, testDetails.length, 3).setValues(testDetails);
+    currentRow += testDetails.length;
+  }
+  
+  return currentRow + 1;
+}
+
+/**
+ * 💡 新增建議區段
+ */
+function addRecommendationsSection(sheet, recommendations, startRow) {
+  const sectionData = [
+    ['💡 改進建議', ''],
+    ['建議項目數', recommendations.length],
+    ['']
+  ];
+  
+  sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);
+  sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#F3E5F5');
+  
+  let currentRow = startRow + sectionData.length;
+  
+  const recHeaders = [['優先級', '類型', '建議內容']];
+  sheet.getRange(currentRow, 1, 1, 3).setValues(recHeaders);
+  sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');
+  currentRow++;
+  
+  const recDetails = recommendations.map(rec => [
+    rec.priority,
+    rec.type,
+    rec.message
+  ]);
+  
+  sheet.getRange(currentRow, 1, recDetails.length, 3).setValues(recDetails);
+  currentRow += recDetails.length;
+  
+  return currentRow + 1;
+}
+
+/**
+ * 📖 顯示診斷摘要
+ */
+function showDiagnosticSummary(diagnostics, reportResult) {
+  let summary = '🔍 系統診斷完成\n\n';
+  
+  // 課程容量摘要
+  if (diagnostics.courseCapacity && !diagnostics.courseCapacity.error) {
+    const capacity = diagnostics.courseCapacity;
+    summary += `📊 課程容量：檢查了 ${capacity.checkedCourses}/${capacity.totalCourses} 個課程\n`;
+    if (capacity.warnings && capacity.warnings.length > 0) {
+      summary += `⚠️ 發現 ${capacity.warnings.length} 個容量警告\n`;
+    }
+  }
+  
+  // 權限摘要
+  if (diagnostics.studentPermissions && !diagnostics.studentPermissions.error) {
+    const permissions = diagnostics.studentPermissions;
+    summary += `🔐 權限狀態：檢查了 ${permissions.permissions ? permissions.permissions.length : 0} 個權限項目\n`;
+    if (permissions.issues && permissions.issues.length > 0) {
+      summary += `❌ 發現 ${permissions.issues.length} 個權限問題\n`;
+    }
+  }
+  
+  // API 健康摘要
+  if (diagnostics.apiHealth && !diagnostics.apiHealth.error) {
+    const health = diagnostics.apiHealth;
+    summary += `🏥 API 狀態：${health.overall}\n`;
+  }
+  
+  // 建議摘要
+  if (diagnostics.recommendations && diagnostics.recommendations.length > 0) {
+    const highPriority = diagnostics.recommendations.filter(rec => rec.priority === 'high').length;
+    summary += `💡 改進建議：共 ${diagnostics.recommendations.length} 項（高優先級：${highPriority}）\n`;
+  }
+  
+  // 報告資訊
+  if (reportResult.success) {
+    summary += `\n📋 詳細報告已建立：${reportResult.sheetName}`;
+  }
+  
+  SpreadsheetApp.getUi().alert(
+    '🔍 系統診斷報告',
+    summary,
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 }
 
 /**
