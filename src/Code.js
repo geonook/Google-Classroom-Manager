@@ -10405,11 +10405,11 @@ function parseRealCourseMapping() {
         }
       }
     } catch (error) {
-      console.log(\`⚠️ 解析日誌行失敗: \${line}\`);
+      console.log(`⚠️ 解析日誌行失敗: ${line}`);
     }
   }
   
-  console.log(\`📚 成功解析 \${Object.keys(courseMapping).length} 個班級的課程資料\`);
+  console.log(`📚 成功解析 ${Object.keys(courseMapping).length} 個班級的課程資料`);
   return courseMapping;
 }
 
