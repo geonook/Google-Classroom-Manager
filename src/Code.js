@@ -265,6 +265,7 @@ function onOpen() {
     .addSeparator()
     .addItem('👨‍🏫 4. 新增老師', 'addTeachersUI')
     .addItem('👨‍🎓 5. 新增學生', 'addStudentsUI')
+    .addItem('🎯 5A. 簡易學生新增', 'addStudentsSimple')
     .addItem('🎯 5B. 智能學生分配', 'distributeStudentsUI')
     .addItem('🧹 5C. 清除學生狀態', 'clearStudentStatusColumn')
     .addSeparator()
@@ -9580,5 +9581,211 @@ function getMappingTableStatistics() {
   } catch (error) {
     console.error('❌ 獲取映射表統計資訊失敗:', error.message);
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🎯 簡化學生新增功能 - 直接可用版本
+ * 
+ * 使用方式：
+ * 1. 在 Google Sheets 中建立名為 'stu_course' 的工作表
+ * 2. 填入三欄：學生Email | 課程名稱或ID | 狀態（留空）
+ * 3. 執行此函數
+ * 
+ * @returns {Object} 執行結果
+ */
+function addStudentsSimple() {
+  console.log('🎯 === 簡化學生新增系統 === 🎯');
+  console.log('📚 正在檢查資料表格式和內容...');
+  
+  try {
+    // 步驟 1: 檢查和準備資料表
+    const setupResult = setupStudentDataSheets();
+    if (!setupResult.success) {
+      console.log(`❌ 資料表設定失敗：${setupResult.error}`);
+      showUserMessage('❌ 設定錯誤', setupResult.error + '\n\n請按照說明準備資料表。', 'error');
+      return { success: false, error: setupResult.error };
+    }
+    
+    console.log('✅ 資料表格式檢查完成');
+    
+    // 步驟 2: 執行學生新增
+    console.log('🚀 開始執行學生新增...');
+    const result = executeRealStudentBatch();
+    
+    // 步驟 3: 顯示結果
+    showStudentAdditionResults(result);
+    
+    return result;
+    
+  } catch (error) {
+    const errorMsg = `系統執行錯誤：${error.message}`;
+    console.log(`❌ ${errorMsg}`);
+    showUserMessage('❌ 執行失敗', errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * 📋 設定和檢查學生資料表
+ */
+function setupStudentDataSheets() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 檢查主要資料表：stu_course
+    let stuSheet = ss.getSheetByName('stu_course');
+    if (!stuSheet) {
+      console.log('🔧 建立 stu_course 工作表...');
+      stuSheet = ss.insertSheet('stu_course');
+      
+      // 設定標題行
+      stuSheet.getRange(1, 1, 1, 3).setValues([
+        ['學生Email', '課程名稱或ID', '狀態']
+      ]);
+      stuSheet.getRange(1, 1, 1, 3).setBackground('#4285f4').setFontColor('white').setFontWeight('bold');
+      stuSheet.setFrozenRows(1);
+      
+      // 設定範例資料
+      stuSheet.getRange(2, 1, 2, 3).setValues([
+        ['student1@school.edu', 'G6 Voyagers', ''],
+        ['student2@school.edu', 'G3 Achievers', '']
+      ]);
+      
+      console.log('✅ stu_course 工作表已建立，請填入學生資料');
+      return { 
+        success: false, 
+        error: '已為您建立 stu_course 工作表並設定範例資料。\n\n請填入實際的學生Email和課程名稱，然後再次執行此功能。\n\n格式：\n• 欄位A：學生Email\n• 欄位B：課程名稱（如 G6 Voyagers）或課程ID\n• 欄位C：狀態（請留空）'
+      };
+    }
+    
+    // 檢查資料內容
+    const lastRow = stuSheet.getLastRow();
+    if (lastRow < 2) {
+      return { 
+        success: false, 
+        error: 'stu_course 工作表中沒有學生資料。\n\n請在工作表中填入：\n• 欄位A：學生Email\n• 欄位B：課程名稱或ID\n• 欄位C：狀態（留空）'
+      };
+    }
+    
+    // 檢查課程映射表
+    const mappingResult = checkCourseMappingSheet();
+    if (!mappingResult.success) {
+      console.log('⚠️ 課程映射表問題，但將嘗試繼續執行...');
+    }
+    
+    console.log(`📊 發現 ${lastRow - 1} 筆學生資料，準備處理`);
+    return { success: true };
+    
+  } catch (error) {
+    return { success: false, error: `資料表設定錯誤：${error.message}` };
+  }
+}
+
+/**
+ * 🔍 檢查課程映射表
+ */
+function checkCourseMappingSheet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let mappingSheet = ss.getSheetByName('course_mapping');
+    
+    if (!mappingSheet) {
+      console.log('🔧 建立 course_mapping 工作表...');
+      mappingSheet = ss.insertSheet('course_mapping');
+      
+      // 設定標題行
+      mappingSheet.getRange(1, 1, 1, 4).setValues([
+        ['Course Name', 'Subject', 'Course ID', 'Status']
+      ]);
+      mappingSheet.getRange(1, 1, 1, 4).setBackground('#34a853').setFontColor('white').setFontWeight('bold');
+      mappingSheet.setFrozenRows(1);
+      
+      // 設定範例資料
+      mappingSheet.getRange(2, 1, 3, 4).setValues([
+        ['G6 Voyagers', 'LT', '請填入實際課程ID', 'ACTIVE'],
+        ['G6 Voyagers', 'IT', '請填入實際課程ID', 'ACTIVE'],
+        ['G3 Achievers', 'LT', '請填入實際課程ID', 'ACTIVE']
+      ]);
+      
+      return { 
+        success: false, 
+        error: '已建立課程映射表，如果使用課程名稱而非ID，請先設定課程映射'
+      };
+    }
+    
+    const lastRow = mappingSheet.getLastRow();
+    if (lastRow < 2) {
+      return { 
+        success: false, 
+        error: 'course_mapping 工作表為空，如果使用課程名稱，請先填入課程映射資料'
+      };
+    }
+    
+    console.log(`📋 課程映射表包含 ${lastRow - 1} 筆映射資料`);
+    return { success: true };
+    
+  } catch (error) {
+    return { success: false, error: `課程映射表檢查失敗：${error.message}` };
+  }
+}
+
+/**
+ * 📊 顯示學生新增結果
+ */
+function showStudentAdditionResults(result) {
+  try {
+    let message = '🎉 學生新增執行完成！\n\n';
+    
+    if (result.success) {
+      message += `✅ 處理狀態：成功\n`;
+      message += `📊 處理數量：${result.processedCount || 0} 項\n`;
+      message += `📈 總任務數：${result.totalAssignments || 0} 項\n\n`;
+      
+      if (result.summary) {
+        message += `詳細結果：\n`;
+        message += `• 成功：${result.summary.successful || 0} 項\n`;
+        message += `• 已存在：${result.summary.existing || 0} 項\n`;
+        message += `• 錯誤：${result.summary.errors || 0} 項\n`;
+      }
+      
+      if (result.processedCount > 0) {
+        message += `\n📋 詳細報告已儲存至工作表`;
+      }
+      
+    } else {
+      message += `❌ 執行失敗\n`;
+      message += `錯誤原因：${result.error}\n\n`;
+      message += `請檢查：\n`;
+      message += `• stu_course 工作表格式是否正確\n`;
+      message += `• 學生Email和課程資料是否完整\n`;
+      message += `• Google Classroom 權限是否正常`;
+    }
+    
+    console.log('📊 結果摘要：', message.replace(/\n/g, ' | '));
+    showUserMessage('📊 執行結果', message, result.success ? 'info' : 'warning');
+    
+  } catch (error) {
+    console.log(`❌ 顯示結果失敗：${error.message}`);
+  }
+}
+
+/**
+ * 💬 顯示用戶訊息（統一介面）
+ */
+function showUserMessage(title, message, type = 'info') {
+  try {
+    const ui = SpreadsheetApp.getUi();
+    
+    // 根據類型選擇按鈕組
+    let buttonSet = ui.ButtonSet.OK;
+    if (type === 'error' || type === 'warning') {
+      buttonSet = ui.ButtonSet.OK;
+    }
+    
+    ui.alert(title, message, buttonSet);
+    
+  } catch (error) {
+    console.log(`💬 UI訊息：${title} - ${message}`);
   }
 }
