@@ -267,6 +267,7 @@ function onOpen() {
     .addItem('👨‍🎓 5. 新增學生', 'addStudentsUI')
     .addItem('🎯 5A. 簡易學生新增', 'addStudentsSimple')
     .addItem('📋 5A1. 生成學生課程資料', 'generateCompleteStudentCourseData')
+    .addItem('🔄 5A2. 擴展現有學生資料', 'expandStudentCourseData')
     .addItem('🎯 5B. 智能學生分配', 'distributeStudentsUI')
     .addItem('🧹 5C. 清除學生狀態', 'clearStudentStatusColumn')
     .addSeparator()
@@ -10028,6 +10029,553 @@ function updateStuCourseSheet(records) {
     if (dataRows.length > 0) {
       sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
       console.log(`✅ 成功寫入 ${dataRows.length} 筆學生-課程記錄`);
+    }
+    
+    // 自動調整欄寬
+    sheet.autoResizeColumns(1, headers.length);
+    
+    return { success: true };
+    
+  } catch (error) {
+    return { success: false, error: `工作表更新失敗：${error.message}` };
+  }
+}
+
+/**
+ * 🎯 擴展現有學生課程資料
+ * 將真實的學生資料從班級名稱擴展為3門課程記錄
+ */
+function expandStudentCourseData() {
+  console.log('🎯 === 擴展學生課程資料系統 === 🎯');
+  
+  try {
+    const result = expandRealStudentData();
+    
+    if (result.success) {
+      showUserMessage('✅ 資料擴展成功', 
+        `已成功擴展 ${result.expandedRecords} 筆學生-課程記錄\n\n` +
+        `📊 統計：\n` +
+        `• 原始學生記錄：${result.originalRecords}\n` +
+        `• 擴展後記錄：${result.expandedRecords}\n` +
+        `• 成功映射：${result.mappedClasses}\n` +
+        `• 失敗映射：${result.unmappedClasses}\n\n` +
+        `資料已更新至 'stu_course' 工作表，可以直接執行學生新增功能。`, 
+        'info'
+      );
+    } else {
+      showUserMessage('❌ 擴展失敗', result.error, 'error');
+    }
+    
+    return result;
+    
+  } catch (error) {
+    const errorMsg = `擴展學生課程資料失敗：${error.message}`;
+    console.log(`❌ ${errorMsg}`);
+    showUserMessage('❌ 系統錯誤', errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * 🔧 執行真實學生資料擴展
+ */
+function expandRealStudentData() {
+  console.log('🔧 開始擴展真實學生資料...');
+  
+  try {
+    // 步驟 1: 解析真實課程映射資料
+    const courseMapping = parseRealCourseMapping();
+    console.log(`📋 解析到 ${Object.keys(courseMapping).length} 個班級的課程資料`);
+    
+    // 步驟 2: 讀取現有學生資料
+    const currentStudentData = readCurrentStudentData();
+    if (!currentStudentData.success) {
+      return { success: false, error: currentStudentData.error };
+    }
+    console.log(`👥 讀取到 ${currentStudentData.records.length} 筆學生記錄`);
+    
+    // 步驟 3: 擴展學生-課程記錄
+    const expandedRecords = createExpandedStudentRecords(currentStudentData.records, courseMapping);
+    console.log(`📊 擴展為 ${expandedRecords.mappedRecords.length} 筆學生-課程記錄`);
+    
+    // 步驟 4: 更新工作表
+    const updateResult = updateExpandedStuCourseSheet(expandedRecords.mappedRecords);
+    
+    return {
+      success: updateResult.success,
+      originalRecords: currentStudentData.records.length,
+      expandedRecords: expandedRecords.mappedRecords.length,
+      mappedClasses: expandedRecords.mappedCount,
+      unmappedClasses: expandedRecords.unmappedCount,
+      error: updateResult.error
+    };
+    
+  } catch (error) {
+    return { success: false, error: `資料擴展失敗：${error.message}` };
+  }
+}
+
+/**
+ * 📚 解析真實課程映射資料
+ * 從 populateSheetFromLog 的日誌資料中解析所有真實課程
+ */
+function parseRealCourseMapping() {
+  console.log('📚 解析真實課程映射資料...');
+  
+  // 從 populateSheetFromLog 函數中的日誌資料解析
+  const logData = `[INFO]   ✅ 成功: LT-G1 Achievers (ID: 779922029471)
+[INFO]   ✅ 成功: IT-G1 Achievers (ID: 779921968089)
+[INFO]   ✅ 成功: KCFS-G1 Achievers (ID: 779922003016)
+[INFO]   ✅ 成功: LT-G1 Discoverers (ID: 779922024070)
+[INFO]   ✅ 成功: IT-G1 Discoverers (ID: 779922045964)
+[INFO]   ✅ 成功: KCFS-G1 Discoverers (ID: 779922047333)
+[INFO]   ✅ 成功: LT-G1 Voyagers (ID: 779922000504)
+[INFO]   ✅ 成功: IT-G1 Voyagers (ID: 779921963954)
+[INFO]   ✅ 成功: KCFS-G1 Voyagers (ID: 779922050446)
+[INFO]   ✅ 成功: LT-G1 Explorers (ID: 779922034354)
+[INFO]   ✅ 成功: IT-G1 Explorers (ID: 779921930383)
+[INFO]   ✅ 成功: KCFS-G1 Explorers (ID: 779922065235)
+[INFO]   ✅ 成功: LT-G1 Navigators (ID: 779922057508)
+[INFO]   ✅ 成功: IT-G1 Navigators (ID: 779921999359)
+[INFO]   ✅ 成功: KCFS-G1 Navigators (ID: 779921986009)
+[INFO]   ✅ 成功: LT-G1 Adventurers (ID: 779921948860)
+[INFO]   ✅ 成功: IT-G1 Adventurers (ID: 779921980356)
+[INFO]   ✅ 成功: KCFS-G1 Adventurers (ID: 779921972429)
+[INFO]   ✅ 成功: LT-G1 Guardians (ID: 779922003082)
+[INFO]   ✅ 成功: IT-G1 Guardians (ID: 779921980390)
+[INFO]   ✅ 成功: KCFS-G1 Guardians (ID: 779922046054)
+[INFO]   ✅ 成功: LT-G1 Pioneers (ID: 779922021273)
+[INFO]   ✅ 成功: IT-G1 Pioneers (ID: 779922050570)
+[INFO]   ✅ 成功: KCFS-G1 Pioneers (ID: 779922046073)
+[INFO]   ✅ 成功: LT-G1 Innovators (ID: 779922008329)
+[INFO]   ✅ 成功: IT-G1 Innovators (ID: 779922021811)
+[INFO]   ✅ 成功: KCFS-G1 Innovators (ID: 779922057889)
+[INFO]   ✅ 成功: LT-G1 Visionaries (ID: 779922034584)
+[INFO]   ✅ 成功: IT-G1 Visionaries (ID: 779921968221)
+[INFO]   ✅ 成功: KCFS-G1 Visionaries (ID: 779922011931)
+[INFO]   ✅ 成功: LT-G1 Pathfinders (ID: 779922007326)
+[INFO]   ✅ 成功: IT-G1 Pathfinders (ID: 779921921745)
+[INFO]   ✅ 成功: KCFS-G1 Pathfinders (ID: 779922000731)
+[INFO]   ✅ 成功: LT-G1 Seekers (ID: 779922037880)
+[INFO]   ✅ 成功: IT-G1 Seekers (ID: 779922007364)
+[INFO]   ✅ 成功: KCFS-G1 Seekers (ID: 779922014522)
+[INFO]   ✅ 成功: LT-G1 Trailblazers (ID: 779922044405)
+[INFO]   ✅ 成功: IT-G1 Trailblazers (ID: 779922002217)
+[INFO]   ✅ 成功: KCFS-G1 Trailblazers (ID: 779922034657)
+[INFO]   ✅ 成功: LT-G1 Inventors (ID: 779922048392)
+[INFO]   ✅ 成功: IT-G1 Inventors (ID: 779922040087)
+[INFO]   ✅ 成功: KCFS-G1 Inventors (ID: 779921999592)
+[INFO]   ✅ 成功: LT-G2 Achievers (ID: 779921948991)
+[INFO]   ✅ 成功: IT-G2 Achievers (ID: 779922014568)
+[INFO]   ✅ 成功: KCFS-G2 Achievers (ID: 779922012472)
+[INFO]   ✅ 成功: LT-G2 Discoverers (ID: 779922046211)
+[INFO]   ✅ 成功: IT-G2 Discoverers (ID: 779922018036)
+[INFO]   ✅ 成功: KCFS-G2 Discoverers (ID: 779922005259)
+[INFO]   ✅ 成功: LT-G2 Voyagers (ID: 779921921851)
+[INFO]   ✅ 成功: IT-G2 Voyagers (ID: 779922034749)
+[INFO]   ✅ 成功: KCFS-G2 Voyagers (ID: 779922005284)
+[INFO]   ✅ 成功: LT-G2 Explorers (ID: 779922026952)
+[INFO]   ✅ 成功: IT-G2 Explorers (ID: 779922044545)
+[INFO]   ✅ 成功: KCFS-G2 Explorers (ID: 779922081094)
+[INFO]   ✅ 成功: LT-G2 Navigators (ID: 779922038996)
+[INFO]   ✅ 成功: IT-G2 Navigators (ID: 779922046276)
+[INFO]   ✅ 成功: KCFS-G2 Navigators (ID: 779921985590)
+[INFO]   ✅ 成功: LT-G2 Adventurers (ID: 779922074842)
+[INFO]   ✅ 成功: IT-G2 Adventurers (ID: 779922065624)
+[INFO]   ✅ 成功: KCFS-G2 Adventurers (ID: 779922075985)
+[INFO]   ✅ 成功: LT-G2 Guardians (ID: 779922003336)
+[INFO]   ✅ 成功: IT-G2 Guardians (ID: 779922024530)
+[INFO]   ✅ 成功: KCFS-G2 Guardians (ID: 779922035489)
+[INFO]   ✅ 成功: LT-G2 Pioneers (ID: 779922014736)
+[INFO]   ✅ 成功: IT-G2 Pioneers (ID: 779922021999)
+[INFO]   ✅ 成功: KCFS-G2 Pioneers (ID: 779921964337)
+[INFO]   ✅ 成功: LT-G2 Innovators (ID: 779922016609)
+[INFO]   ✅ 成功: IT-G2 Innovators (ID: 779922047733)
+[INFO]   ✅ 成功: KCFS-G2 Innovators (ID: 779922035521)
+[INFO]   ✅ 成功: LT-G2 Visionaries (ID: 779921978592)
+[INFO]   ✅ 成功: IT-G2 Visionaries (ID: 779922013496)
+[INFO]   ✅ 成功: KCFS-G2 Visionaries (ID: 779922048583)
+[INFO]   ✅ 成功: LT-G2 Pathfinders (ID: 779922049004)
+[INFO]   ✅ 成功: IT-G2 Pathfinders (ID: 779922049019)
+[INFO]   ✅ 成功: KCFS-G2 Pathfinders (ID: 779922016672)
+[INFO]   ✅ 成功: LT-G2 Seekers (ID: 779922065744)
+[INFO]   ✅ 成功: IT-G2 Seekers (ID: 779922013559)
+[INFO]   ✅ 成功: KCFS-G2 Seekers (ID: 779922035577)
+[INFO]   ✅ 成功: LT-G2 Trailblazers (ID: 779922012668)
+[INFO]   ✅ 成功: IT-G2 Trailblazers (ID: 779921930880)
+[INFO]   ✅ 成功: KCFS-G2 Trailblazers (ID: 779922070707)
+[INFO]   ✅ 成功: LT-G2 Inventors (ID: 779921987442)
+[INFO]   ✅ 成功: IT-G2 Inventors (ID: 779921986411)
+[INFO]   ✅ 成功: KCFS-G2 Inventors (ID: 779922047855)
+[INFO]   ✅ 成功: LT-G3 Achievers (ID: 779922075128)
+[INFO]   ✅ 成功: IT-G3 Achievers (ID: 779922073859)
+[INFO]   ✅ 成功: KCFS-G3 Achievers (ID: 779922001163)
+[INFO]   ✅ 成功: LT-G3 Discoverers (ID: 779922084538)
+[INFO]   ✅ 成功: IT-G3 Discoverers (ID: 779921999845)
+[INFO]   ✅ 成功: KCFS-G3 Discoverers (ID: 779922035255)
+[INFO]   ✅ 成功: LT-G3 Voyagers (ID: 779921955583)
+[INFO]   ✅ 成功: IT-G3 Voyagers (ID: 779922018332)
+[INFO]   ✅ 成功: KCFS-G3 Voyagers (ID: 779922065856)
+[INFO]   ✅ 成功: LT-G3 Explorers (ID: 779921985920)
+[INFO]   ✅ 成功: IT-G3 Explorers (ID: 779922084573)
+[INFO]   ✅ 成功: KCFS-G3 Explorers (ID: 779922072945)
+[INFO]   ✅ 成功: LT-G3 Navigators (ID: 779922028593)
+[INFO]   ✅ 成功: IT-G3 Navigators (ID: 779922022149)
+[INFO]   ✅ 成功: KCFS-G3 Navigators (ID: 779922047961)
+[INFO]   ✅ 成功: LT-G3 Adventurers (ID: 779922036661)
+[INFO]   ✅ 成功: IT-G3 Adventurers (ID: 779922047983)
+[INFO]   ✅ 成功: KCFS-G3 Adventurers (ID: 779922074011)
+[INFO]   ✅ 成功: LT-G3 Guardians (ID: 779922084207)
+[INFO]   ✅ 成功: IT-G3 Guardians (ID: 779922060904)
+[INFO]   ✅ 成功: KCFS-G3 Guardians (ID: 779922033349)
+[INFO]   ✅ 成功: LT-G3 Pioneers (ID: 779922015538)
+[INFO]   ✅ 成功: IT-G3 Pioneers (ID: 779921931059)
+[INFO]   ✅ 成功: KCFS-G3 Pioneers (ID: 779922001293)
+[INFO]   ✅ 成功: LT-G3 Innovators (ID: 779922081422)
+[INFO]   ✅ 成功: IT-G3 Innovators (ID: 779921931088)
+[INFO]   ✅ 成功: KCFS-G3 Innovators (ID: 779922066519)
+[INFO]   ✅ 成功: LT-G3 Visionaries (ID: 779922069179)
+[INFO]   ✅ 成功: IT-G3 Visionaries (ID: 779921931113)
+[INFO]   ✅ 成功: KCFS-G3 Visionaries (ID: 779922083299)
+[INFO]   ✅ 成功: LT-G3 Pathfinders (ID: 779922010084)
+[INFO]   ✅ 成功: IT-G3 Pathfinders (ID: 779922040641)
+[INFO]   ✅ 成功: KCFS-G3 Pathfinders (ID: 779922072684)
+[INFO]   ✅ 成功: LT-G3 Seekers (ID: 779922061523)
+[INFO]   ✅ 成功: IT-G3 Seekers (ID: 779922074147)
+[INFO]   ✅ 成功: KCFS-G3 Seekers (ID: 779922063726)
+[INFO]   ✅ 成功: LT-G3 Trailblazers (ID: 779922010127)
+[INFO]   ✅ 成功: IT-G3 Trailblazers (ID: 779922090717)
+[INFO]   ✅ 成功: KCFS-G3 Trailblazers (ID: 779922027509)
+[INFO]   ✅ 成功: LT-G3 Inventors (ID: 779922025875)
+[INFO]   ✅ 成功: IT-G3 Inventors (ID: 779921976606)
+[INFO]   ✅ 成功: KCFS-G3 Inventors (ID: 779922036847)
+[INFO]   ✅ 成功: LT-G4 Achievers (ID: 779922000137)
+[INFO]   ✅ 成功: IT-G4 Achievers (ID: 779922025914)
+[INFO]   ✅ 成功: KCFS-G4 Achievers (ID: 779922088094)
+[INFO]   ✅ 成功: LT-G4 Discoverers (ID: 779922052946)
+[INFO]   ✅ 成功: IT-G4 Discoverers (ID: 779922066706)
+[INFO]   ✅ 成功: KCFS-G4 Discoverers (ID: 779922084754)
+[INFO]   ✅ 成功: LT-G4 Voyagers (ID: 779922056194)
+[INFO]   ✅ 成功: IT-G4 Voyagers (ID: 779922086834)
+[INFO]   ✅ 成功: KCFS-G4 Voyagers (ID: 779922089490)
+[INFO]   ✅ 成功: LT-G4 Explorers (ID: 779922013975)
+[INFO]   ✅ 成功: IT-G4 Explorers (ID: 779922066775)
+[INFO]   ✅ 成功: KCFS-G4 Explorers (ID: 779922089512)
+[INFO]   ✅ 成功: LT-G4 Navigators (ID: 779922063870)
+[INFO]   ✅ 成功: IT-G4 Navigators (ID: 779922085853)
+[INFO]   ✅ 成功: KCFS-G4 Navigators (ID: 779922094010)
+[INFO]   ✅ 成功: LT-G4 Adventurers (ID: 779922086926)
+[INFO]   ✅ 成功: IT-G4 Adventurers (ID: 779922099328)
+[INFO]   ✅ 成功: KCFS-G4 Adventurers (ID: 779922106185)
+[INFO]   ✅ 成功: LT-G4 Guardians (ID: 779922076793)
+[INFO]   ✅ 成功: IT-G4 Guardians (ID: 779922097960)
+[INFO]   ✅ 成功: KCFS-G4 Guardians (ID: 779921964848)
+[INFO]   ✅ 成功: LT-G4 Pioneers (ID: 779922087000)
+[INFO]   ✅ 成功: IT-G4 Pioneers (ID: 779922053075)
+[INFO]   ✅ 成功: KCFS-G4 Pioneers (ID: 779922005683)
+[INFO]   ✅ 成功: LT-G4 Innovators (ID: 779921931362)
+[INFO]   ✅ 成功: IT-G4 Innovators (ID: 779922046575)
+[INFO]   ✅ 成功: KCFS-G4 Innovators (ID: 779922010296)
+[INFO]   ✅ 成功: LT-G4 Visionaries (ID: 779922061743)
+[INFO]   ✅ 成功: IT-G4 Visionaries (ID: 779921957489)
+[INFO]   ✅ 成功: KCFS-G4 Visionaries (ID: 779922082747)
+[INFO]   ✅ 成功: LT-G4 Pathfinders (ID: 779921964917)
+[INFO]   ✅ 成功: IT-G4 Pathfinders (ID: 779922045224)
+[INFO]   ✅ 成功: KCFS-G4 Pathfinders (ID: 779922037087)
+[INFO]   ✅ 成功: LT-G4 Seekers (ID: 779922118116)
+[INFO]   ✅ 成功: IT-G4 Seekers (ID: 779922087091)
+[INFO]   ✅ 成功: KCFS-G4 Seekers (ID: 779922000366)
+[INFO]   ✅ 成功: LT-G4 Trailblazers (ID: 779921976893)
+[INFO]   ✅ 成功: IT-G4 Trailblazers (ID: 779922087126)
+[INFO]   ✅ 成功: KCFS-G4 Trailblazers (ID: 779922022554)
+[INFO]   ✅ 成功: LT-G4 Inventors (ID: 779922066935)
+[INFO]   ✅ 成功: IT-G4 Inventors (ID: 779922083645)
+[INFO]   ✅ 成功: KCFS-G4 Inventors (ID: 779922109730)
+[INFO]   ✅ 成功: LT-G5 Achievers (ID: 779922074546)
+[INFO]   ✅ 成功: IT-G5 Achievers (ID: 779922099574)
+[INFO]   ✅ 成功: KCFS-G5 Achievers (ID: 779922073457)
+[INFO]   ✅ 成功: LT-G5 Discoverers (ID: 779921931563)
+[INFO]   ✅ 成功: IT-G5 Discoverers (ID: 779922096914)
+[INFO]   ✅ 成功: KCFS-G5 Discoverers (ID: 779922005836)
+[INFO]   ✅ 成功: LT-G5 Voyagers (ID: 779922106393)
+[INFO]   ✅ 成功: IT-G5 Voyagers (ID: 779922071283)
+[INFO]   ✅ 成功: KCFS-G5 Voyagers (ID: 779922104191)
+[INFO]   ✅ 成功: LT-G5 Explorers (ID: 779922015982)
+[INFO]   ✅ 成功: IT-G5 Explorers (ID: 779922089793)
+[INFO]   ✅ 成功: KCFS-G5 Explorers (ID: 779922121004)
+[INFO]   ✅ 成功: LT-G5 Navigators (ID: 779922106948)
+[INFO]   ✅ 成功: IT-G5 Navigators (ID: 779922088900)
+[INFO]   ✅ 成功: KCFS-G5 Navigators (ID: 779922010480)
+[INFO]   ✅ 成功: LT-G5 Adventurers (ID: 779922074692)
+[INFO]   ✅ 成功: IT-G5 Adventurers (ID: 779922087247)
+[INFO]   ✅ 成功: KCFS-G5 Adventurers (ID: 779922118257)
+[INFO]   ✅ 成功: LT-G5 Guardians (ID: 779922118268)
+[INFO]   ✅ 成功: IT-G5 Guardians (ID: 779922122756)
+[INFO]   ✅ 成功: KCFS-G5 Guardians (ID: 779922098229)
+[INFO]   ✅ 成功: LT-G5 Pioneers (ID: 779921977048)
+[INFO]   ✅ 成功: IT-G5 Pioneers (ID: 779922088558)
+[INFO]   ✅ 成功: KCFS-G5 Pioneers (ID: 779922089900)
+[INFO]   ✅ 成功: LT-G5 Innovators (ID: 779922016083)
+[INFO]   ✅ 成功: IT-G5 Innovators (ID: 779922010543)
+[INFO]   ✅ 成功: KCFS-G5 Innovators (ID: 779921931734)
+[INFO]   ✅ 成功: LT-G5 Visionaries (ID: 779922052460)
+[INFO]   ✅ 成功: IT-G5 Visionaries (ID: 779922037396)
+[INFO]   ✅ 成功: KCFS-G5 Visionaries (ID: 779922098837)
+[INFO]   ✅ 成功: LT-G5 Pathfinders (ID: 779922111472)
+[INFO]   ✅ 成功: IT-G5 Pathfinders (ID: 779922118345)
+[INFO]   ✅ 成功: KCFS-G5 Pathfinders (ID: 779922073728)
+[INFO]   ✅ 成功: LT-G5 Seekers (ID: 779922132564)
+[INFO]   ✅ 成功: IT-G5 Seekers (ID: 779922095056)
+[INFO]   ✅ 成功: KCFS-G5 Seekers (ID: 779922118448)
+[INFO]   ✅ 成功: LT-G5 Trailblazers (ID: 779922046886)
+[INFO]   ✅ 成功: IT-G5 Trailblazers (ID: 779922141268)
+[INFO]   ✅ 成功: KCFS-G5 Trailblazers (ID: 779922028036)
+[INFO]   ✅ 成功: LT-G5 Inventors (ID: 779922037459)
+[INFO]   ✅ 成功: IT-G5 Inventors (ID: 779922121234)
+[INFO]   ✅ 成功: KCFS-G5 Inventors (ID: 779922104556)
+[INFO]   ✅ 成功: LT-G6 Achievers (ID: 779922124589)
+[INFO]   ✅ 成功: IT-G6 Achievers (ID: 779922110229)
+[INFO]   ✅ 成功: KCFS-G6 Achievers (ID: 779922107986)
+[INFO]   ✅ 成功: LT-G6 Discoverers (ID: 779922128862)
+[INFO]   ✅ 成功: IT-G6 Discoverers (ID: 779922092838)
+[INFO]   ✅ 成功: KCFS-G6 Discoverers (ID: 779922131945)
+[INFO]   ✅ 成功: LT-G6 Voyagers (ID: 779922102231)
+[INFO]   ✅ 成功: IT-G6 Voyagers (ID: 779922132705)
+[INFO]   ✅ 成功: KCFS-G6 Voyagers (ID: 779922020009)
+[INFO]   ✅ 成功: LT-G6 Explorers (ID: 779922081809)
+[INFO]   ✅ 成功: IT-G6 Explorers (ID: 779922093224)
+[INFO]   ✅ 成功: KCFS-G6 Explorers (ID: 779922107364)
+[INFO]   ✅ 成功: LT-G6 Navigators (ID: 779922121362)
+[INFO]   ✅ 成功: IT-G6 Navigators (ID: 779922053606)
+[INFO]   ✅ 成功: KCFS-G6 Navigators (ID: 779921957996)
+[INFO]   ✅ 成功: LT-G6 Adventurers (ID: 779922135025)
+[INFO]   ✅ 成功: IT-G6 Adventurers (ID: 779922068481)
+[INFO]   ✅ 成功: KCFS-G6 Adventurers (ID: 779922135536)
+[INFO]   ✅ 成功: LT-G6 Guardians (ID: 779922054467)
+[INFO]   ✅ 成功: IT-G6 Guardians (ID: 779922097338)
+[INFO]   ✅ 成功: KCFS-G6 Guardians (ID: 779922020130)
+[INFO]   ✅ 成功: LT-G6 Pioneers (ID: 779922059888)
+[INFO]   ✅ 成功: IT-G6 Pioneers (ID: 779922147963)
+[INFO]   ✅ 成功: KCFS-G6 Pioneers (ID: 779922006256)
+[INFO]   ✅ 成功: LT-G6 Innovators (ID: 779922135094)
+[INFO]   ✅ 成功: IT-G6 Innovators (ID: 779922093290)
+[INFO]   ✅ 成功: KCFS-G6 Innovators (ID: 779922056967)
+[INFO]   ✅ 成功: LT-G6 Visionaries (ID: 779922131171)
+[INFO]   ✅ 成功: IT-G6 Visionaries (ID: 779922087726)
+[INFO]   ✅ 成功: KCFS-G6 Visionaries (ID: 779922132903)
+[INFO]   ✅ 成功: LT-G6 Pathfinders (ID: 779922107477)
+[INFO]   ✅ 成功: IT-G6 Pathfinders (ID: 779922081950)
+[INFO]   ✅ 成功: KCFS-G6 Pathfinders (ID: 779922126500)
+[INFO]   ✅ 成功: LT-G6 Seekers (ID: 779922129063)
+[INFO]   ✅ 成功: IT-G6 Seekers (ID: 779922135162)
+[INFO]   ✅ 成功: KCFS-G6 Seekers (ID: 779922102469)
+[INFO]   ✅ 成功: LT-G6 Trailblazers (ID: 779922143433)
+[INFO]   ✅ 成功: IT-G6 Trailblazers (ID: 779922097560)
+[INFO]   ✅ 成功: KCFS-G6 Trailblazers (ID: 779922136269)
+[INFO]   ✅ 成功: LT-G6 Inventors (ID: 779922129101)
+[INFO]   ✅ 成功: IT-G6 Inventors (ID: 779922124838)
+[INFO]   ✅ 成功: KCFS-G6 Inventors (ID: 779922054673)`;
+  
+  const courseMapping = {};
+  const lines = logData.split('\n').filter(line => line.includes('✅ 成功:'));
+  
+  for (const line of lines) {
+    try {
+      const courseNameMatch = line.match(/✅ 成功: (.+) \(ID:/);
+      const courseIdMatch = line.match(/\(ID: (\d+)\)/);
+      
+      if (courseNameMatch && courseIdMatch) {
+        const fullCourseName = courseNameMatch[1]; // 例如: "LT-G1 Achievers"
+        const courseId = courseIdMatch[1];
+        
+        const parts = fullCourseName.split('-');
+        if (parts.length === 2) {
+          const subject = parts[0]; // "LT"
+          const className = parts[1]; // "G1 Achievers"
+          
+          if (!courseMapping[className]) {
+            courseMapping[className] = [];
+          }
+          
+          courseMapping[className].push({
+            subject: subject,
+            courseId: courseId,
+            teacher: getTeacherBySubject(subject)
+          });
+        }
+      }
+    } catch (error) {
+      console.log(\`⚠️ 解析日誌行失敗: \${line}\`);
+    }
+  }
+  
+  console.log(\`📚 成功解析 \${Object.keys(courseMapping).length} 個班級的課程資料\`);
+  return courseMapping;
+}
+
+/**
+ * 👨‍🏫 根據科目獲取教師
+ */
+function getTeacherBySubject(subject) {
+  const teachers = {
+    'LT': 'Ms. Kate',
+    'IT': 'Mr. Perry',
+    'KCFS': 'Mr. Louw'
+  };
+  return teachers[subject] || 'Unknown';
+}
+
+/**
+ * 📖 讀取現有學生資料
+ */
+function readCurrentStudentData() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('stu_course');
+    
+    if (!sheet) {
+      return { success: false, error: '找不到 stu_course 工作表' };
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, error: 'stu_course 工作表中沒有學生資料' };
+    }
+    
+    // 讀取資料（跳過標題行）
+    const range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    const data = range.getValues();
+    
+    const records = [];
+    data.forEach((row, index) => {
+      const studentEmail = row[0];
+      const classNameOrId = row[1]; // 可能是班級名稱或課程ID
+      const status = row[2];
+      
+      if (!studentEmail || !classNameOrId) {
+        console.log(`⚠️ 第 ${index + 2} 行資料不完整，跳過`);
+        return;
+      }
+      
+      // 跳過已處理的項目
+      if (status && status.toString().trim()) {
+        console.log(`ℹ️ 學生 ${studentEmail} 已處理，跳過`);
+        return;
+      }
+      
+      records.push({
+        studentEmail: studentEmail.toString().trim(),
+        className: classNameOrId.toString().trim(),
+        originalRow: index + 2
+      });
+    });
+    
+    console.log(`📖 讀取到 ${records.length} 筆未處理的學生記錄`);
+    return { success: true, records };
+    
+  } catch (error) {
+    return { success: false, error: `讀取學生資料失敗：${error.message}` };
+  }
+}
+
+/**
+ * 🔄 創建擴展的學生記錄
+ */
+function createExpandedStudentRecords(studentRecords, courseMapping) {
+  const mappedRecords = [];
+  let mappedCount = 0;
+  let unmappedCount = 0;
+  
+  studentRecords.forEach(student => {
+    const className = student.className;
+    const courses = courseMapping[className];
+    
+    if (courses && courses.length > 0) {
+      // 為這個學生創建3門課程記錄
+      courses.forEach(course => {
+        mappedRecords.push({
+          studentEmail: student.studentEmail,
+          courseId: course.courseId,
+          courseName: `${className}-${course.subject}`,
+          subject: course.subject,
+          teacher: course.teacher,
+          status: '',
+          originalClassName: className
+        });
+      });
+      mappedCount++;
+    } else {
+      console.log(`❌ 找不到班級 "${className}" 的課程映射`);
+      unmappedCount++;
+      
+      // 即使找不到映射，也保留原始記錄
+      mappedRecords.push({
+        studentEmail: student.studentEmail,
+        courseId: className, // 保留原始值
+        courseName: className,
+        subject: 'UNKNOWN',
+        teacher: 'Unknown',
+        status: '',
+        originalClassName: className,
+        mappingError: `找不到班級 "${className}" 的課程映射`
+      });
+    }
+  });
+  
+  console.log(`🔄 映射結果：成功 ${mappedCount} 個班級，失敗 ${unmappedCount} 個班級`);
+  console.log(`📊 總共創建 ${mappedRecords.length} 筆學生-課程記錄`);
+  
+  return {
+    mappedRecords,
+    mappedCount,
+    unmappedCount
+  };
+}
+
+/**
+ * 📊 更新擴展的 stu_course 工作表
+ */
+function updateExpandedStuCourseSheet(records) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('stu_course');
+    
+    if (!sheet) {
+      console.log('🔧 創建 stu_course 工作表...');
+      sheet = ss.insertSheet('stu_course');
+    }
+    
+    // 清空現有資料
+    sheet.clear();
+    
+    // 設定標題行
+    const headers = ['學生Email', '課程ID', '狀態', '課程名稱', '科目', '教師', '備註'];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setBackground('#4285f4').setFontColor('white').setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    
+    // 準備資料行
+    const dataRows = records.map(record => [
+      record.studentEmail,
+      record.courseId,
+      record.status,
+      record.courseName,
+      record.subject,
+      record.teacher,
+      record.mappingError || ''
+    ]);
+    
+    // 寫入資料
+    if (dataRows.length > 0) {
+      sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
+      console.log(`✅ 成功寫入 ${dataRows.length} 筆擴展的學生-課程記錄`);
+      
+      // 標記有錯誤的行
+      dataRows.forEach((row, index) => {
+        if (row[6]) { // 如果有備註（錯誤訊息）
+          sheet.getRange(index + 2, 1, 1, headers.length).setBackground('#ffebee');
+        }
+      });
     }
     
     // 自動調整欄寬
