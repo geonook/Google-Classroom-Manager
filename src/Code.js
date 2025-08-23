@@ -1110,11 +1110,7 @@ function populateSheetFromLog() {
   // --- 設定 ---
   const LOG_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
   const LOG_SHEET_NAME = 'course_teacher';
-  const SUBJECTS_MAP = {
-    LT: 'Ms. Kate',
-    IT: 'Mr. Perry',
-    KCFS: 'Mr. Louw',
-  };
+  // 不再使用硬編碼的 SUBJECTS_MAP，改用動態教師資料
   // --- 結束設定 ---
 
   // --- 將你提供的日誌貼在這裡 ---
@@ -1422,10 +1418,14 @@ function populateSheetFromLog() {
         const gradeAndClass = parts[1].split(' ');
         const grade = gradeAndClass[0];
         const className = gradeAndClass[1];
-        const teacher = SUBJECTS_MAP[subjectCode] || '未知';
+        // 動態獲取教師資料
+        const teacherInfo = getTeacherInfoBySubject(subjectCode);
+        const teacher = teacherInfo.success ? teacherInfo.teacherName : '未知教師';
+        const teacherEmail = teacherInfo.success ? teacherInfo.teacherEmail : 'unknown@school.edu';
         const courseLink = `https://classroom.google.com/c/${courseId}`;
 
-        const newRow = [subjectCode, grade, className, teacher, '', courseId, courseLink, false];
+        // 包含教師 Email 的完整資料行
+        const newRow = [subjectCode, grade, className, teacher, teacherEmail, courseId, courseLink, false];
         logSheet.appendRow(newRow);
         writeSuccess++;
       } else {
@@ -10116,11 +10116,22 @@ function expandRealStudentData() {
 }
 
 /**
- * 📚 解析真實課程映射資料
- * 從 populateSheetFromLog 的日誌資料中解析所有真實課程
+ * 📚 解析真實課程映射資料 (重構版本)
+ * 整合日誌資料和真實教師資料，消除硬編碼
  */
 function parseRealCourseMapping() {
   console.log('📚 解析真實課程映射資料...');
+  
+  // 首先嘗試從 course_teacher 工作表讀取真實教師資料
+  const teacherMappingResult = readCourseTeacherMapping();
+  let teacherMapping = {};
+  
+  if (teacherMappingResult.success) {
+    teacherMapping = teacherMappingResult.mapping;
+    console.log(`✅ 成功載入 ${teacherMappingResult.count} 筆真實教師資料`);
+  } else {
+    console.log('⚠️ 無法讀取真實教師資料，將使用課程ID映射');
+  }
   
   // 從 populateSheetFromLog 函數中的日誌資料解析
   const logData = `[INFO]   ✅ 成功: LT-G1 Achievers (ID: 779922029471)
@@ -10397,10 +10408,35 @@ function parseRealCourseMapping() {
             courseMapping[className] = [];
           }
           
+          // 獲取真實教師資料
+          let teacherInfo = {
+            teacherName: 'Unknown Teacher',
+            teacherEmail: 'unknown@school.edu'
+          };
+          
+          if (teacherMapping[courseId]) {
+            // 從真實資料中獲取教師資訊
+            teacherInfo = {
+              teacherName: teacherMapping[courseId].teacherName,
+              teacherEmail: teacherMapping[courseId].teacherEmail
+            };
+          } else {
+            // 後備方案：嘗試從科目映射獲取
+            const subjectMappingResult = buildSubjectTeacherMapping();
+            if (subjectMappingResult.success && subjectMappingResult.mapping[subject]) {
+              teacherInfo = subjectMappingResult.mapping[subject];
+            } else {
+              console.log(`⚠️ 找不到課程 ${courseId} (${subject}-${className}) 的教師資料`);
+            }
+          }
+          
           courseMapping[className].push({
             subject: subject,
             courseId: courseId,
-            teacher: getTeacherBySubject(subject)
+            teacherName: teacherInfo.teacherName,
+            teacherEmail: teacherInfo.teacherEmail,
+            // 保持向下相容
+            teacher: teacherInfo.teacherName
           });
         }
       }
@@ -10414,15 +10450,247 @@ function parseRealCourseMapping() {
 }
 
 /**
- * 👨‍🏫 根據科目獲取教師
+ * 👨‍🏫 根據科目獲取教師 (重構版本)
+ * 動態從 course_teacher 工作表讀取真實教師資料
  */
 function getTeacherBySubject(subject) {
-  const teachers = {
-    'LT': 'Ms. Kate',
-    'IT': 'Mr. Perry',
-    'KCFS': 'Mr. Louw'
+  console.log(`🔍 查詢科目 "${subject}" 的教師資訊...`);
+  
+  try {
+    const subjectMappingResult = buildSubjectTeacherMapping();
+    
+    if (subjectMappingResult.success && subjectMappingResult.mapping[subject]) {
+      const teacherInfo = subjectMappingResult.mapping[subject];
+      console.log(`✅ 找到科目 "${subject}" 的教師: ${teacherInfo.teacherName}`);
+      return teacherInfo.teacherName;
+    }
+    
+    // 使用後備映射
+    if (subjectMappingResult.fallbackMapping && subjectMappingResult.fallbackMapping[subject]) {
+      const fallbackInfo = subjectMappingResult.fallbackMapping[subject];
+      console.log(`⚠️ 使用後備教師資料: ${fallbackInfo.teacherName}`);
+      return fallbackInfo.teacherName;
+    }
+    
+    console.log(`❌ 找不到科目 "${subject}" 的教師，返回 Unknown`);
+    return 'Unknown Teacher';
+    
+  } catch (error) {
+    console.log(`❌ 查詢教師資訊失敗: ${error.message}`);
+    return 'Unknown Teacher';
+  }
+}
+
+/**
+ * 👨‍🏫 根據科目獲取完整教師資訊 (新增)
+ * 返回包含姓名和 Email 的完整教師資訊
+ */
+function getTeacherInfoBySubject(subject) {
+  console.log(`🔍 查詢科目 "${subject}" 的完整教師資訊...`);
+  
+  try {
+    const subjectMappingResult = buildSubjectTeacherMapping();
+    
+    if (subjectMappingResult.success && subjectMappingResult.mapping[subject]) {
+      const teacherInfo = subjectMappingResult.mapping[subject];
+      console.log(`✅ 找到科目 "${subject}" 的教師: ${teacherInfo.teacherName} (${teacherInfo.teacherEmail})`);
+      return {
+        success: true,
+        teacherName: teacherInfo.teacherName,
+        teacherEmail: teacherInfo.teacherEmail
+      };
+    }
+    
+    // 使用後備映射
+    if (subjectMappingResult.fallbackMapping && subjectMappingResult.fallbackMapping[subject]) {
+      const fallbackInfo = subjectMappingResult.fallbackMapping[subject];
+      console.log(`⚠️ 使用後備教師資料: ${fallbackInfo.teacherName}`);
+      return {
+        success: false,
+        teacherName: fallbackInfo.teacherName,
+        teacherEmail: fallbackInfo.teacherEmail,
+        note: '使用後備資料'
+      };
+    }
+    
+    return {
+      success: false,
+      error: `找不到科目 "${subject}" 的教師資訊`,
+      teacherName: 'Unknown Teacher',
+      teacherEmail: 'unknown@school.edu'
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      error: `查詢教師資訊失敗：${error.message}`,
+      teacherName: 'Unknown Teacher',
+      teacherEmail: 'unknown@school.edu'
+    };
+  }
+}
+
+// ========================== 真實教師資料讀取系統 ==========================
+
+/**
+ * 📚 讀取課程-教師映射資料
+ * 從 course_teacher 工作表讀取真實的教師姓名和 Email
+ */
+function readCourseTeacherMapping() {
+  console.log('📚 開始讀取真實課程-教師映射資料...');
+  
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('course_teacher');
+    
+    if (!sheet) {
+      console.log('❌ 找不到 course_teacher 工作表');
+      return { success: false, error: '找不到 course_teacher 工作表，無法讀取真實教師資料' };
+    }
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      console.log('❌ course_teacher 工作表中沒有資料');
+      return { success: false, error: 'course_teacher 工作表中沒有教師資料' };
+    }
+    
+    // 讀取所有資料（跳過標題行）
+    const range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+    const data = range.getValues();
+    
+    const courseTeacherMapping = {};
+    let successCount = 0;
+    
+    data.forEach((row, index) => {
+      try {
+        // 假設欄位順序：課程名稱, 課程ID, 科目, 教師姓名, 教師Email
+        const courseName = row[0];
+        const courseId = row[1];
+        const subject = row[2];
+        const teacherName = row[3];
+        const teacherEmail = row[4];
+        
+        if (!courseId || !teacherName || !teacherEmail) {
+          console.log(`⚠️ 第 ${index + 2} 行資料不完整，跳過`);
+          return;
+        }
+        
+        courseTeacherMapping[courseId.toString()] = {
+          courseName: courseName || '',
+          courseId: courseId.toString(),
+          subject: subject || '',
+          teacherName: teacherName.toString().trim(),
+          teacherEmail: teacherEmail.toString().trim()
+        };
+        
+        successCount++;
+        
+      } catch (error) {
+        console.log(`❌ 解析第 ${index + 2} 行資料失敗: ${error.message}`);
+      }
+    });
+    
+    console.log(`✅ 成功讀取 ${successCount} 筆課程-教師映射資料`);
+    
+    return {
+      success: true,
+      mapping: courseTeacherMapping,
+      count: successCount
+    };
+    
+  } catch (error) {
+    console.log(`❌ 讀取課程-教師映射失敗: ${error.message}`);
+    return { success: false, error: `讀取課程-教師映射失敗：${error.message}` };
+  }
+}
+
+/**
+ * 🔍 根據課程ID獲取教師資訊
+ * 從 course_teacher 工作表中查找對應的教師資訊
+ */
+function getTeacherInfoByCourseId(courseId) {
+  if (!courseId) {
+    return { success: false, error: '缺少課程 ID' };
+  }
+  
+  try {
+    const mappingResult = readCourseTeacherMapping();
+    if (!mappingResult.success) {
+      return mappingResult;
+    }
+    
+    const teacherInfo = mappingResult.mapping[courseId.toString()];
+    if (!teacherInfo) {
+      console.log(`⚠️ 找不到課程 ID ${courseId} 的教師資訊`);
+      return { 
+        success: false, 
+        error: `找不到課程 ID ${courseId} 的教師資訊`,
+        fallback: {
+          teacherName: 'Unknown Teacher',
+          teacherEmail: 'unknown@school.edu'
+        }
+      };
+    }
+    
+    return {
+      success: true,
+      teacherInfo: teacherInfo
+    };
+    
+  } catch (error) {
+    return { 
+      success: false, 
+      error: `查詢教師資訊失敗：${error.message}`,
+      fallback: {
+        teacherName: 'Unknown Teacher',
+        teacherEmail: 'unknown@school.edu'
+      }
+    };
+  }
+}
+
+/**
+ * 📊 建立科目-教師映射
+ * 從真實資料中建立科目到教師的映射關係
+ */
+function buildSubjectTeacherMapping() {
+  console.log('📊 建立科目-教師映射...');
+  
+  const mappingResult = readCourseTeacherMapping();
+  if (!mappingResult.success) {
+    console.log('❌ 無法讀取教師資料，使用預設映射');
+    return {
+      success: false,
+      error: mappingResult.error,
+      fallbackMapping: {
+        'LT': { teacherName: 'Language Teacher', teacherEmail: 'lt@school.edu' },
+        'IT': { teacherName: 'IT Teacher', teacherEmail: 'it@school.edu' },
+        'KCFS': { teacherName: 'KCFS Teacher', teacherEmail: 'kcfs@school.edu' }
+      }
+    };
+  }
+  
+  const subjectMapping = {};
+  const courseMapping = mappingResult.mapping;
+  
+  // 分析每個科目的教師
+  Object.values(courseMapping).forEach(course => {
+    const subject = course.subject;
+    if (subject && !subjectMapping[subject]) {
+      subjectMapping[subject] = {
+        teacherName: course.teacherName,
+        teacherEmail: course.teacherEmail
+      };
+    }
+  });
+  
+  console.log(`✅ 建立了 ${Object.keys(subjectMapping).length} 個科目的教師映射`);
+  
+  return {
+    success: true,
+    mapping: subjectMapping,
+    totalCourses: Object.keys(courseMapping).length
   };
-  return teachers[subject] || 'Unknown';
 }
 
 /**
@@ -10498,9 +10766,12 @@ function createExpandedStudentRecords(studentRecords, courseMapping) {
           courseId: course.courseId,
           courseName: `${className}-${course.subject}`,
           subject: course.subject,
-          teacher: course.teacher,
+          teacherName: course.teacherName || course.teacher || 'Unknown Teacher',
+          teacherEmail: course.teacherEmail || 'unknown@school.edu',
           status: '',
-          originalClassName: className
+          originalClassName: className,
+          // 保持向下相容性
+          teacher: course.teacherName || course.teacher || 'Unknown Teacher'
         });
       });
       mappedCount++;
@@ -10514,10 +10785,13 @@ function createExpandedStudentRecords(studentRecords, courseMapping) {
         courseId: className, // 保留原始值
         courseName: className,
         subject: 'UNKNOWN',
-        teacher: 'Unknown',
+        teacherName: 'Unknown Teacher',
+        teacherEmail: 'unknown@school.edu',
         status: '',
         originalClassName: className,
-        mappingError: `找不到班級 "${className}" 的課程映射`
+        mappingError: `找不到班級 "${className}" 的課程映射`,
+        // 保持向下相容性
+        teacher: 'Unknown Teacher'
       });
     }
   });
@@ -10548,20 +10822,21 @@ function updateExpandedStuCourseSheet(records) {
     // 清空現有資料
     sheet.clear();
     
-    // 設定標題行
-    const headers = ['學生Email', '課程ID', '狀態', '課程名稱', '科目', '教師', '備註'];
+    // 設定標題行（包含教師 Email）
+    const headers = ['學生Email', '課程ID', '狀態', '課程名稱', '科目', '教師姓名', '教師Email', '備註'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length).setBackground('#4285f4').setFontColor('white').setFontWeight('bold');
     sheet.setFrozenRows(1);
     
-    // 準備資料行
+    // 準備資料行（包含教師 Email）
     const dataRows = records.map(record => [
       record.studentEmail,
       record.courseId,
       record.status,
       record.courseName,
       record.subject,
-      record.teacher,
+      record.teacherName || record.teacher || 'Unknown Teacher',
+      record.teacherEmail || 'unknown@school.edu',
       record.mappingError || ''
     ]);
     
