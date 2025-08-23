@@ -10042,6 +10042,48 @@ function updateStuCourseSheet(records) {
 }
 
 /**
+ * 🔧 測試教師資料讀取功能
+ * 驗證 readCourseTeacherMapping 函數是否正確讀取教師資料
+ */
+function testTeacherMapping() {
+  console.log('🧪 === 測試教師資料讀取功能 === 🧪');
+  
+  const mappingResult = readCourseTeacherMapping();
+  
+  if (!mappingResult.success) {
+    console.log(`❌ 教師資料讀取失敗: ${mappingResult.error}`);
+    showUserMessage('❌ 教師資料讀取失敗', mappingResult.error, 'error');
+    return;
+  }
+  
+  const mapping = mappingResult.mapping;
+  const teacherCount = mappingResult.count;
+  
+  console.log(`✅ 成功讀取 ${teacherCount} 筆教師資料`);
+  
+  // 顯示前5筆資料作為範例
+  let sampleData = '📋 教師資料範例（前5筆）:\n';
+  let count = 0;
+  for (const [courseId, info] of Object.entries(mapping)) {
+    if (count >= 5) break;
+    sampleData += `\n課程ID: ${courseId}\n`;
+    sampleData += `  └ 課程: ${info.courseName}\n`;
+    sampleData += `  └ 科目: ${info.subject}\n`;
+    sampleData += `  └ 教師: ${info.teacherName}\n`;
+    sampleData += `  └ Email: ${info.teacherEmail}\n`;
+    count++;
+  }
+  
+  console.log(sampleData);
+  
+  showUserMessage('✅ 教師資料測試完成', 
+    `成功讀取 ${teacherCount} 筆教師資料\n\n` +
+    sampleData, 
+    'info'
+  );
+}
+
+/**
  * 🎯 擴展現有學生課程資料
  * 將真實的學生資料從班級名稱擴展為3門課程記錄
  */
@@ -10563,15 +10605,18 @@ function readCourseTeacherMapping() {
     
     data.forEach((row, index) => {
       try {
-        // 假設欄位順序：課程名稱, 課程ID, 科目, 教師姓名, 教師Email
-        const courseName = row[0];
-        const courseId = row[1];
-        const subject = row[2];
-        const teacherName = row[3];
-        const teacherEmail = row[4];
+        // 根據實際 course_teacher 工作表結構：E欄=教師姓名, F欄=教師Email, G欄=課程ID
+        const courseName = row[0];      // A欄：課程名稱
+        const subject = row[2];         // C欄：科目 
+        const teacherName = row[4];     // E欄：教師姓名
+        const teacherEmail = row[5];    // F欄：教師Email
+        const courseId = row[6];        // G欄：課程ID
+        
+        // 詳細除錯日誌
+        console.log(`🔍 第 ${index + 2} 行資料：課程名稱="${courseName}", 科目="${subject}", 教師="${teacherName}", Email="${teacherEmail}", 課程ID="${courseId}"`);
         
         if (!courseId || !teacherName || !teacherEmail) {
-          console.log(`⚠️ 第 ${index + 2} 行資料不完整，跳過`);
+          console.log(`⚠️ 第 ${index + 2} 行資料不完整，跳過 (課程ID: ${courseId}, 教師: ${teacherName}, Email: ${teacherEmail})`);
           return;
         }
         
