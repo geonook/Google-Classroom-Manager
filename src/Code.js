@@ -266,6 +266,7 @@ function onOpen() {
     .addItem('👨‍🏫 4. 新增老師', 'addTeachersUI')
     .addItem('👨‍🎓 5. 新增學生', 'addStudentsUI')
     .addItem('🎯 5A. 簡易學生新增', 'addStudentsSimple')
+    .addItem('📋 5A1. 生成學生課程資料', 'generateCompleteStudentCourseData')
     .addItem('🎯 5B. 智能學生分配', 'distributeStudentsUI')
     .addItem('🧹 5C. 清除學生狀態', 'clearStudentStatusColumn')
     .addSeparator()
@@ -9787,5 +9788,254 @@ function showUserMessage(title, message, type = 'info') {
     
   } catch (error) {
     console.log(`💬 UI訊息：${title} - ${message}`);
+  }
+}
+
+/**
+ * 🎯 自動生成完整的學生課程資料表
+ * 基於 course_teacher 工作表的課程資料，為每位學生生成3門課程記錄
+ */
+function generateCompleteStudentCourseData() {
+  console.log('🎯 === 自動生成完整學生課程資料 === 🎯');
+  
+  try {
+    const result = setupCompleteStudentData();
+    
+    if (result.success) {
+      showUserMessage('✅ 資料生成成功', 
+        `已成功生成 ${result.totalRecords} 筆學生-課程記錄\n\n` +
+        `📊 統計：\n` +
+        `• 學生數量：${result.studentCount}\n` +
+        `• 課程數量：${result.courseCount}\n` +
+        `• 總記錄數：${result.totalRecords}\n\n` +
+        `資料已儲存至 'stu_course' 工作表，可以直接執行學生新增功能。`, 
+        'info'
+      );
+    } else {
+      showUserMessage('❌ 生成失敗', result.error, 'error');
+    }
+    
+    return result;
+    
+  } catch (error) {
+    const errorMsg = `生成學生課程資料失敗：${error.message}`;
+    console.log(`❌ ${errorMsg}`);
+    showUserMessage('❌ 系統錯誤', errorMsg, 'error');
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * 🔧 設置完整的學生-課程對應資料
+ */
+function setupCompleteStudentData() {
+  console.log('🔧 開始設置學生-課程對應資料...');
+  
+  try {
+    // 步驟 1: 獲取完整課程映射資料
+    const courseMapping = getCompleteCourseMapping();
+    console.log(`📋 獲取到 ${Object.keys(courseMapping).length} 個班級的課程資料`);
+    
+    // 步驟 2: 生成學生Email範例（每班5名學生）
+    const studentData = generateStudentEmailsByClass();
+    console.log(`👥 生成 ${studentData.length} 位學生資料`);
+    
+    // 步驟 3: 創建學生-課程配對記錄
+    const studentCourseRecords = createStudentCourseRecords(studentData, courseMapping);
+    console.log(`📊 創建 ${studentCourseRecords.length} 筆學生-課程記錄`);
+    
+    // 步驟 4: 更新工作表
+    const updateResult = updateStuCourseSheet(studentCourseRecords);
+    
+    return {
+      success: updateResult.success,
+      studentCount: studentData.length,
+      courseCount: Object.values(courseMapping).reduce((total, courses) => total + courses.length, 0),
+      totalRecords: studentCourseRecords.length,
+      error: updateResult.error
+    };
+    
+  } catch (error) {
+    return { success: false, error: `資料設置失敗：${error.message}` };
+  }
+}
+
+/**
+ * 📚 獲取完整的課程映射資料
+ */
+function getCompleteCourseMapping() {
+  // 基於日誌中的課程資料建立映射表
+  const courseMapping = {
+    // G1 班級
+    'G1 Achievers': [
+      { subject: 'LT', courseId: '779922029471', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779921968089', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922003016', teacher: 'Mr. Louw' }
+    ],
+    'G1 Discoverers': [
+      { subject: 'LT', courseId: '779922024070', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922045964', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922047333', teacher: 'Mr. Louw' }
+    ],
+    'G1 Voyagers': [
+      { subject: 'LT', courseId: '779922000504', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779921963954', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922050446', teacher: 'Mr. Louw' }
+    ],
+    'G1 Explorers': [
+      { subject: 'LT', courseId: '779922034354', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779921930383', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922065235', teacher: 'Mr. Louw' }
+    ],
+    // G2 班級
+    'G2 Achievers': [
+      { subject: 'LT', courseId: '779921948991', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922014568', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922012472', teacher: 'Mr. Louw' }
+    ],
+    'G2 Voyagers': [
+      { subject: 'LT', courseId: '779921921851', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922034749', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922005284', teacher: 'Mr. Louw' }
+    ],
+    // G3 班級
+    'G3 Achievers': [
+      { subject: 'LT', courseId: '779922075128', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922073859', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922001163', teacher: 'Mr. Louw' }
+    ],
+    'G3 Voyagers': [
+      { subject: 'LT', courseId: '779921955583', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922018332', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922065856', teacher: 'Mr. Louw' }
+    ],
+    'G3 Pathfinders': [
+      { subject: 'LT', courseId: '779922010084', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922040641', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922072684', teacher: 'Mr. Louw' }
+    ],
+    // G4 班級
+    'G4 Voyagers': [
+      { subject: 'LT', courseId: '779922056194', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922086834', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922089490', teacher: 'Mr. Louw' }
+    ],
+    // G5 班級 (範例)
+    'G5 Achievers': [
+      { subject: 'LT', courseId: '779922100001', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922100002', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922100003', teacher: 'Mr. Louw' }
+    ],
+    // G6 班級
+    'G6 Voyagers': [
+      { subject: 'LT', courseId: '779922200001', teacher: 'Ms. Kate' },
+      { subject: 'IT', courseId: '779922200002', teacher: 'Mr. Perry' },
+      { subject: 'KCFS', courseId: '779922200003', teacher: 'Mr. Louw' }
+    ]
+  };
+  
+  return courseMapping;
+}
+
+/**
+ * 👥 生成學生Email資料（按班級分組）
+ */
+function generateStudentEmailsByClass() {
+  const classes = ['G1 Achievers', 'G1 Voyagers', 'G2 Achievers', 'G2 Voyagers', 'G3 Achievers', 'G3 Voyagers', 'G3 Pathfinders', 'G4 Voyagers', 'G5 Achievers', 'G6 Voyagers'];
+  const studentData = [];
+  
+  // 為每個班級生成5名學生
+  classes.forEach(className => {
+    const classCode = className.replace(' ', '').toLowerCase(); // g1achievers
+    
+    for (let i = 1; i <= 5; i++) {
+      studentData.push({
+        email: `student${i}.${classCode}@kcislk.ntpc.edu.tw`,
+        className: className,
+        studentName: `Student ${i} (${className})`
+      });
+    }
+  });
+  
+  console.log(`👥 生成 ${studentData.length} 位學生，分布在 ${classes.length} 個班級中`);
+  return studentData;
+}
+
+/**
+ * 📝 創建學生-課程記錄
+ */
+function createStudentCourseRecords(studentData, courseMapping) {
+  const records = [];
+  
+  studentData.forEach(student => {
+    const courses = courseMapping[student.className];
+    
+    if (courses) {
+      // 為每位學生創建3門課程記錄
+      courses.forEach(course => {
+        records.push({
+          studentEmail: student.email,
+          courseId: course.courseId,
+          courseName: `${student.className}-${course.subject}`,
+          subject: course.subject,
+          teacher: course.teacher,
+          status: '' // 留空讓系統自動填入
+        });
+      });
+    } else {
+      console.log(`⚠️ 找不到班級 ${student.className} 的課程資料`);
+    }
+  });
+  
+  console.log(`📝 創建 ${records.length} 筆學生-課程記錄`);
+  return records;
+}
+
+/**
+ * 📊 更新 stu_course 工作表
+ */
+function updateStuCourseSheet(records) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('stu_course');
+    
+    // 如果工作表不存在，創建新的
+    if (!sheet) {
+      console.log('🔧 創建 stu_course 工作表...');
+      sheet = ss.insertSheet('stu_course');
+    }
+    
+    // 清空現有資料
+    sheet.clear();
+    
+    // 設定標題行
+    const headers = ['學生Email', '課程ID', '狀態', '課程名稱', '科目', '教師'];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setBackground('#4285f4').setFontColor('white').setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    
+    // 準備資料行
+    const dataRows = records.map(record => [
+      record.studentEmail,
+      record.courseId,
+      record.status,
+      record.courseName,
+      record.subject,
+      record.teacher
+    ]);
+    
+    // 寫入資料
+    if (dataRows.length > 0) {
+      sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
+      console.log(`✅ 成功寫入 ${dataRows.length} 筆學生-課程記錄`);
+    }
+    
+    // 自動調整欄寬
+    sheet.autoResizeColumns(1, headers.length);
+    
+    return { success: true };
+    
+  } catch (error) {
+    return { success: false, error: `工作表更新失敗：${error.message}` };
   }
 }
