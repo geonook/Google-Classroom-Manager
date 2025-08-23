@@ -1,6 +1,6 @@
 {
   "name": "google-classroom-manager-pro",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "企業級 Google Classroom 課程管理自動化工具",
   "main": "Code.js",
   "scripts": {

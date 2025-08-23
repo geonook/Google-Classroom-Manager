@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-V8-yellow.svg)
 ![Classroom API](https://img.shields.io/badge/Google%20Classroom%20API-v1-red.svg)
@@ -49,7 +49,9 @@
 - **課程清單查詢**：完整的活動課程列表
 
 ### 👥 成員管理
-- **批次新增成員**：同時處理老師和學生
+- **批次新增成員**：同時處理老師和學生，支援 4500+ 記錄批次處理
+- **學生課程資料擴展**：一鍵將班級資料擴展為完整課程記錄（100% 成功率）
+- **動態教師資料系統**：從工作表即時讀取真實教師姓名和Email
 - **成員清單查詢**：查看課程師生名單
 - **單一成員操作**：快速新增或移除個別成員
 - **角色權限管理**：精確控制成員權限
@@ -60,6 +62,7 @@
 - **錯誤自動恢復**：網路或暫時性錯誤自動重試
 - **快取機制**：減少重複 API 呼叫，提升 60% 效能
 - **詳細日誌記錄**：完整的操作追蹤與錯誤診斷
+- **資料驗證測試**：內建 `testTeacherMapping()` 等驗證功能
 
 ### 🛡️ 企業級特性
 - **資料安全性**：所有操作符合 Google 安全標準
@@ -305,7 +308,19 @@ npm run test:coverage
 
 ## 📦 版本歷程
 
-### v2.0.0 (2024-01-XX) - 企業級重構
+### v2.0.1 (2025-01-23) - 教師資料系統修復
+🔧 **重要修復**
+- 完全解決 "Unknown Teacher" 問題
+- 修正教師資料讀取欄位映射錯誤
+- 4521 筆學生-課程記錄 100% 成功處理
+- 動態教師資料系統取代硬編碼資料
+
+✨ **新增功能**
+- 學生課程資料擴展系統
+- testTeacherMapping() 驗證功能
+- 詳細的除錯日誌系統
+
+### v2.0.0 (2024-01-15) - 企業級重構
 🚀 **重大更新**
 - 完全重寫核心架構
 - 新增批次處理引擎

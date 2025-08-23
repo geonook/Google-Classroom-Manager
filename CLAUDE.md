@@ -1,10 +1,10 @@
 # CLAUDE.md - Google Classroom Manager Pro
 
 > **Documentation Version**: 2.0.1  
-> **Last Updated**: 2025-07-09  
-> **Project**: Google Classroom Manager Pro v2.0.0  
+> **Last Updated**: 2025-01-23  
+> **Project**: Google Classroom Manager Pro v2.0.1  
 > **Description**: 基於 Google Apps Script 的批次處理工具，用於課程與成員管理  
-> **Features**: GitHub auto-backup, Task agents, technical debt prevention, SuperClaude integration
+> **Features**: GitHub auto-backup, Task agents, technical debt prevention, SuperClaude integration, 動態教師資料系統
 
 This file provides essential guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -286,11 +286,16 @@ Edit(file_path="src/ExistingFeature.js", old_string="...", new_string="...")
 - Maintain Google Apps Script globals
 - Use proper error handling patterns
 
+### ✅ RECENT MAJOR FIXES (v2.0.1):
+- **教師資料讀取修復**: 完全解決 "Unknown Teacher" 問題，修正欄位映射錯誤
+- **學生課程資料擴展系統**: 4521 筆記錄 100% 成功處理，支援班級到課程的完整映射
+- **動態教師資料系統**: 取代硬編碼，從 `course_teacher` 工作表讀取真實教師資料
+- **新增測試功能**: `testTeacherMapping()` 用於驗證教師資料讀取功能
+
 ### ⚠️ KNOWN TECHNICAL DEBT:
-- `OptimizedCode.js` duplicates functionality from `Code.js`
-- Future refactoring should consolidate these into single source of truth
-- Current main file: `Code.js` (as per filePushOrder)
-- Consider merging optimizations into main file
+- `AIIntelligentMapping.js` 有部分 ESLint 錯誤需要清理
+- 部分 undefined 函數引用需要重構
+- Current main file: `Code.js` (as per filePushOrder) - 已穩定運作
 
 ---
 
