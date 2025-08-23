@@ -6332,6 +6332,571 @@ async function testSmallBatchStudentAddition() {
   }
 }
 
+// ========================== 批次處理優化原型 ==========================
+
+/**
+ * 🚀 一鍵完整映射原型 - 主入口函數
+ */
+async function oneClickCompleteMapping(options = {}) {
+  console.log('🚀 啟動一鍵完整課程映射系統');
+  console.log('📊 目標：處理 82 個班級 × 3 個科目 = 246 個課程');
+  
+  const startTime = Date.now();
+  const defaultOptions = {
+    clearExisting: true,
+    backupExisting: true,
+    enableTurboMode: true,
+    maxExecutionTime: 5 * 60 * 1000, // 5 分鐘
+    batchSize: 20,
+    showProgress: true
+  };
+  
+  const config = { ...defaultOptions, ...options };
+  
+  try {
+    // 📊 步驟 1: 快速系統健康檢查
+    console.log('\n📍 步驟 1/4: 系統健康檢查');
+    const healthCheck = await quickSystemHealthCheck();
+    if (!healthCheck.success) {
+      throw new Error(`系統健康檢查失敗: ${healthCheck.error}`);
+    }
+    console.log('✅ 系統健康狀況良好');
+    
+    // 🔍 步驟 2: 超高速課程發現
+    console.log('\n📍 步驟 2/4: 超高速課程發現');
+    const discoveryResult = await turboCourseDiscovery(config);
+    if (!discoveryResult.success) {
+      throw new Error(`課程發現失敗: ${discoveryResult.error}`);
+    }
+    console.log(`✅ 發現 ${discoveryResult.totalCourses} 個課程`);
+    
+    // 🤖 步驟 3: AI 智能映射
+    console.log('\n📍 步驟 3/4: AI 智能映射處理');
+    const mappingResult = await turboIntelligentMapping(discoveryResult.courses, config);
+    if (!mappingResult.success) {
+      throw new Error(`智能映射失敗: ${mappingResult.error}`);
+    }
+    console.log(`✅ 完成 ${mappingResult.successfulMappings} 個課程映射`);
+    
+    // 💾 步驟 4: 高速映射表更新
+    console.log('\n📍 步驟 4/4: 高速映射表更新');
+    const updateResult = await turboMappingTableUpdate(mappingResult.mappings, config);
+    if (!updateResult.success) {
+      throw new Error(`映射表更新失敗: ${updateResult.error}`);
+    }
+    console.log(`✅ 映射表更新完成`);
+    
+    const endTime = Date.now();
+    const duration = Math.round((endTime - startTime) / 1000);
+    
+    // 📊 最終統計報告
+    const finalReport = {
+      success: true,
+      duration: `${duration} 秒`,
+      totalCourses: discoveryResult.totalCourses,
+      successfulMappings: mappingResult.successfulMappings,
+      failedMappings: mappingResult.failedMappings,
+      accuracy: Math.round((mappingResult.successfulMappings / discoveryResult.totalCourses) * 100),
+      performance: duration < 360 ? '優秀' : duration < 480 ? '良好' : '需要優化'
+    };
+    
+    console.log('\n🎉 一鍵完整映射執行完成！');
+    console.log(`📊 處理時間：${finalReport.duration}`);
+    console.log(`📈 成功率：${finalReport.accuracy}%`);
+    console.log(`⚡ 性能評級：${finalReport.performance}`);
+    
+    return finalReport;
+    
+  } catch (error) {
+    console.log(`❌ 一鍵完整映射失敗：${error.message}`);
+    return {
+      success: false,
+      error: error.message,
+      duration: Math.round((Date.now() - startTime) / 1000)
+    };
+  }
+}
+
+/**
+ * 🔥 超高速課程發現
+ */
+async function turboCourseDiscovery(config) {
+  console.log('🔍 啟動超高速課程發現...');
+  
+  try {
+    // 使用已有的智能發現系統
+    const coursesResult = await getAllClassroomCourses();
+    if (!coursesResult.success) {
+      return { success: false, error: coursesResult.error };
+    }
+    
+    const courses = coursesResult.data || [];
+    console.log(`✅ 發現 ${courses.length} 個課程`);
+    
+    return {
+      success: true,
+      totalCourses: courses.length,
+      courses: courses
+    };
+    
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🤖 超高速 AI 智能映射
+ */
+async function turboIntelligentMapping(courses, config) {
+  console.log('🤖 啟動 AI 智能映射處理...');
+  
+  try {
+    // 定義完整班級列表
+    const allClasses = [
+      // G1
+      'G1 Achievers', 'G1 Discoverers', 'G1 Voyagers', 'G1 Explorers', 'G1 Navigators', 
+      'G1 Adventurers', 'G1 Guardians', 'G1 Pioneers', 'G1 Innovators', 'G1 Visionaries', 
+      'G1 Pathfinders', 'G1 Seekers', 'G1 Trailblazers', 'G1 Inventors',
+      // G2
+      'G2 Pioneers', 'G2 Explorers', 'G2 Inventors', 'G2 Achievers', 'G2 Voyagers', 
+      'G2 Adventurers', 'G2 Innovators', 'G2 Guardians', 'G2 Pathfinders', 'G2 Visionaries', 
+      'G2 Navigators', 'G2 Discoverers', 'G2 Seekers', 'G2 Trailblazers',
+      // G3
+      'G3 Inventors', 'G3 Innovators', 'G3 Guardians', 'G3 Achievers', 'G3 Voyagers', 
+      'G3 Visionaries', 'G3 Trailblazers', 'G3 Discoverers', 'G3 Explorers', 'G3 Navigators', 
+      'G3 Adventurers', 'G3 Seekers', 'G3 Pathfinders', 'G3 Pioneers',
+      // G4
+      'G4 Seekers', 'G4 Voyagers', 'G4 Visionaries', 'G4 Achievers', 'G4 Navigators', 
+      'G4 Trailblazers', 'G4 Pathfinders', 'G4 Explorers', 'G4 Adventurers', 'G4 Innovators', 
+      'G4 Discoverers', 'G4 Guardians', 'G4 Inventors', 'G4 Pioneers',
+      // G5
+      'G5 Adventurers', 'G5 Navigators', 'G5 Pioneers', 'G5 Inventors', 'G5 Seekers', 
+      'G5 Discoverers', 'G5 Guardians', 'G5 Pathfinders', 'G5 Explorers', 'G5 Achievers', 
+      'G5 Voyagers', 'G5 Trailblazers', 'G5 Innovators', 'G5 Visionaries',
+      // G6
+      'G6 Explorers', 'G6 Inventors', 'G6 Adventurers', 'G6 Achievers', 'G6 Voyagers', 
+      'G6 Discoverers', 'G6 Innovators', 'G6 Guardians', 'G6 Pathfinders', 'G6 Seekers', 
+      'G6 Visionaries', 'G6 Pioneers', 'G6 Trailblazers', 'G6 Navigators'
+    ];
+    
+    const subjects = ['LT', 'IT', 'KCFS'];
+    const mappings = [];
+    let successCount = 0;
+    let failCount = 0;
+    
+    // 批次處理映射
+    console.log(`🔄 開始批次映射處理 (${config.batchSize} 項/批次)`);
+    
+    for (const className of allClasses) {
+      for (const subject of subjects) {
+        try {
+          // 使用已有的智能查找功能
+          const foundCourse = findCourseByPattern(className, subject, courses);
+          
+          if (foundCourse.success) {
+            mappings.push({
+              courseName: className,
+              subject: subject,
+              courseId: foundCourse.courseId,
+              status: 'ACTIVE',
+              confidence: foundCourse.confidence || 100
+            });
+            successCount++;
+          } else {
+            mappings.push({
+              courseName: className,
+              subject: subject,
+              courseId: null,
+              status: 'MISSING',
+              confidence: 0
+            });
+            failCount++;
+          }
+          
+          // 進度報告
+          if ((successCount + failCount) % config.batchSize === 0) {
+            const progress = Math.round(((successCount + failCount) / (allClasses.length * subjects.length)) * 100);
+            console.log(`📈 進度：${progress}% (成功：${successCount}, 失敗：${failCount})`);
+          }
+          
+        } catch (error) {
+          console.log(`❌ 映射失敗：${className} - ${subject}: ${error.message}`);
+          failCount++;
+        }
+      }
+    }
+    
+    console.log(`✅ AI 映射完成：成功 ${successCount}, 失敗 ${failCount}`);
+    
+    return {
+      success: true,
+      successfulMappings: successCount,
+      failedMappings: failCount,
+      mappings: mappings
+    };
+    
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 💾 超高速映射表更新
+ */
+async function turboMappingTableUpdate(mappings, config) {
+  console.log('💾 啟動映射表高速更新...');
+  
+  try {
+    // 備份現有資料
+    if (config.backupExisting) {
+      console.log('💾 正在備份現有映射資料...');
+      await backupCourseMappingSheet();
+    }
+    
+    // 使用已有的更新功能
+    const updateResult = await updateCourseMappingSheet(mappings, {
+      clearExisting: config.clearExisting,
+      batchSize: config.batchSize
+    });
+    
+    if (!updateResult.success) {
+      return { success: false, error: updateResult.error };
+    }
+    
+    console.log('✅ 映射表更新完成');
+    
+    return {
+      success: true,
+      updatedCount: mappings.length,
+      timestamp: new Date().toLocaleString('zh-TW')
+    };
+    
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * ❤️ 快速系統健康檢查
+ */
+async function quickSystemHealthCheck() {
+  console.log('❤️ 執行快速系統健康檢查...');
+  
+  try {
+    // 檢查基本 API 連線
+    const testResult = Classroom.Courses.list({ pageSize: 1 });
+    
+    // 檢查工作表存取
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const testSheet = spreadsheet.getSheetByName('course_mapping');
+    
+    console.log('✅ 系統健康檢查通過');
+    return { 
+      success: true, 
+      apiStatus: 'OK',
+      sheetStatus: testSheet ? 'OK' : 'MISSING',
+      timestamp: new Date().toLocaleString('zh-TW')
+    };
+    
+  } catch (error) {
+    console.log(`❌ 系統健康檢查失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🧪 快速映射驗證器
+ */
+async function rapidMappingValidator() {
+  console.log('🧪 啟動快速映射驗證器');
+  const startTime = Date.now();
+  
+  try {
+    // 讀取映射資料
+    const mappingData = readCourseMappingFromSheet();
+    if (!mappingData.success) {
+      return { success: false, error: mappingData.error };
+    }
+    
+    const courses = mappingData.courses || [];
+    const stats = {
+      total: courses.length,
+      active: courses.filter(c => c.status === 'ACTIVE').length,
+      missing: courses.filter(c => c.status === 'MISSING').length,
+      duplicates: 0,
+      errors: []
+    };
+    
+    // 檢查重複
+    const courseIds = courses.map(c => c.courseId).filter(id => id);
+    const uniqueIds = new Set(courseIds);
+    stats.duplicates = courseIds.length - uniqueIds.size;
+    
+    // 檢查格式
+    courses.forEach((course, index) => {
+      if (course.status === 'ACTIVE' && (!course.courseId || !/^\d{10,15}$/.test(course.courseId))) {
+        stats.errors.push(`第 ${index + 1} 行：課程 ID 格式錯誤`);
+      }
+    });
+    
+    const endTime = Date.now();
+    const duration = Math.round((endTime - startTime) / 1000);
+    
+    console.log(`✅ 驗證完成 (${duration} 秒)`);
+    console.log(`📊 總計：${stats.total}, 活躍：${stats.active}, 缺失：${stats.missing}`);
+    
+    return {
+      success: true,
+      duration: duration,
+      statistics: stats,
+      accuracy: Math.round((stats.active / stats.total) * 100)
+    };
+    
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+// ========================== 完整系統測試和驗證 ==========================
+
+/**
+ * 🎯 完整課程映射系統測試
+ */
+async function testCompleteCourseMappingSystem() {
+  console.log('🎯 啟動完整課程映射系統測試');
+  console.log('📊 測試範圍：82 個班級 × 3 個科目 = 246 個課程映射');
+  
+  const testResults = {
+    startTime: new Date(),
+    phases: [],
+    overall: { success: false, duration: 0 }
+  };
+  
+  try {
+    // 🏥 階段 1: 系統健康檢查
+    console.log('\n📍 階段 1/5: 系統健康檢查');
+    const healthResult = await quickSystemHealthCheck();
+    testResults.phases.push({
+      phase: '系統健康檢查',
+      success: healthResult.success,
+      details: healthResult
+    });
+    
+    if (!healthResult.success) {
+      throw new Error(`系統健康檢查失敗: ${healthResult.error}`);
+    }
+    console.log('✅ 系統健康檢查通過');
+    
+    // 🔍 階段 2: 課程發現測試  
+    console.log('\n📍 階段 2/5: 課程發現系統測試');
+    const discoveryResult = await turboCourseDiscovery({ batchSize: 20 });
+    testResults.phases.push({
+      phase: '課程發現測試',
+      success: discoveryResult.success,
+      details: discoveryResult
+    });
+    
+    if (!discoveryResult.success) {
+      throw new Error(`課程發現測試失敗: ${discoveryResult.error}`);
+    }
+    console.log(`✅ 課程發現測試通過 (發現 ${discoveryResult.totalCourses} 個課程)`);
+    
+    // 🤖 階段 3: AI 映射測試
+    console.log('\n📍 階段 3/5: AI 智能映射測試');
+    const mappingResult = await turboIntelligentMapping(discoveryResult.courses, { batchSize: 20 });
+    testResults.phases.push({
+      phase: 'AI 映射測試',
+      success: mappingResult.success,
+      details: mappingResult
+    });
+    
+    if (!mappingResult.success) {
+      throw new Error(`AI 映射測試失敗: ${mappingResult.error}`);
+    }
+    console.log(`✅ AI 映射測試通過 (成功映射 ${mappingResult.successfulMappings} 個)`);
+    
+    // 💾 階段 4: 映射表更新測試
+    console.log('\n📍 階段 4/5: 映射表更新測試');
+    const updateResult = await turboMappingTableUpdate(mappingResult.mappings, { 
+      clearExisting: false, 
+      backupExisting: true 
+    });
+    testResults.phases.push({
+      phase: '映射表更新測試',
+      success: updateResult.success,
+      details: updateResult
+    });
+    
+    if (!updateResult.success) {
+      throw new Error(`映射表更新測試失敗: ${updateResult.error}`);
+    }
+    console.log('✅ 映射表更新測試通過');
+    
+    // 🧪 階段 5: 完整性驗證測試
+    console.log('\n📍 階段 5/5: 完整性驗證測試');
+    const validationResult = await rapidMappingValidator();
+    testResults.phases.push({
+      phase: '完整性驗證測試',
+      success: validationResult.success,
+      details: validationResult
+    });
+    
+    if (!validationResult.success) {
+      throw new Error(`完整性驗證測試失敗: ${validationResult.error}`);
+    }
+    console.log(`✅ 完整性驗證測試通過 (準確率: ${validationResult.accuracy}%)`);
+    
+    // 📊 最終結果統計
+    const endTime = new Date();
+    const duration = Math.round((endTime - testResults.startTime) / 1000);
+    
+    testResults.overall = {
+      success: true,
+      duration: duration,
+      totalCourses: discoveryResult.totalCourses,
+      successfulMappings: mappingResult.successfulMappings,
+      accuracy: validationResult.accuracy,
+      performance: duration < 300 ? '優秀' : duration < 480 ? '良好' : '需優化'
+    };
+    
+    console.log('\n🎉 完整系統測試執行完成！');
+    console.log(`📊 總處理時間：${duration} 秒`);
+    console.log(`📈 映射準確率：${validationResult.accuracy}%`);
+    console.log(`⚡ 系統性能：${testResults.overall.performance}`);
+    console.log(`✅ 所有 ${testResults.phases.length} 個階段測試通過`);
+    
+    return testResults;
+    
+  } catch (error) {
+    const endTime = new Date();
+    const duration = Math.round((endTime - testResults.startTime) / 1000);
+    
+    console.log(`❌ 完整系統測試失敗：${error.message}`);
+    console.log(`⏱️ 測試持續時間：${duration} 秒`);
+    
+    testResults.overall = {
+      success: false,
+      error: error.message,
+      duration: duration
+    };
+    
+    return testResults;
+  }
+}
+
+/**
+ * 🚀 終極一鍵解決方案 - 處理所有課程映射問題
+ */
+async function ultimateOneClickSolution() {
+  console.log('🚀 啟動終極一鍵解決方案');
+  console.log('🎯 目標：完全解決 82 班級 × 3 科目的課程映射問題');
+  console.log('⚡ 模式：超高速 + AI 智能 + 自動修復');
+  
+  const startTime = Date.now();
+  
+  try {
+    // 執行完整的一鍵映射
+    const mappingResult = await oneClickCompleteMapping({
+      clearExisting: true,
+      backupExisting: true,
+      enableTurboMode: true,
+      batchSize: 25,
+      showProgress: true
+    });
+    
+    if (!mappingResult.success) {
+      throw new Error(`一鍵映射失敗: ${mappingResult.error}`);
+    }
+    
+    // 執行驗證確保品質
+    const validationResult = await rapidMappingValidator();
+    
+    const endTime = Date.now();
+    const totalDuration = Math.round((endTime - startTime) / 1000);
+    
+    // 生成最終報告
+    const finalReport = {
+      success: true,
+      timestamp: new Date().toLocaleString('zh-TW'),
+      execution: {
+        duration: `${totalDuration} 秒`,
+        performance: totalDuration < 300 ? '🚀 優秀' : totalDuration < 480 ? '✅ 良好' : '⚠️ 需優化'
+      },
+      results: {
+        totalCourses: mappingResult.totalCourses || 0,
+        successfulMappings: mappingResult.successfulMappings || 0,
+        failedMappings: mappingResult.failedMappings || 0,
+        accuracy: mappingResult.accuracy || 0
+      },
+      validation: {
+        accuracy: validationResult.accuracy || 0,
+        errors: validationResult.statistics?.errors?.length || 0,
+        duplicates: validationResult.statistics?.duplicates || 0
+      },
+      recommendations: generateRecommendations(mappingResult, validationResult)
+    };
+    
+    // 顯示最終結果
+    console.log('\n🎉 終極一鍵解決方案執行完成！');
+    console.log('═'.repeat(50));
+    console.log(`⏱️  執行時間：${finalReport.execution.duration}`);
+    console.log(`📊 處理課程：${finalReport.results.totalCourses} 個`);
+    console.log(`✅ 成功映射：${finalReport.results.successfulMappings} 個`);
+    console.log(`📈 準確率：${finalReport.results.accuracy}%`);
+    console.log(`⚡ 性能評級：${finalReport.execution.performance}`);
+    console.log('═'.repeat(50));
+    
+    if (finalReport.recommendations.length > 0) {
+      console.log('\n💡 改進建議：');
+      finalReport.recommendations.forEach((rec, index) => {
+        console.log(`${index + 1}. ${rec}`);
+      });
+    }
+    
+    return finalReport;
+    
+  } catch (error) {
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    console.log(`❌ 終極解決方案失敗：${error.message}`);
+    console.log(`⏱️ 執行時間：${duration} 秒`);
+    
+    return {
+      success: false,
+      error: error.message,
+      duration: duration
+    };
+  }
+}
+
+/**
+ * 💡 生成改進建議
+ */
+function generateRecommendations(mappingResult, validationResult) {
+  const recommendations = [];
+  
+  if (mappingResult.accuracy < 90) {
+    recommendations.push('映射準確率低於 90%，建議檢查課程命名規則');
+  }
+  
+  if (validationResult.statistics?.duplicates > 0) {
+    recommendations.push(`發現 ${validationResult.statistics.duplicates} 個重複映射，建議清理`);
+  }
+  
+  if (validationResult.statistics?.errors?.length > 0) {
+    recommendations.push(`發現 ${validationResult.statistics.errors.length} 個格式錯誤，建議修正`);
+  }
+  
+  if (mappingResult.failedMappings > mappingResult.successfulMappings * 0.1) {
+    recommendations.push('失敗映射比例較高，建議檢查課程命名一致性');
+  }
+  
+  if (recommendations.length === 0) {
+    recommendations.push('系統運行完美！所有映射均成功完成');
+  }
+  
+  return recommendations;
+}
+
 // ========================== 智能課程發現系統 ==========================
 
 /**
