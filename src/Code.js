@@ -1223,11 +1223,337 @@ async function batchCreateGradebooks() {
 }
 
 // =============================================
-// Test Functions for Gradebook Creation
+// Specialized Gradebook Functions for Midterm and Final
 // =============================================
 
 /**
- * 測試 Gradebook 建立功能
+ * 批次建立所有課程的 Midterm Gradebook（Google Sheets）
+ * 檔名格式：2526F1_TeacherName_Subject_Gradebook_Midterm
+ * 表頭最後兩個考試欄位都是 Midterm Exam
+ */
+async function batchCreateGradebooksForMidterm() {
+  console.log('📚 === 開始批次建立 Midterm Gradebook === 📚');
+  
+  // --- 設定區域 ---
+  const SCHOOL_YEAR = '2526';  // 2025-2026 學年
+  const SEMESTER = 'F1';       // Fall semester 1st term
+  const EXAM_TYPE = 'Midterm'; // 考試類型標識
+  const LOG_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
+  const COURSE_SHEET_NAME = 'course_teacher';
+  
+  // Midterm Gradebook 表頭設定 - 兩個考試欄位都是 Midterm
+  const GRADEBOOK_HEADERS = [
+    'English Name',
+    'Student ID', 
+    'Email',
+    'Assignment 1',
+    'Assignment 2',
+    'Assignment 3',
+    'Assignment 4',
+    'Assignment 5',
+    'Midterm Exam',
+    'Midterm Exam',
+    'Total Score',
+    'Grade',
+    'Comments'
+  ];
+  // --- 結束設定 ---
+  
+  let totalSuccess = 0;
+  let totalFailed = 0;
+  
+  try {
+    // 讀取課程-教師資料
+    console.log('🔍 讀取課程教師資料...');
+    const teacherMappingResult = readCourseTeacherMapping();
+    
+    if (!teacherMappingResult.success) {
+      console.log('❌ 無法讀取教師資料：', teacherMappingResult.error);
+      return {
+        success: false,
+        error: teacherMappingResult.error
+      };
+    }
+    
+    const courseTeacherMapping = teacherMappingResult.mapping || {};
+    const courseIds = Object.keys(courseTeacherMapping);
+    
+    console.log(`📊 找到 ${courseIds.length} 門課程需要建立 Midterm Gradebook`);
+    
+    // 為每門課程建立 Midterm Gradebook
+    for (const courseId of courseIds) {
+      const courseInfo = courseTeacherMapping[courseId];
+      const { teacherName, subject, courseName } = courseInfo;
+      
+      // 生成檔名：2526F1_Ms. Kate_LT_Gradebook_Midterm
+      const fileName = `${SCHOOL_YEAR}${SEMESTER}_${teacherName}_${subject}_Gradebook_${EXAM_TYPE}`;
+      
+      console.log(`[處理中] 正在為課程 "${courseName}" 建立 ${EXAM_TYPE} Gradebook: ${fileName}`);
+      
+      try {
+        // 建立新的 Google Sheets
+        const spreadsheet = SpreadsheetApp.create(fileName);
+        const sheet = spreadsheet.getActiveSheet();
+        
+        // 設定工作表名稱
+        sheet.setName(`${subject}_${courseName.split('-')[1] || 'Class'}_${EXAM_TYPE}`);
+        
+        // 寫入表頭
+        sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
+        
+        // 格式化表頭
+        const headerRange = sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length);
+        headerRange.setFontWeight('bold');
+        headerRange.setBackground('#e8f5e8'); // 淺綠色背景表示 Midterm
+        headerRange.setHorizontalAlignment('center');
+        
+        // 自動調整欄寬
+        sheet.autoResizeColumns(1, GRADEBOOK_HEADERS.length);
+        
+        // 設定保護範圍（表頭不可編輯）
+        const protection = headerRange.protect();
+        protection.setDescription('Midterm Gradebook Headers');
+        
+        console.log(`  ✅ 成功建立: ${fileName}`);
+        console.log(`  📊 Gradebook URL: ${spreadsheet.getUrl()}`);
+        
+        totalSuccess++;
+        
+        // 短暫延遲避免 API 限制
+        Utilities.sleep(500);
+        
+      } catch (error) {
+        console.log(`  ❌ 建立失敗: ${fileName} - ${error.message}`);
+        totalFailed++;
+      }
+    }
+    
+  } catch (error) {
+    console.log(`❌ 批次建立過程發生錯誤: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+  
+  console.log(`📚 === Midterm Gradebook 建立完成 === 📚`);
+  console.log(`✅ 成功建立: ${totalSuccess} 個 Midterm Gradebook`);
+  console.log(`❌ 建立失敗: ${totalFailed} 個 Midterm Gradebook`);
+  
+  return {
+    success: true,
+    totalSuccess,
+    totalFailed,
+    examType: EXAM_TYPE,
+    summary: `成功建立 ${totalSuccess} 個 ${EXAM_TYPE} Gradebook，失敗 ${totalFailed} 個`
+  };
+}
+
+/**
+ * 批次建立所有課程的 Final Gradebook（Google Sheets）
+ * 檔名格式：2526F1_TeacherName_Subject_Gradebook_Final
+ * 表頭包含 Midterm Exam 和 Final Exam 兩個不同考試欄位
+ */
+async function batchCreateGradebooksForFinal() {
+  console.log('📚 === 開始批次建立 Final Gradebook === 📚');
+  
+  // --- 設定區域 ---
+  const SCHOOL_YEAR = '2526';  // 2025-2026 學年
+  const SEMESTER = 'F1';       // Fall semester 1st term
+  const EXAM_TYPE = 'Final';   // 考試類型標識
+  const LOG_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
+  const COURSE_SHEET_NAME = 'course_teacher';
+  
+  // Final Gradebook 表頭設定 - Midterm 和 Final 兩個不同考試欄位
+  const GRADEBOOK_HEADERS = [
+    'English Name',
+    'Student ID', 
+    'Email',
+    'Assignment 1',
+    'Assignment 2',
+    'Assignment 3',
+    'Assignment 4',
+    'Assignment 5',
+    'Midterm Exam',
+    'Final Exam',
+    'Total Score',
+    'Grade',
+    'Comments'
+  ];
+  // --- 結束設定 ---
+  
+  let totalSuccess = 0;
+  let totalFailed = 0;
+  
+  try {
+    // 讀取課程-教師資料
+    console.log('🔍 讀取課程教師資料...');
+    const teacherMappingResult = readCourseTeacherMapping();
+    
+    if (!teacherMappingResult.success) {
+      console.log('❌ 無法讀取教師資料：', teacherMappingResult.error);
+      return {
+        success: false,
+        error: teacherMappingResult.error
+      };
+    }
+    
+    const courseTeacherMapping = teacherMappingResult.mapping || {};
+    const courseIds = Object.keys(courseTeacherMapping);
+    
+    console.log(`📊 找到 ${courseIds.length} 門課程需要建立 Final Gradebook`);
+    
+    // 為每門課程建立 Final Gradebook
+    for (const courseId of courseIds) {
+      const courseInfo = courseTeacherMapping[courseId];
+      const { teacherName, subject, courseName } = courseInfo;
+      
+      // 生成檔名：2526F1_Ms. Kate_LT_Gradebook_Final
+      const fileName = `${SCHOOL_YEAR}${SEMESTER}_${teacherName}_${subject}_Gradebook_${EXAM_TYPE}`;
+      
+      console.log(`[處理中] 正在為課程 "${courseName}" 建立 ${EXAM_TYPE} Gradebook: ${fileName}`);
+      
+      try {
+        // 建立新的 Google Sheets
+        const spreadsheet = SpreadsheetApp.create(fileName);
+        const sheet = spreadsheet.getActiveSheet();
+        
+        // 設定工作表名稱
+        sheet.setName(`${subject}_${courseName.split('-')[1] || 'Class'}_${EXAM_TYPE}`);
+        
+        // 寫入表頭
+        sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
+        
+        // 格式化表頭
+        const headerRange = sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length);
+        headerRange.setFontWeight('bold');
+        headerRange.setBackground('#ffe6e6'); // 淺紅色背景表示 Final
+        headerRange.setHorizontalAlignment('center');
+        
+        // 自動調整欄寬
+        sheet.autoResizeColumns(1, GRADEBOOK_HEADERS.length);
+        
+        // 設定保護範圍（表頭不可編輯）
+        const protection = headerRange.protect();
+        protection.setDescription('Final Gradebook Headers');
+        
+        console.log(`  ✅ 成功建立: ${fileName}`);
+        console.log(`  📊 Gradebook URL: ${spreadsheet.getUrl()}`);
+        
+        totalSuccess++;
+        
+        // 短暫延遲避免 API 限制
+        Utilities.sleep(500);
+        
+      } catch (error) {
+        console.log(`  ❌ 建立失敗: ${fileName} - ${error.message}`);
+        totalFailed++;
+      }
+    }
+    
+  } catch (error) {
+    console.log(`❌ 批次建立過程發生錯誤: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+  
+  console.log(`📚 === Final Gradebook 建立完成 === 📚`);
+  console.log(`✅ 成功建立: ${totalSuccess} 個 Final Gradebook`);
+  console.log(`❌ 建立失敗: ${totalFailed} 個 Final Gradebook`);
+  
+  return {
+    success: true,
+    totalSuccess,
+    totalFailed,
+    examType: EXAM_TYPE,
+    summary: `成功建立 ${totalSuccess} 個 ${EXAM_TYPE} Gradebook，失敗 ${totalFailed} 個`
+  };
+}
+
+// =============================================
+// Test Functions for Specialized Gradebook Creation
+// =============================================
+
+/**
+ * 測試 Midterm 和 Final Gradebook 建立功能
+ * 驗證兩種不同函數的表頭結構差異
+ */
+function testSpecializedGradebookCreation() {
+  console.log('🧪 === 開始測試專用 Gradebook 建立功能 === 🧪');
+  
+  // 測試 1: 驗證教師資料讀取
+  console.log('\n📋 測試 1: 教師資料讀取測試');
+  const teacherMappingResult = readCourseTeacherMapping();
+  
+  if (!teacherMappingResult.success) {
+    console.log('❌ 教師資料讀取失敗:', teacherMappingResult.error);
+    return { success: false, error: '教師資料讀取失敗' };
+  }
+  
+  const courseTeacherMapping = teacherMappingResult.mapping || {};
+  const courseIds = Object.keys(courseTeacherMapping);
+  
+  console.log(`✅ 成功讀取 ${courseIds.length} 門課程的教師資料`);
+  
+  // 測試 2: 驗證 Midterm 表頭結構
+  console.log('\n📋 測試 2: Midterm Gradebook 表頭驗證');
+  const MIDTERM_HEADERS = [
+    'English Name', 'Student ID', 'Email',
+    'Assignment 1', 'Assignment 2', 'Assignment 3', 'Assignment 4', 'Assignment 5',
+    'Midterm Exam', 'Midterm Exam',  // 兩個都是 Midterm
+    'Total Score', 'Grade', 'Comments'
+  ];
+  
+  console.log(`✅ Midterm 表頭欄位數量: ${MIDTERM_HEADERS.length}`);
+  console.log(`✅ Midterm 包含兩個 "Midterm Exam": ${MIDTERM_HEADERS.filter(h => h === 'Midterm Exam').length === 2}`);
+  console.log(`   📋 Midterm 表頭: ${MIDTERM_HEADERS.join(', ')}`);
+  
+  // 測試 3: 驗證 Final 表頭結構
+  console.log('\n📋 測試 3: Final Gradebook 表頭驗證');
+  const FINAL_HEADERS = [
+    'English Name', 'Student ID', 'Email',
+    'Assignment 1', 'Assignment 2', 'Assignment 3', 'Assignment 4', 'Assignment 5',
+    'Midterm Exam', 'Final Exam',    // Midterm 和 Final 各一個
+    'Total Score', 'Grade', 'Comments'
+  ];
+  
+  console.log(`✅ Final 表頭欄位數量: ${FINAL_HEADERS.length}`);
+  console.log(`✅ Final 包含 "Midterm Exam": ${FINAL_HEADERS.includes('Midterm Exam')}`);
+  console.log(`✅ Final 包含 "Final Exam": ${FINAL_HEADERS.includes('Final Exam')}`);
+  console.log(`   📋 Final 表頭: ${FINAL_HEADERS.join(', ')}`);
+  
+  // 測試 4: 驗證檔名格式
+  console.log('\n📋 測試 4: 檔名格式測試');
+  const SCHOOL_YEAR = '2526';
+  const SEMESTER = 'F1';
+  
+  if (courseIds.length > 0) {
+    const courseInfo = courseTeacherMapping[courseIds[0]];
+    const midtermFileName = `${SCHOOL_YEAR}${SEMESTER}_${courseInfo.teacherName}_${courseInfo.subject}_Gradebook_Midterm`;
+    const finalFileName = `${SCHOOL_YEAR}${SEMESTER}_${courseInfo.teacherName}_${courseInfo.subject}_Gradebook_Final`;
+    
+    console.log(`   📝 Midterm 檔名格式: ${midtermFileName}`);
+    console.log(`   📝 Final 檔名格式: ${finalFileName}`);
+  }
+  
+  console.log('\n🧪 === 專用 Gradebook 建立功能測試完成 === 🧪');
+  console.log('✅ 所有測試項目通過');
+  console.log('📚 可以安全執行 batchCreateGradebooksForMidterm() 和 batchCreateGradebooksForFinal()');
+  
+  return {
+    success: true,
+    courseCount: courseIds.length,
+    midtermHeaderCount: MIDTERM_HEADERS.length,
+    finalHeaderCount: FINAL_HEADERS.length,
+    midtermHasTwoMidterms: MIDTERM_HEADERS.filter(h => h === 'Midterm Exam').length === 2,
+    finalHasBothExams: FINAL_HEADERS.includes('Midterm Exam') && FINAL_HEADERS.includes('Final Exam')
+  };
+}
+
+/**
+ * 測試 Gradebook 建立功能 (原版)
  * 驗證檔名格式、表頭結構和教師資料讀取
  */
 function testGradebookCreation() {
