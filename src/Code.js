@@ -1175,18 +1175,8 @@ async function batchCreateGradebooks() {
         // 寫入表頭
         sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
         
-        // 格式化表頭
-        const headerRange = sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length);
-        headerRange.setFontWeight('bold');
-        headerRange.setBackground('#e3f2fd');
-        headerRange.setHorizontalAlignment('center');
-        
-        // 自動調整欄寬
-        sheet.autoResizeColumns(1, GRADEBOOK_HEADERS.length);
-        
-        // 設定保護範圍（表頭不可編輯）
-        const protection = headerRange.protect();
-        protection.setDescription('Gradebook Headers');
+        // 套用專業格式化設定
+        applyGradebookFormatting(sheet, 'General');
         
         console.log(`  ✅ 成功建立: ${fileName}`);
         console.log(`  📊 Gradebook URL: ${spreadsheet.getUrl()}`);
@@ -1220,6 +1210,137 @@ async function batchCreateGradebooks() {
     totalFailed,
     summary: `成功建立 ${totalSuccess} 個 Gradebook，失敗 ${totalFailed} 個`
   };
+}
+
+// =============================================
+// Gradebook Formatting Core Function
+// =============================================
+
+/**
+ * 套用專業的成績簿格式化設定
+ * 符合 Teacher Gradebook Template 範本標準
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - 工作表物件
+ * @param {string} examType - 考試類型 ('General', 'Midterm', 'Final')
+ */
+function applyGradebookFormatting(sheet, examType = 'General') {
+  console.log(`🎨 開始套用 ${examType} 成績簿格式化...`);
+  
+  try {
+    // 取得表頭資訊
+    const lastCol = sheet.getLastColumn();
+    const maxRows = Math.max(100, sheet.getMaxRows()); // 至少預留100行
+    
+    // === 1. 凍結窗格設定 ===
+    sheet.setFrozenRows(1);      // 凍結表頭行
+    sheet.setFrozenColumns(3);   // 凍結前3欄 (English Name, Student ID, Email)
+    
+    // === 2. 表頭格式設定 ===
+    const headerRange = sheet.getRange(1, 1, 1, lastCol);
+    headerRange.setBackground('#4285f4');    // Google 藍色背景
+    headerRange.setFontColor('#ffffff');     // 白色字體
+    headerRange.setFontWeight('bold');       // 粗體
+    headerRange.setHorizontalAlignment('center'); // 置中對齊
+    headerRange.setFontSize(11);             // 字體大小
+    
+    // === 3. 特定欄位底色格式化 ===
+    
+    // 學生基本資訊欄位 (A-C: English Name, Student ID, Email) - 淺藍色
+    if (lastCol >= 3) {
+      const basicInfoRange = sheet.getRange(2, 1, maxRows - 1, 3);
+      basicInfoRange.setBackground('#f0f8ff');
+    }
+    
+    // Assignment 欄位 (D-H: Assignment 1-5) - 淺黃色
+    if (lastCol >= 8) {
+      const assignmentRange = sheet.getRange(2, 4, maxRows - 1, 5);
+      assignmentRange.setBackground('#fffacd');
+    }
+    
+    // 考試欄位格式依考試類型而定
+    if (lastCol >= 10) {
+      const examRange = sheet.getRange(2, 9, maxRows - 1, 2); // I-J 欄位
+      
+      switch (examType) {
+        case 'Midterm':
+          examRange.setBackground('#e8f5e8'); // 淺綠色 - 兩個都是 Midterm
+          break;
+        case 'Final':
+          examRange.setBackground('#ffe4e1'); // 淺紅色 - Midterm + Final
+          break;
+        default:
+          examRange.setBackground('#ffe4e1'); // 預設淺紅色
+      }
+    }
+    
+    // 總分和成績欄位 (K-L: Total Score, Grade) - 淺綠色
+    if (lastCol >= 12) {
+      const gradeRange = sheet.getRange(2, 11, maxRows - 1, 2);
+      gradeRange.setBackground('#f0fff0');
+    }
+    
+    // 備註欄位 (M: Comments) - 淺灰色
+    if (lastCol >= 13) {
+      const commentsRange = sheet.getRange(2, 13, maxRows - 1, 1);
+      commentsRange.setBackground('#f8f9fa');
+    }
+    
+    // === 4. 邊框設定 ===
+    const allDataRange = sheet.getRange(1, 1, maxRows, lastCol);
+    allDataRange.setBorder(true, true, true, true, true, true);
+    
+    // === 5. 欄寬自動調整 ===
+    sheet.autoResizeColumns(1, lastCol);
+    
+    // === 6. 資料驗證和保護 ===
+    // 保護表頭不被意外編輯
+    const headerProtection = headerRange.protect();
+    headerProtection.setDescription(`${examType} Gradebook Headers - Protected`);
+    
+    // === 7. 條件格式設定（分數欄位） ===
+    if (lastCol >= 10) {
+      // 為考試分數欄位設定條件格式
+      const examScoreRange = sheet.getRange(2, 9, maxRows - 1, 2);
+      
+      // 高分 (80分以上) - 深綠色背景
+      const highScoreRule = SpreadsheetApp.newConditionalFormatRule()
+        .whenNumberGreaterThanOrEqualTo(80)
+        .setBackground('#d4edda')
+        .setRanges([examScoreRange])
+        .build();
+      
+      // 中等分數 (60-79分) - 淺黃色背景  
+      const mediumScoreRule = SpreadsheetApp.newConditionalFormatRule()
+        .whenNumberBetween(60, 79)
+        .setBackground('#fff3cd')
+        .setRanges([examScoreRange])
+        .build();
+      
+      // 低分 (60分以下) - 淺紅色背景
+      const lowScoreRule = SpreadsheetApp.newConditionalFormatRule()
+        .whenNumberLessThan(60)
+        .setBackground('#f8d7da')
+        .setRanges([examScoreRange])
+        .build();
+      
+      // 套用條件格式規則
+      const rules = sheet.getConditionalFormatRules();
+      rules.push(highScoreRule, mediumScoreRule, lowScoreRule);
+      sheet.setConditionalFormatRules(rules);
+    }
+    
+    // === 8. 儲存格對齊設定 ===
+    // 數字欄位置中對齊
+    if (lastCol >= 8) {
+      const numberRange = sheet.getRange(2, 4, maxRows - 1, lastCol - 3);
+      numberRange.setHorizontalAlignment('center');
+    }
+    
+    console.log(`✅ ${examType} 成績簿格式化完成`);
+    
+  } catch (error) {
+    console.log(`❌ 格式化過程發生錯誤: ${error.message}`);
+    throw error;
+  }
 }
 
 // =============================================
@@ -1301,18 +1422,8 @@ async function batchCreateGradebooksForMidterm() {
         // 寫入表頭
         sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
         
-        // 格式化表頭
-        const headerRange = sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length);
-        headerRange.setFontWeight('bold');
-        headerRange.setBackground('#e8f5e8'); // 淺綠色背景表示 Midterm
-        headerRange.setHorizontalAlignment('center');
-        
-        // 自動調整欄寬
-        sheet.autoResizeColumns(1, GRADEBOOK_HEADERS.length);
-        
-        // 設定保護範圍（表頭不可編輯）
-        const protection = headerRange.protect();
-        protection.setDescription('Midterm Gradebook Headers');
+        // 套用 Midterm 專業格式化設定
+        applyGradebookFormatting(sheet, 'Midterm');
         
         console.log(`  ✅ 成功建立: ${fileName}`);
         console.log(`  📊 Gradebook URL: ${spreadsheet.getUrl()}`);
@@ -1424,18 +1535,8 @@ async function batchCreateGradebooksForFinal() {
         // 寫入表頭
         sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
         
-        // 格式化表頭
-        const headerRange = sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length);
-        headerRange.setFontWeight('bold');
-        headerRange.setBackground('#ffe6e6'); // 淺紅色背景表示 Final
-        headerRange.setHorizontalAlignment('center');
-        
-        // 自動調整欄寬
-        sheet.autoResizeColumns(1, GRADEBOOK_HEADERS.length);
-        
-        // 設定保護範圍（表頭不可編輯）
-        const protection = headerRange.protect();
-        protection.setDescription('Final Gradebook Headers');
+        // 套用 Final 專業格式化設定
+        applyGradebookFormatting(sheet, 'Final');
         
         console.log(`  ✅ 成功建立: ${fileName}`);
         console.log(`  📊 Gradebook URL: ${spreadsheet.getUrl()}`);
@@ -1697,14 +1798,8 @@ async function createTestGradebook() {
     // 寫入表頭
     sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
     
-    // 格式化表頭
-    const headerRange = sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length);
-    headerRange.setFontWeight('bold');
-    headerRange.setBackground('#e3f2fd');
-    headerRange.setHorizontalAlignment('center');
-    
-    // 自動調整欄寬
-    sheet.autoResizeColumns(1, GRADEBOOK_HEADERS.length);
+    // 套用專業格式化設定
+    applyGradebookFormatting(sheet, 'General');
     
     // 新增一行測試資料
     const testData = [
@@ -1738,6 +1833,95 @@ async function createTestGradebook() {
     
   } catch (error) {
     console.log(`❌ 建立測試 Gradebook 失敗: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 測試新的格式化效果
+ * 建立一個包含完整格式化的測試成績簿
+ */
+async function testGradebookFormatting() {
+  console.log('🧪 === 測試成績簿格式化效果 === 🧪');
+  
+  try {
+    // 讀取第一門課程的資料
+    const teacherMappingResult = readCourseTeacherMapping();
+    
+    if (!teacherMappingResult.success) {
+      console.log('❌ 無法讀取教師資料');
+      return { success: false, error: teacherMappingResult.error };
+    }
+    
+    const courseTeacherMapping = teacherMappingResult.mapping || {};
+    const courseIds = Object.keys(courseTeacherMapping);
+    
+    if (courseIds.length === 0) {
+      console.log('❌ 沒有找到任何課程資料');
+      return { success: false, error: '沒有課程資料' };
+    }
+    
+    // 選擇第一門課程作為測試
+    const firstCourseId = courseIds[0];
+    const courseInfo = courseTeacherMapping[firstCourseId];
+    
+    const fileName = `FORMAT_TEST_2526F1_${courseInfo.teacherName}_${courseInfo.subject}_Gradebook`;
+    
+    const GRADEBOOK_HEADERS = [
+      'English Name', 'Student ID', 'Email',
+      'Assignment 1', 'Assignment 2', 'Assignment 3', 'Assignment 4', 'Assignment 5',
+      'Midterm Exam', 'Final Exam',
+      'Total Score', 'Grade', 'Comments'
+    ];
+    
+    console.log(`📝 建立格式化測試 Gradebook: ${fileName}`);
+    
+    // 建立測試用 Google Sheets
+    const spreadsheet = SpreadsheetApp.create(fileName);
+    const sheet = spreadsheet.getActiveSheet();
+    
+    // 設定工作表名稱
+    sheet.setName(`FORMAT_TEST_${courseInfo.subject}`);
+    
+    // 寫入表頭
+    sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
+    
+    // 套用新的格式化設定
+    applyGradebookFormatting(sheet, 'General');
+    
+    // 新增多行測試資料來展示格式化效果
+    const testData = [
+      ['John Doe', 'STU001', 'john.doe@school.edu', '85', '90', '88', '92', '87', '89', '91', '522', 'A', 'Excellent work'],
+      ['Jane Smith', 'STU002', 'jane.smith@school.edu', '78', '82', '75', '80', '83', '77', '85', '460', 'B+', 'Good progress'],
+      ['Mike Johnson', 'STU003', 'mike.johnson@school.edu', '95', '93', '97', '94', '96', '98', '95', '668', 'A+', 'Outstanding'],
+      ['Sarah Wilson', 'STU004', 'sarah.wilson@school.edu', '65', '70', '68', '72', '69', '66', '74', '484', 'C+', 'Needs improvement'],
+      ['David Brown', 'STU005', 'david.brown@school.edu', '55', '58', '52', '60', '57', '59', '61', '402', 'D+', 'Requires attention'],
+    ];
+    
+    sheet.getRange(2, 1, testData.length, GRADEBOOK_HEADERS.length).setValues(testData);
+    
+    console.log(`✅ 成功建立格式化測試 Gradebook`);
+    console.log(`📊 Gradebook URL: ${spreadsheet.getUrl()}`);
+    console.log(`🎨 格式化特點:`);
+    console.log(`   • 凍結表頭行和前3欄`);
+    console.log(`   • 藍色表頭背景，白色字體`);
+    console.log(`   • 學生資訊欄位淺藍色背景`);
+    console.log(`   • Assignment 欄位淺黃色背景`);
+    console.log(`   • 考試欄位淺紅色背景`);
+    console.log(`   • 成績欄位淺綠色背景`);
+    console.log(`   • 備註欄位淺灰色背景`);
+    console.log(`   • 分數條件格式化 (高分綠色、中分黃色、低分紅色)`);
+    
+    return {
+      success: true,
+      spreadsheetUrl: spreadsheet.getUrl(),
+      fileName: fileName,
+      courseInfo: courseInfo,
+      testDataRows: testData.length
+    };
+    
+  } catch (error) {
+    console.log(`❌ 建立格式化測試失敗: ${error.message}`);
     return { success: false, error: error.message };
   }
 }
