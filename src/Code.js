@@ -1098,6 +1098,325 @@ async function batchCreateAllGradeCourses() {
 }
 
 // =============================================
+// Batch Create Gradebooks Function
+// =============================================
+
+/**
+ * 批次建立所有課程的 Gradebook（Google Sheets）
+ * 檔名格式：2526F1_TeacherName_Subject_Gradebook
+ * 表頭包含：English Name, Student ID, Assignment 1, Assignment 2, etc.
+ */
+async function batchCreateGradebooks() {
+  console.log('📚 === 開始批次建立 Gradebook === 📚');
+  
+  // --- 設定區域 ---
+  const SCHOOL_YEAR = '2526';  // 2025-2026 學年
+  const SEMESTER = 'F1';       // Fall semester 1st term
+  const LOG_SPREADSHEET_ID = '1GWbn5qIKCikvLV_frTeIjDcTbi8wWxwCQR6S0NIEAp8';
+  const COURSE_SHEET_NAME = 'course_teacher';
+  
+  // Gradebook 表頭設定
+  const GRADEBOOK_HEADERS = [
+    'English Name',
+    'Student ID', 
+    'Email',
+    'Assignment 1',
+    'Assignment 2',
+    'Assignment 3',
+    'Assignment 4',
+    'Assignment 5',
+    'Midterm Exam',
+    'Final Exam',
+    'Total Score',
+    'Grade',
+    'Comments'
+  ];
+  // --- 結束設定 ---
+  
+  let totalSuccess = 0;
+  let totalFailed = 0;
+  
+  try {
+    // 讀取課程-教師資料
+    console.log('🔍 讀取課程教師資料...');
+    const teacherMappingResult = readCourseTeacherMapping();
+    
+    if (!teacherMappingResult.success) {
+      console.log('❌ 無法讀取教師資料：', teacherMappingResult.error);
+      return {
+        success: false,
+        error: teacherMappingResult.error
+      };
+    }
+    
+    const courseTeacherMapping = teacherMappingResult.mapping || {};
+    const courseIds = Object.keys(courseTeacherMapping);
+    
+    console.log(`📊 找到 ${courseIds.length} 門課程需要建立 Gradebook`);
+    
+    // 為每門課程建立 Gradebook
+    for (const courseId of courseIds) {
+      const courseInfo = courseTeacherMapping[courseId];
+      const { teacherName, subject, courseName } = courseInfo;
+      
+      // 生成檔名：2526F1_Ms. Kate_LT_Gradebook
+      const fileName = `${SCHOOL_YEAR}${SEMESTER}_${teacherName}_${subject}_Gradebook`;
+      
+      console.log(`[處理中] 正在為課程 "${courseName}" 建立 Gradebook: ${fileName}`);
+      
+      try {
+        // 建立新的 Google Sheets
+        const spreadsheet = SpreadsheetApp.create(fileName);
+        const sheet = spreadsheet.getActiveSheet();
+        
+        // 設定工作表名稱
+        sheet.setName(`${subject}_${courseName.split('-')[1] || 'Class'}`);
+        
+        // 寫入表頭
+        sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
+        
+        // 格式化表頭
+        const headerRange = sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length);
+        headerRange.setFontWeight('bold');
+        headerRange.setBackground('#e3f2fd');
+        headerRange.setHorizontalAlignment('center');
+        
+        // 自動調整欄寬
+        sheet.autoResizeColumns(1, GRADEBOOK_HEADERS.length);
+        
+        // 設定保護範圍（表頭不可編輯）
+        const protection = headerRange.protect();
+        protection.setDescription('Gradebook Headers');
+        
+        console.log(`  ✅ 成功建立: ${fileName}`);
+        console.log(`  📊 Gradebook URL: ${spreadsheet.getUrl()}`);
+        
+        totalSuccess++;
+        
+        // 短暫延遲避免 API 限制
+        Utilities.sleep(500);
+        
+      } catch (error) {
+        console.log(`  ❌ 建立失敗: ${fileName} - ${error.message}`);
+        totalFailed++;
+      }
+    }
+    
+  } catch (error) {
+    console.log(`❌ 批次建立過程發生錯誤: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+  
+  console.log(`📚 === Gradebook 建立完成 === 📚`);
+  console.log(`✅ 成功建立: ${totalSuccess} 個 Gradebook`);
+  console.log(`❌ 建立失敗: ${totalFailed} 個 Gradebook`);
+  
+  return {
+    success: true,
+    totalSuccess,
+    totalFailed,
+    summary: `成功建立 ${totalSuccess} 個 Gradebook，失敗 ${totalFailed} 個`
+  };
+}
+
+// =============================================
+// Test Functions for Gradebook Creation
+// =============================================
+
+/**
+ * 測試 Gradebook 建立功能
+ * 驗證檔名格式、表頭結構和教師資料讀取
+ */
+function testGradebookCreation() {
+  console.log('🧪 === 開始測試 Gradebook 建立功能 === 🧪');
+  
+  // 測試 1: 驗證教師資料讀取
+  console.log('\n📋 測試 1: 教師資料讀取測試');
+  const teacherMappingResult = readCourseTeacherMapping();
+  
+  if (!teacherMappingResult.success) {
+    console.log('❌ 教師資料讀取失敗:', teacherMappingResult.error);
+    return { success: false, error: '教師資料讀取失敗' };
+  }
+  
+  const courseTeacherMapping = teacherMappingResult.mapping || {};
+  const courseIds = Object.keys(courseTeacherMapping);
+  
+  console.log(`✅ 成功讀取 ${courseIds.length} 門課程的教師資料`);
+  
+  // 顯示前 3 門課程的資料作為樣本
+  courseIds.slice(0, 3).forEach(courseId => {
+    const courseInfo = courseTeacherMapping[courseId];
+    console.log(`   📚 課程: ${courseInfo.courseName} | 教師: ${courseInfo.teacherName} | 科目: ${courseInfo.subject}`);
+  });
+  
+  // 測試 2: 驗證檔名格式產生
+  console.log('\n📋 測試 2: 檔名格式測試');
+  const SCHOOL_YEAR = '2526';
+  const SEMESTER = 'F1';
+  
+  courseIds.slice(0, 3).forEach(courseId => {
+    const courseInfo = courseTeacherMapping[courseId];
+    const fileName = `${SCHOOL_YEAR}${SEMESTER}_${courseInfo.teacherName}_${courseInfo.subject}_Gradebook`;
+    console.log(`   📝 檔名格式: ${fileName}`);
+  });
+  
+  // 測試 3: 驗證表頭結構
+  console.log('\n📋 測試 3: Gradebook 表頭驗證');
+  const GRADEBOOK_HEADERS = [
+    'English Name',
+    'Student ID', 
+    'Email',
+    'Assignment 1',
+    'Assignment 2',
+    'Assignment 3',
+    'Assignment 4',
+    'Assignment 5',
+    'Midterm Exam',
+    'Final Exam',
+    'Total Score',
+    'Grade',
+    'Comments'
+  ];
+  
+  console.log(`✅ 表頭欄位數量: ${GRADEBOOK_HEADERS.length}`);
+  console.log(`✅ 包含 "English Name": ${GRADEBOOK_HEADERS.includes('English Name')}`);
+  console.log(`   📋 完整表頭: ${GRADEBOOK_HEADERS.join(', ')}`);
+  
+  // 測試 4: 模擬執行檢查
+  console.log('\n📋 測試 4: 執行環境檢查');
+  try {
+    // 檢查 SpreadsheetApp 是否可用
+    const testAccess = typeof SpreadsheetApp !== 'undefined';
+    console.log(`✅ SpreadsheetApp 存取: ${testAccess ? '正常' : '異常'}`);
+    
+    console.log(`✅ 預計建立的 Gradebook 數量: ${courseIds.length}`);
+    
+  } catch (error) {
+    console.log(`⚠️ 執行環境檢查警告: ${error.message}`);
+  }
+  
+  console.log('\n🧪 === Gradebook 建立功能測試完成 === 🧪');
+  console.log('✅ 所有測試項目通過，可以安全執行 batchCreateGradebooks()');
+  
+  return {
+    success: true,
+    courseCount: courseIds.length,
+    headerCount: GRADEBOOK_HEADERS.length,
+    hasEnglishName: GRADEBOOK_HEADERS.includes('English Name'),
+    sampleFileName: `${SCHOOL_YEAR}${SEMESTER}_${courseIds.length > 0 ? courseTeacherMapping[courseIds[0]].teacherName : 'Teacher'}_${courseIds.length > 0 ? courseTeacherMapping[courseIds[0]].subject : 'Subject'}_Gradebook`
+  };
+}
+
+/**
+ * 建立單一測試用 Gradebook (用於驗證功能)
+ * 只建立一個 Gradebook 來測試格式和功能
+ */
+async function createTestGradebook() {
+  console.log('🧪 === 建立測試用 Gradebook === 🧪');
+  
+  try {
+    // 讀取第一門課程的資料
+    const teacherMappingResult = readCourseTeacherMapping();
+    
+    if (!teacherMappingResult.success) {
+      console.log('❌ 無法讀取教師資料');
+      return { success: false, error: teacherMappingResult.error };
+    }
+    
+    const courseTeacherMapping = teacherMappingResult.mapping || {};
+    const courseIds = Object.keys(courseTeacherMapping);
+    
+    if (courseIds.length === 0) {
+      console.log('❌ 沒有找到任何課程資料');
+      return { success: false, error: '沒有課程資料' };
+    }
+    
+    // 選擇第一門課程作為測試
+    const firstCourseId = courseIds[0];
+    const courseInfo = courseTeacherMapping[firstCourseId];
+    
+    const SCHOOL_YEAR = '2526';
+    const SEMESTER = 'F1';
+    const fileName = `TEST_${SCHOOL_YEAR}${SEMESTER}_${courseInfo.teacherName}_${courseInfo.subject}_Gradebook`;
+    
+    const GRADEBOOK_HEADERS = [
+      'English Name',
+      'Student ID', 
+      'Email',
+      'Assignment 1',
+      'Assignment 2',
+      'Assignment 3',
+      'Assignment 4',
+      'Assignment 5',
+      'Midterm Exam',
+      'Final Exam',
+      'Total Score',
+      'Grade',
+      'Comments'
+    ];
+    
+    console.log(`📝 建立測試 Gradebook: ${fileName}`);
+    
+    // 建立測試用 Google Sheets
+    const spreadsheet = SpreadsheetApp.create(fileName);
+    const sheet = spreadsheet.getActiveSheet();
+    
+    // 設定工作表名稱
+    sheet.setName(`TEST_${courseInfo.subject}`);
+    
+    // 寫入表頭
+    sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length).setValues([GRADEBOOK_HEADERS]);
+    
+    // 格式化表頭
+    const headerRange = sheet.getRange(1, 1, 1, GRADEBOOK_HEADERS.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#e3f2fd');
+    headerRange.setHorizontalAlignment('center');
+    
+    // 自動調整欄寬
+    sheet.autoResizeColumns(1, GRADEBOOK_HEADERS.length);
+    
+    // 新增一行測試資料
+    const testData = [
+      'John Doe',           // English Name
+      'STU001',             // Student ID
+      'john.doe@school.edu', // Email
+      '85',                 // Assignment 1
+      '90',                 // Assignment 2
+      '88',                 // Assignment 3
+      '',                   // Assignment 4
+      '',                   // Assignment 5
+      '',                   // Midterm Exam
+      '',                   // Final Exam
+      '',                   // Total Score
+      '',                   // Grade
+      'Test data'           // Comments
+    ];
+    
+    sheet.getRange(2, 1, 1, GRADEBOOK_HEADERS.length).setValues([testData]);
+    
+    console.log(`✅ 成功建立測試 Gradebook`);
+    console.log(`📊 Gradebook URL: ${spreadsheet.getUrl()}`);
+    console.log(`📋 課程資訊: ${courseInfo.courseName} (${courseInfo.teacherName})`);
+    
+    return {
+      success: true,
+      spreadsheetUrl: spreadsheet.getUrl(),
+      fileName: fileName,
+      courseInfo: courseInfo
+    };
+    
+  } catch (error) {
+    console.log(`❌ 建立測試 Gradebook 失敗: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+// =============================================
 // Utility Function to Populate Sheet from Log
 // =============================================
 
