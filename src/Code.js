@@ -11407,3 +11407,661 @@ function generateSystemVerificationReport() {
   
   return report;
 }
+
+// ==========================================
+// 🚀 Google Apps Script 直接執行函數區域
+// 可在 Apps Script 編輯器中直接執行，查看詳細進度
+// ==========================================
+
+/**
+ * 🚀 直接執行學生批次新增 (Apps Script 編輯器專用)
+ * 
+ * 使用方式：
+ * 1. 在 Apps Script 編輯器中選擇此函數
+ * 2. 點擊執行按鈕
+ * 3. 在執行記錄中查看詳細進度
+ * 
+ * 功能特色：
+ * - 實時 console.log 進度顯示
+ * - 可配置執行參數
+ * - 詳細的錯誤診斷
+ * - 支援斷點續傳
+ */
+async function executeStudentBatchDirect() {
+  console.log("🚀 ============================================");
+  console.log("🚀 開始直接執行學生批次新增");
+  console.log("🚀 ============================================");
+  
+  // ⚙️ 可配置參數區域 - 可在此修改執行設定
+  const CONFIG = {
+    sheetName: '新增學生',           // 工作表名稱
+    batchSize: 275,                 // 批次大小（推薦 275 for 4500+ 筆資料）
+    testMode: false,                // 測試模式（true=只處理前 10 筆）
+    startRow: 2,                    // 起始行數（通常從第 2 行開始）
+    maxRows: null,                  // 最大處理行數（null=全部處理）
+    resumeJobId: null,              // 恢復任務ID（null=建立新任務）
+    enableDetailedLog: true,        // 啟用詳細日誌
+    showProgressEvery: 10           // 每處理 N 筆顯示進度
+  };
+  
+  console.log("⚙️ 執行設定:");
+  console.log("  📊 工作表名稱:", CONFIG.sheetName);
+  console.log("  📦 批次大小:", CONFIG.batchSize);
+  console.log("  🧪 測試模式:", CONFIG.testMode ? "啟用" : "關閉");
+  console.log("  📍 起始行數:", CONFIG.startRow);
+  console.log("  📏 最大處理行數:", CONFIG.maxRows || "全部");
+  console.log("  🔄 恢復任務ID:", CONFIG.resumeJobId || "建立新任務");
+  
+  try {
+    // 步驟1: 系統健康檢查
+    console.log("");
+    console.log("🔍 ============== 步驟 1: 系統健康檢查 ==============");
+    
+    // 檢查工作表是否存在
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName(CONFIG.sheetName);
+    
+    if (!sheet) {
+      throw new Error(`找不到工作表: ${CONFIG.sheetName}`);
+    }
+    
+    console.log("✅ 工作表檢查通過:", CONFIG.sheetName);
+    
+    // 檢查資料行數
+    const lastRow = sheet.getLastRow();
+    const dataRows = lastRow - CONFIG.startRow + 1;
+    
+    console.log("📊 資料統計:");
+    console.log("  總行數:", lastRow);
+    console.log("  資料行數:", Math.max(0, dataRows));
+    console.log("  預計處理:", CONFIG.testMode ? Math.min(10, dataRows) : dataRows);
+    
+    if (dataRows <= 0) {
+      throw new Error("沒有找到需要處理的資料");
+    }
+    
+    // 檢查 ClassroomService 是否可用
+    if (!classroomService) {
+      throw new Error("ClassroomService 未初始化");
+    }
+    
+    console.log("✅ ClassroomService 檢查通過");
+    
+    // 步驟2: 讀取和驗證資料
+    console.log("");
+    console.log("📖 ============== 步驟 2: 讀取和驗證資料 ==============");
+    
+    const studentCourseData = await readStudentCourseDataFromSheet(CONFIG.sheetName);
+    
+    if (!studentCourseData.success) {
+      throw new Error(`讀取資料失敗: ${studentCourseData.error}`);
+    }
+    
+    let assignments = studentCourseData.assignments;
+    const originalCount = assignments.length;
+    
+    console.log("📊 原始資料:");
+    console.log("  讀取成功:", originalCount, "項");
+    
+    // 測試模式：只處理前 N 筆
+    if (CONFIG.testMode && assignments.length > 10) {
+      assignments = assignments.slice(0, 10);
+      console.log("🧪 測試模式：限制處理", assignments.length, "項");
+    }
+    
+    // 最大行數限制
+    if (CONFIG.maxRows && assignments.length > CONFIG.maxRows) {
+      assignments = assignments.slice(0, CONFIG.maxRows);
+      console.log("📏 行數限制：限制處理", assignments.length, "項");
+    }
+    
+    console.log("✅ 最終處理:", assignments.length, "項新增任務");
+    
+    // 顯示前幾筆資料樣本
+    if (CONFIG.enableDetailedLog && assignments.length > 0) {
+      console.log("");
+      console.log("📋 資料樣本 (前 3 筆):");
+      assignments.slice(0, 3).forEach((item, index) => {
+        console.log(`  ${index + 1}. ${item.studentEmail} → 課程 ${item.courseId}`);
+      });
+    }
+    
+    // 步驟3: 執行批次處理
+    console.log("");
+    console.log("🚀 ============== 步驟 3: 執行批次處理 ==============");
+    console.log("⏰ 預估時間:", Math.ceil(assignments.length * 1.2 / 60), "分鐘");
+    console.log("📦 預計批次數:", Math.ceil(assignments.length / CONFIG.batchSize));
+    
+    // 準備批次處理參數
+    const batchOptions = {
+      jobId: CONFIG.resumeJobId,
+      batchSize: CONFIG.batchSize,
+      enableDetailedLog: CONFIG.enableDetailedLog,
+      testMode: CONFIG.testMode
+    };
+    
+    // 轉換為 ClassroomService 預期格式
+    const members = assignments.map(assignment => ({
+      courseId: assignment.courseId,
+      userEmail: assignment.studentEmail,
+      originalData: assignment // 保留原始資料以便後續更新
+    }));
+    
+    console.log("🔄 開始進階批次處理...");
+    
+    const result = await classroomService.addMembersBatchAdvanced(
+      members,
+      "STUDENT", 
+      batchOptions
+    );
+    
+    // 步驟4: 結果分析和報告
+    console.log("");
+    console.log("📊 ============== 步驟 4: 執行結果分析 ==============");
+    
+    if (result.success || result.partial) {
+      console.log("✅ 執行狀態:", result.partial ? "部分完成" : "完全成功");
+      console.log("📈 處理統計:");
+      console.log("  總任務數:", result.totalItems || assignments.length);
+      console.log("  已處理:", result.processedCount || 0);
+      console.log("  成功數:", result.successCount || 0);
+      console.log("  失敗數:", result.errorCount || 0);
+      console.log("  完成率:", Math.round(((result.successCount || 0) / (result.totalItems || assignments.length)) * 100), "%");
+      
+      if (result.executionTime) {
+        console.log("  執行時間:", Math.round(result.executionTime / 1000), "秒");
+        console.log("  處理速度:", Math.round((result.processedCount || 0) / (result.executionTime / 1000 / 60)), "項/分鐘");
+      }
+      
+      // 顯示錯誤詳情
+      if (result.errors && result.errors.length > 0) {
+        console.log("");
+        console.log("❌ 錯誤詳情 (前 10 項):");
+        result.errors.slice(0, 10).forEach((error, index) => {
+          console.log(`  ${index + 1}. ${error.userEmail} → 課程 ${error.courseId}: ${error.error}`);
+        });
+        
+        if (result.errors.length > 10) {
+          console.log(`  ... 以及其他 ${result.errors.length - 10} 個錯誤`);
+        }
+      }
+      
+      // 如果是部分完成，顯示恢復資訊
+      if (result.partial && result.jobId) {
+        console.log("");
+        console.log("⏸️ 部分完成通知:");
+        console.log("  任務 ID:", result.jobId);
+        console.log("  恢復指令: 修改 CONFIG.resumeJobId =", `"${result.jobId}"`);
+        console.log("  或執行: resumeBatchDirect('" + result.jobId + "')");
+      }
+      
+    } else {
+      console.log("❌ 執行失敗:", result.error);
+      console.log("💡 建議檢查:");
+      console.log("  - Google Classroom API 權限");
+      console.log("  - 網路連線狀態");
+      console.log("  - 學生 Email 和課程 ID 格式");
+      console.log("  - API 配額使用情況");
+    }
+    
+    // 步驟5: 更新工作表（如果有結果）
+    if (result.results && result.results.length > 0) {
+      console.log("");
+      console.log("📝 ============== 步驟 5: 更新工作表狀態 ==============");
+      try {
+        await updateStudentCourseStatusBatch(result.results, CONFIG.sheetName);
+        console.log("✅ 工作表狀態更新完成");
+      } catch (updateError) {
+        console.log("⚠️ 工作表更新失敗:", updateError.message);
+      }
+    }
+    
+    console.log("");
+    console.log("🎉 ============== 執行完成 ==============");
+    console.log("🎯 總結:", result.partial ? "部分完成，可繼續執行" : "全部完成");
+    
+    return result;
+    
+  } catch (error) {
+    console.log("");
+    console.log("❌ ============== 執行失敗 ==============");
+    console.log("錯誤訊息:", error.message);
+    console.log("錯誤類型:", error.name);
+    
+    if (error.stack) {
+      console.log("錯誤堆疊:", error.stack);
+    }
+    
+    console.log("");
+    console.log("💡 故障排除建議:");
+    console.log("1. 檢查工作表名稱和資料格式");
+    console.log("2. 確認 Google Classroom API 權限");
+    console.log("3. 檢查學生 Email 和課程 ID 有效性");
+    console.log("4. 查看完整錯誤訊息進行診斷");
+    
+    throw error;
+  }
+}
+
+/**
+ * 🧪 測試單個學生新增 (除錯專用)
+ * 
+ * 使用方式：
+ * 1. 修改下方的測試參數
+ * 2. 在 Apps Script 編輯器中執行此函數
+ * 3. 查看詳細的執行過程和錯誤資訊
+ */
+async function testSingleStudent() {
+  console.log("🧪 ============================================");
+  console.log("🧪 開始單個學生新增測試");
+  console.log("🧪 ============================================");
+  
+  // ⚙️ 測試參數 - 修改這裡的值進行測試
+  const TEST_CONFIG = {
+    studentEmail: "LE14234@stu.kcislk.ntpc.edu.tw",  // 要測試的學生 Email
+    courseId: "779922029471",                         // 要新增到的課程 ID
+    enableDetailedDiagnosis: true                     // 啟用詳細診斷
+  };
+  
+  console.log("🎯 測試目標:");
+  console.log("  學生Email:", TEST_CONFIG.studentEmail);
+  console.log("  課程ID:", TEST_CONFIG.courseId);
+  console.log("  詳細診斷:", TEST_CONFIG.enableDetailedDiagnosis ? "啟用" : "關閉");
+  
+  try {
+    // 步驟1: 參數驗證
+    console.log("");
+    console.log("🔍 ============== 步驟 1: 參數驗證 ==============");
+    
+    const emailValidation = ValidationUtils.validateEmail(TEST_CONFIG.studentEmail);
+    console.log("📧 Email 驗證:", emailValidation.valid ? "✅ 通過" : "❌ 失敗");
+    if (!emailValidation.valid) {
+      console.log("  錯誤:", emailValidation.error);
+    }
+    
+    const courseValidation = ValidationUtils.validateCourseId(TEST_CONFIG.courseId);
+    console.log("🏫 課程ID驗證:", courseValidation.valid ? "✅ 通過" : "❌ 失敗");
+    if (!courseValidation.valid) {
+      console.log("  錯誤:", courseValidation.error);
+    }
+    
+    // 步驟2: 預檢權限和設定
+    if (TEST_CONFIG.enableDetailedDiagnosis) {
+      console.log("");
+      console.log("🔍 ============== 步驟 2: 詳細預檢 ==============");
+      
+      try {
+        // 檢查課程是否存在和可存取
+        console.log("📚 檢查課程存取權限...");
+        const course = Classroom.Courses.get(TEST_CONFIG.courseId);
+        console.log("✅ 課程資訊:");
+        console.log("  課程名稱:", course.name);
+        console.log("  課程狀態:", course.courseState);
+        console.log("  建立時間:", course.creationTime);
+        console.log("  擁有者ID:", course.ownerId);
+        
+        // 檢查當前用戶權限
+        console.log("");
+        console.log("👤 檢查當前用戶權限...");
+        const currentUser = Session.getActiveUser().getEmail();
+        console.log("當前用戶:", currentUser);
+        
+        // 嘗試列出現有成員（測試權限）
+        try {
+          const teachers = Classroom.Courses.Teachers.list(TEST_CONFIG.courseId);
+          console.log("✅ 教師清單存取: 成功 (", teachers.teachers ? teachers.teachers.length : 0, "位教師)");
+        } catch (teacherError) {
+          console.log("⚠️ 教師清單存取: 失敗 -", teacherError.message);
+        }
+        
+        try {
+          const students = Classroom.Courses.Students.list(TEST_CONFIG.courseId);
+          console.log("✅ 學生清單存取: 成功 (", students.students ? students.students.length : 0, "位學生)");
+        } catch (studentError) {
+          console.log("⚠️ 學生清單存取: 失敗 -", studentError.message);
+        }
+        
+      } catch (courseError) {
+        console.log("❌ 課程檢查失敗:", courseError.message);
+        console.log("💡 可能原因:");
+        console.log("  - 課程 ID 不正確");
+        console.log("  - 沒有課程存取權限");
+        console.log("  - 課程已被刪除或封存");
+      }
+      
+      // 域名檢查
+      console.log("");
+      console.log("🌐 域名相容性檢查...");
+      try {
+        const domainValidation = ErrorHandler.validateUserDomain(TEST_CONFIG.studentEmail);
+        console.log("域名驗證結果:", domainValidation.valid ? "✅ 匹配" : "⚠️ 不匹配");
+        if (!domainValidation.valid) {
+          console.log("  學生域名:", domainValidation.userDomain);
+          console.log("  允許域名:", domainValidation.allowedDomains);
+          console.log("  不匹配原因:", domainValidation.reason);
+        }
+      } catch (domainError) {
+        console.log("⚠️ 域名檢查失敗:", domainError.message);
+      }
+    }
+    
+    // 步驟3: 執行新增測試
+    console.log("");
+    console.log("🚀 ============== 步驟 3: 執行新增測試 ==============");
+    console.log("開始新增學生到課程...");
+    
+    const startTime = Date.now();
+    
+    try {
+      const result = await classroomService.addMemberToCourse(
+        TEST_CONFIG.courseId,
+        TEST_CONFIG.studentEmail,
+        'STUDENT'
+      );
+      
+      const executionTime = Date.now() - startTime;
+      
+      console.log("");
+      console.log("✅ ============== 新增成功 ==============");
+      console.log("📊 執行結果:");
+      console.log("  狀態: ✅ 成功");
+      console.log("  學生Email:", TEST_CONFIG.studentEmail);
+      console.log("  課程ID:", TEST_CONFIG.courseId);
+      console.log("  執行時間:", executionTime, "毫秒");
+      console.log("  API 回應:", JSON.stringify(result, null, 2));
+      
+    } catch (addError) {
+      const executionTime = Date.now() - startTime;
+      
+      console.log("");
+      console.log("❌ ============== 新增失敗 ==============");
+      console.log("📊 執行結果:");
+      console.log("  狀態: ❌ 失敗");
+      console.log("  學生Email:", TEST_CONFIG.studentEmail);
+      console.log("  課程ID:", TEST_CONFIG.courseId);
+      console.log("  執行時間:", executionTime, "毫秒");
+      console.log("  錯誤訊息:", addError.message);
+      
+      // 詳細錯誤分析
+      console.log("");
+      console.log("🔍 詳細錯誤分析:");
+      const errorAnalysis = ErrorHandler.parseApiError(addError);
+      console.log("  錯誤類型:", errorAnalysis.type || "UNKNOWN");
+      console.log("  用戶訊息:", errorAnalysis.userMessage);
+      console.log("  技術訊息:", errorAnalysis.technicalMessage);
+      console.log("  應重試:", errorAnalysis.shouldRetry ? "是" : "否");
+      
+      if (errorAnalysis.diagnosticInfo) {
+        console.log("");
+        console.log("💡 診斷建議:");
+        console.log("  可能原因:");
+        errorAnalysis.diagnosticInfo.possibleCauses.forEach((cause, index) => {
+          console.log(`    ${index + 1}. ${cause}`);
+        });
+        console.log("  建議解決方案:");
+        errorAnalysis.diagnosticInfo.solutions.forEach((solution, index) => {
+          console.log(`    ${index + 1}. ${solution}`);
+        });
+      }
+      
+      // 如果是特定類型的錯誤，提供額外建議
+      if (addError.message.includes('CannotDirectAddUser')) {
+        console.log("");
+        console.log("⚠️ 'CannotDirectAddUser' 錯誤 - 特殊處理建議:");
+        console.log("1. 確認學生 Email 域名與學校管理域匹配");
+        console.log("2. 檢查學生帳戶是否已在 Google Workspace 中啟用");
+        console.log("3. 確認執行帳戶具備域管理員權限");
+        console.log("4. 嘗試讓學生自行加入課程（發送邀請碼）");
+      }
+      
+      if (addError.message.includes('403') || addError.message.includes('permission')) {
+        console.log("");
+        console.log("⚠️ 權限錯誤 - 特殊處理建議:");
+        console.log("1. 確認當前執行帳戶是課程擁有者或協同教師");
+        console.log("2. 檢查是否具備域管理員權限");
+        console.log("3. 重新授權 Google Classroom API 權限");
+        console.log("4. 聯絡 IT 管理員確認權限設定");
+      }
+      
+      throw addError;
+    }
+    
+  } catch (error) {
+    console.log("");
+    console.log("❌ ============== 測試失敗 ==============");
+    console.log("最終錯誤:", error.message);
+    
+    console.log("");
+    console.log("🛠️ 故障排除步驟:");
+    console.log("1. 檢查測試參數是否正確");
+    console.log("2. 確認 API 權限和配額");
+    console.log("3. 驗證網路連線");
+    console.log("4. 查看完整錯誤訊息");
+    console.log("5. 嘗試使用不同的測試資料");
+    
+    return {
+      success: false,
+      error: error.message,
+      testConfig: TEST_CONFIG
+    };
+  }
+}
+
+/**
+ * 📊 檢查批次處理狀態 (直接執行版)
+ */
+function checkBatchStatusDirect(jobId = null) {
+  console.log("📊 ============================================");
+  console.log("📊 檢查批次處理狀態");
+  console.log("📊 ============================================");
+  
+  try {
+    if (!jobId) {
+      console.log("💡 使用方式: checkBatchStatusDirect('your-job-id')");
+      console.log("或修改下方的 DEFAULT_JOB_ID");
+      
+      // 如果沒有提供 jobId，嘗試使用預設值或列出所有任務
+      const DEFAULT_JOB_ID = null; // 在這裡設定預設的 job ID
+      
+      if (DEFAULT_JOB_ID) {
+        jobId = DEFAULT_JOB_ID;
+        console.log("使用預設任務ID:", jobId);
+      } else {
+        console.log("");
+        console.log("📋 查詢所有批次任務狀態...");
+        
+        // 嘗試列出所有可能的任務
+        const allStatuses = [];
+        for (let i = 1; i <= 10; i++) {
+          const testJobId = `batch_${Date.now() - i * 86400000}`; // 過去10天的可能ID
+          try {
+            const status = classroomService.checkBatchStatus(testJobId);
+            if (status.found) {
+              allStatuses.push({ jobId: testJobId, ...status });
+            }
+          } catch (e) {
+            // 忽略不存在的任務
+          }
+        }
+        
+        if (allStatuses.length > 0) {
+          console.log("📊 找到的批次任務:");
+          allStatuses.forEach((status, index) => {
+            console.log(`${index + 1}. 任務ID: ${status.jobId}`);
+            console.log(`   狀態: ${status.status}`);
+            console.log(`   進度: ${status.progress}%`);
+            console.log(`   已處理: ${status.processed}/${status.total}`);
+          });
+        } else {
+          console.log("📭 沒有找到任何批次任務");
+        }
+        
+        return { success: false, error: "需要提供任務ID" };
+      }
+    }
+    
+    console.log("🔍 查詢任務ID:", jobId);
+    
+    const status = classroomService.checkBatchStatus(jobId);
+    
+    console.log("");
+    if (status.found) {
+      console.log("✅ ============== 找到批次任務 ==============");
+      console.log("📊 任務資訊:");
+      console.log("  任務ID:", jobId);
+      console.log("  任務狀態:", status.status || "未知");
+      console.log("  執行進度:", status.progress || 0, "%");
+      console.log("  已處理項目:", status.processed || 0);
+      console.log("  總項目數:", status.total || 0);
+      console.log("  最後更新:", status.lastUpdate || "未知");
+      console.log("  開始時間:", status.startTime || "未知");
+      
+      if (status.hasError) {
+        console.log("  ❌ 錯誤狀態: 有錯誤");
+        console.log("  錯誤訊息:", status.error || "未知錯誤");
+      } else {
+        console.log("  ✅ 錯誤狀態: 無錯誤");
+      }
+      
+      // 顯示詳細統計
+      if (status.statistics) {
+        console.log("");
+        console.log("📈 詳細統計:");
+        console.log("  成功數:", status.statistics.successCount || 0);
+        console.log("  失敗數:", status.statistics.failureCount || 0);
+        console.log("  跳過數:", status.statistics.skippedCount || 0);
+      }
+      
+      // 如果任務未完成，提供恢復建議
+      if (status.progress < 100 && status.status !== 'COMPLETED') {
+        console.log("");
+        console.log("🔄 任務未完成 - 恢復選項:");
+        console.log("  1. 執行: resumeBatchDirect('" + jobId + "')");
+        console.log("  2. 或修改 executeStudentBatchDirect() 中的 CONFIG.resumeJobId");
+      }
+      
+      return {
+        success: true,
+        status: status
+      };
+      
+    } else {
+      console.log("❌ ============== 任務不存在 ==============");
+      console.log("💡 可能原因:");
+      console.log("  - 任務ID不正確");
+      console.log("  - 任務已過期被清理");
+      console.log("  - 從未建立過此任務");
+      
+      return {
+        success: false,
+        error: "任務不存在",
+        jobId: jobId
+      };
+    }
+    
+  } catch (error) {
+    console.log("❌ ============== 狀態檢查失敗 ==============");
+    console.log("錯誤訊息:", error.message);
+    
+    return {
+      success: false,
+      error: error.message,
+      jobId: jobId
+    };
+  }
+}
+
+/**
+ * 🔄 恢復批次處理 (直接執行版)
+ */
+async function resumeBatchDirect(jobId = null) {
+  console.log("🔄 ============================================");
+  console.log("🔄 恢復批次處理");
+  console.log("🔄 ============================================");
+  
+  try {
+    if (!jobId) {
+      console.log("❌ 需要提供任務ID");
+      console.log("💡 使用方式: resumeBatchDirect('your-job-id')");
+      console.log("或修改函數中的預設值");
+      
+      // 可在此設定預設的 job ID
+      const DEFAULT_JOB_ID = null;
+      if (DEFAULT_JOB_ID) {
+        jobId = DEFAULT_JOB_ID;
+        console.log("使用預設任務ID:", jobId);
+      } else {
+        return { success: false, error: "需要提供任務ID" };
+      }
+    }
+    
+    console.log("🎯 目標任務ID:", jobId);
+    
+    // 首先檢查任務狀態
+    console.log("");
+    console.log("🔍 ============== 檢查任務狀態 ==============");
+    const statusCheck = classroomService.checkBatchStatus(jobId);
+    
+    if (!statusCheck.found) {
+      console.log("❌ 任務不存在:", jobId);
+      return { success: false, error: "任務不存在" };
+    }
+    
+    console.log("✅ 找到任務");
+    console.log("  當前進度:", statusCheck.progress, "%");
+    console.log("  已處理:", statusCheck.processed, "/", statusCheck.total);
+    console.log("  任務狀態:", statusCheck.status);
+    
+    if (statusCheck.progress >= 100) {
+      console.log("✅ 任務已完成，無需恢復");
+      return { success: true, message: "任務已完成" };
+    }
+    
+    // 執行恢復
+    console.log("");
+    console.log("🔄 ============== 開始恢復處理 ==============");
+    console.log("從斷點繼續執行...");
+    
+    const result = await classroomService.continueAdvancedBatchProcessing(jobId);
+    
+    console.log("");
+    if (result.success || result.partial) {
+      console.log("✅ ============== 恢復成功 ==============");
+      console.log("📊 恢復結果:");
+      console.log("  狀態:", result.partial ? "部分完成" : "完全完成");
+      console.log("  總處理:", result.processedCount || 0);
+      console.log("  本次處理:", result.processedCount - statusCheck.processed || 0);
+      console.log("  成功數:", result.successCount || 0);
+      console.log("  失敗數:", result.errorCount || 0);
+      
+      if (result.partial) {
+        console.log("");
+        console.log("⏸️ 部分完成 - 可繼續恢復:");
+        console.log("  執行: resumeBatchDirect('" + jobId + "')");
+      } else {
+        console.log("");
+        console.log("🎉 任務完全完成！");
+      }
+      
+    } else {
+      console.log("❌ ============== 恢復失敗 ==============");
+      console.log("錯誤:", result.error);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.log("❌ ============== 恢復處理失敗 ==============");
+    console.log("錯誤訊息:", error.message);
+    
+    if (error.stack) {
+      console.log("錯誤堆疊:", error.stack);
+    }
+    
+    return {
+      success: false,
+      error: error.message,
+      jobId: jobId
+    };
+  }
+}
