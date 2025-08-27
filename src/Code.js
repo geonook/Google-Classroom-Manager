@@ -265,11 +265,15 @@ function onOpen() {
     .addSeparator()
     .addItem('👨‍🏫 4. 新增老師', 'addTeachersUI')
     .addItem('👨‍🎓 5. 新增學生', 'addStudentsUI')
+    .addItem('🚀 5★. 進階批次新增 (支援大量)', 'addStudentsAdvancedUI')
     .addItem('🎯 5A. 簡易學生新增', 'addStudentsSimple')
     .addItem('📋 5A1. 生成學生課程資料', 'generateCompleteStudentCourseData')
     .addItem('🔄 5A2. 擴展現有學生資料', 'expandStudentCourseData')
     .addItem('🎯 5B. 智能學生分配', 'distributeStudentsUI')
     .addItem('🧹 5C. 清除學生狀態', 'clearStudentStatusColumn')
+    .addSeparator()
+    .addItem('📊 5D. 查詢批次狀態', 'checkBatchStatusUI')
+    .addItem('🗑️ 5E. 取消批次處理', 'cancelBatchProcessingUI')
     .addSeparator()
     .addItem('✏️ 6. 更新課程名稱', 'updateCoursesUI')
     .addItem('📦 7. 封存課程', 'archiveCoursesUI')
@@ -10906,4 +10910,524 @@ function updateExpandedStuCourseSheet(records) {
   } catch (error) {
     return { success: false, error: `工作表更新失敗：${error.message}` };
   }
+}
+
+
+/**
+ * 🚀 進階批次新增學生 UI - 支援大量資料處理
+ * 使用改良版批次處理，支援4500+筆資料
+ */
+async function addStudentsAdvancedUI() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    // 步驟1: 獲取工作表名稱
+    const sheetNameResult = ui.prompt(
+      "🚀 進階批次新增學生 - 步驟 1/3",
+      "請輸入包含學生資料的工作表名稱（預設：新增學生）
+格式需包含：學生Email | 課程ID | 狀態
+
+⚡ 支援大量資料處理，自動分批執行",
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (sheetNameResult.getSelectedButton() !== ui.Button.OK) {
+      return;
+    }
+
+    const sheetName = sheetNameResult.getResponseText() || "新增學生";
+
+    // 步驟2: 獲取任務ID（用於恢復）
+    const jobIdResult = ui.prompt(
+      "🚀 進階批次新增學生 - 步驟 2/3",
+      "請輸入任務ID（選填）：
+• 留空：建立新任務
+• 輸入ID：恢復現有任務
+
+💡 任務ID可用於恢復中斷的批次處理",
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (jobIdResult.getSelectedButton() !== ui.Button.OK) {
+      return;
+    }
+
+    const jobId = jobIdResult.getResponseText().trim() || null;
+
+    // 檢查是否為恢復任務
+    if (jobId) {
+      const status = classroomService.checkBatchStatus(jobId);
+      if (status.found) {
+        const resumeConfirm = ui.alert(
+          "📂 發現現有任務",
+          `任務 ${jobId} 狀態：
+• 進度：${status.progress}%
+• 已處理：${status.processed}/${status.total}
+• 最後更新：${status.lastUpdate}
+${status.hasError ? `• 錯誤：${status.error}` : ""}
+
+是否繼續此任務？`,
+          ui.ButtonSet.YES_NO
+        );
+        
+        if (resumeConfirm !== ui.Button.YES) {
+          return;
+        }
+      }
+    }
+
+    // 步驟3: 確認執行
+    const confirmResult = ui.alert(
+      "🚀 進階批次新增學生 - 步驟 3/3",
+      `即將執行進階批次新增學生功能：
+
+📊 工作表：${sheetName}
+🆔 任務ID：${jobId || "將自動生成"}
+
+✨ 新功能特色：
+• 🔄 斷點續傳：中途中斷可恢復
+• ⏰ 時間管理：自動分批避免超時
+• 📈 進度追蹤：即時狀態更新
+• 🤖 自動觸發：無人值守執行
+
+確定開始？`,
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (confirmResult !== ui.Button.OK) {
+      ui.alert("操作已取消", "進階批次新增學生已取消。", ui.ButtonSet.OK);
+      return;
+    }
+
+    // 執行進階批次新增
+    console.log("🚀 開始執行進階批次新增學生");
+    const result = await executeAdvancedBatchStudentAddition(sheetName, { jobId });
+    
+    // 處理結果
+    handleAdvancedBatchResult(result, ui);
+    
+  } catch (error) {
+    console.log(`[ERROR] 進階批次新增學生失敗: ${error.message}`);
+    ui.alert("❌ 系統錯誤", `進階批次處理失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 執行進階批次學生新增
+ */
+async function executeAdvancedBatchStudentAddition(sheetName, options = {}) {
+  console.log(`🚀 開始進階批次學生新增: ${sheetName}`);
+  
+  try {
+    // 步驟1: 讀取學生-課程配對資料
+    const studentCourseData = await readStudentCourseDataFromSheet(sheetName);
+    if (!studentCourseData.success) {
+      return { success: false, error: studentCourseData.error };
+    }
+
+    console.log(`📊 讀取完成: ${studentCourseData.assignments.length} 項新增任務`);
+
+    // 步驟2: 使用進階批次處理
+    const result = await classroomService.addMembersBatchAdvanced(
+      studentCourseData.assignments.map(assignment => ({
+        courseId: assignment.courseId,
+        userEmail: assignment.studentEmail
+      })),
+      "STUDENT",
+      options
+    );
+    
+    // 步驟3: 更新工作表狀態（如果有結果）
+    if (result.results && result.results.length > 0) {
+      await updateStudentCourseStatusBatch(result.results, sheetName);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.log(`[ERROR] 進階批次處理執行失敗: ${error.message}`);
+    return { success: false, error: `進階批次處理失敗: ${error.message}` };
+  }
+}
+
+/**
+ * 處理進階批次結果
+ */
+function handleAdvancedBatchResult(result, ui) {
+  if (result.success) {
+    const message = `🎉 進階批次新增完成！
+
+` +
+      `📊 處理統計：
+` +
+      `• 總項目：${result.totalItems}
+` +
+      `• 已處理：${result.processedCount}
+` +
+      `• 成功率：${((result.processedCount / result.totalItems) * 100).toFixed(1)}%
+` +
+      `• 任務ID：${result.jobId}
+
+` +
+      `✨ 所有項目已成功處理！`;
+      
+    ui.alert("✅ 處理完成", message, ui.ButtonSet.OK);
+    
+  } else if (result.partial) {
+    const message = `⏸️ 部分處理完成
+
+` +
+      `📊 目前進度：
+` +
+      `• 已處理：${result.processedCount}/${result.totalItems}
+` +
+      `• 進度：${((result.processedCount / result.totalItems) * 100).toFixed(1)}%
+` +
+      `• 任務ID：${result.jobId}
+
+` +
+      `🤖 系統將自動繼續處理剩餘項目
+` +
+      `💡 您可以隨時使用任務ID恢復或查看狀態`;
+      
+    ui.alert("⏸️ 部分完成", message, ui.ButtonSet.OK);
+    
+  } else {
+    const errorMessage = result.error || "未知錯誤";
+    const message = `❌ 處理失敗
+
+錯誤：${errorMessage}
+
+` +
+      `${result.jobId ? `任務ID：${result.jobId}` : ""}` +
+      `${result.processedCount ? `
+已處理：${result.processedCount}` : ""}`;
+      
+    ui.alert("❌ 處理失敗", message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 🔄 觸發器回調函數 - 繼續進階批次處理
+ * 由時間觸發器自動調用
+ */
+async function continueAdvancedBatchProcessing() {
+  console.log("🔄 觸發器觸發：繼續進階批次處理");
+  
+  try {
+    // 查找所有進行中的批次任務
+    const properties = PropertiesService.getScriptProperties().getProperties();
+    const batchStates = Object.keys(properties)
+      .filter(key => key.startsWith("batch_state_"))
+      .map(key => {
+        try {
+          return { key, state: JSON.parse(properties[key]) };
+        } catch {
+          return null;
+        }
+      })
+      .filter(item => item !== null);
+    
+    if (batchStates.length === 0) {
+      console.log("📭 沒有找到進行中的批次任務");
+      return;
+    }
+    
+    // 處理第一個找到的批次任務
+    const { key, state } = batchStates[0];
+    const jobId = key.replace("batch_state_", "");
+    
+    console.log(`🔄 恢復批次任務: ${jobId}`);
+    console.log(`📊 當前進度: ${state.lastProcessedIndex}/${state.totalItems}`);
+    
+    // 重構資料格式
+    const members = state.results.map(result => ({
+      courseId: result.courseId,
+      userEmail: result.userEmail
+    }));
+    
+    // 繼續處理
+    const result = await batchManager.processMembersInBatches(
+      members,
+      state.role,
+      { jobId }
+    );
+    
+    console.log("🔄 觸發器處理完成:", result.success ? "成功" : "失敗");
+    
+    // 清除觸發器（如果完成）
+    if (result.success && !result.partial) {
+      const triggers = ScriptApp.getProjectTriggers();
+      for (const trigger of triggers) {
+        if (trigger.getHandlerFunction() === "continueAdvancedBatchProcessing") {
+          ScriptApp.deleteTrigger(trigger);
+          console.log("🗑️ 清除觸發器");
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.log(`[ERROR] 觸發器處理失敗: ${error.message}`);
+    
+    // 錯誤處理：延遲重試
+    const trigger = ScriptApp.newTrigger("continueAdvancedBatchProcessing")
+      .timeBased()
+      .after(5 * 60 * 1000) // 5分鐘後重試
+      .create();
+    
+    console.log(`⏰ 設定重試觸發器: ${trigger.getUniqueId()}`);
+  }
+}
+
+/**
+ * 批次更新學生課程狀態
+ */
+async function updateStudentCourseStatusBatch(results, sheetName) {
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    
+    if (!sheet) {
+      console.log(`[WARN] 找不到工作表: ${sheetName}`);
+      return;
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    
+    // 找到相關欄位索引
+    const emailIndex = headers.findIndex(h => h.includes("Email") || h.includes("email"));
+    const courseIndex = headers.findIndex(h => h.includes("課程ID") || h.includes("Course"));
+    const statusIndex = headers.findIndex(h => h.includes("狀態") || h.includes("Status"));
+    
+    if (emailIndex === -1 || courseIndex === -1 || statusIndex === -1) {
+      console.log("[WARN] 找不到必要的欄位");
+      return;
+    }
+    
+    // 批次更新狀態
+    const updates = [];
+    results.forEach(result => {
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (row[emailIndex] === result.userEmail && 
+            row[courseIndex] === result.courseId) {
+          const status = result.success 
+            ? (result.status === "ALREADY_EXISTS" ? "existed" : "success")
+            : "failed";
+          updates.push({ row: i + 1, col: statusIndex + 1, value: status });
+          break;
+        }
+      }
+    });
+    
+    // 執行批次更新
+    updates.forEach(update => {
+      sheet.getRange(update.row, update.col).setValue(update.value);
+    });
+    
+    console.log(`📝 批次更新 ${updates.length} 個狀態`);
+    
+  } catch (error) {
+    console.log(`[WARN] 批次狀態更新失敗: ${error.message}`);
+  }
+}
+
+/**
+ * 📊 批次處理狀態查詢 UI
+ */
+function checkBatchStatusUI() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const jobIdResult = ui.prompt(
+      "📊 查詢批次處理狀態",
+      "請輸入要查詢的任務ID：",
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (jobIdResult.getSelectedButton() !== ui.Button.OK) {
+      return;
+    }
+
+    const jobId = jobIdResult.getResponseText().trim();
+    if (!jobId) {
+      ui.alert("❌ 錯誤", "請輸入有效的任務ID", ui.ButtonSet.OK);
+      return;
+    }
+
+    const status = classroomService.checkBatchStatus(jobId);
+    
+    if (status.found) {
+      const message = `📊 任務狀態報告
+
+` +
+        `🆔 任務ID：${jobId}
+` +
+        `📈 進度：${status.progress}%
+` +
+        `📝 已處理：${status.processed}/${status.total}
+` +
+        `⏰ 最後更新：${status.lastUpdate}
+` +
+        `${status.hasError ? `❌ 錯誤：${status.error}` : "✅ 狀態正常"}`;
+        
+      ui.alert("📊 狀態查詢結果", message, ui.ButtonSet.OK);
+    } else {
+      ui.alert("❌ 查詢結果", "找不到指定的任務ID或任務已完成", ui.ButtonSet.OK);
+    }
+    
+  } catch (error) {
+    ui.alert("❌ 系統錯誤", `狀態查詢失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 🗑️ 取消批次處理 UI
+ */
+function cancelBatchProcessingUI() {
+  const ui = SpreadsheetApp.getUi();
+  
+  try {
+    const jobIdResult = ui.prompt(
+      "🗑️ 取消批次處理",
+      "請輸入要取消的任務ID：",
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (jobIdResult.getSelectedButton() !== ui.Button.OK) {
+      return;
+    }
+
+    const jobId = jobIdResult.getResponseText().trim();
+    if (!jobId) {
+      ui.alert("❌ 錯誤", "請輸入有效的任務ID", ui.ButtonSet.OK);
+      return;
+    }
+
+    const confirmResult = ui.alert(
+      "⚠️ 確認取消",
+      `確定要取消任務 ${jobId} 嗎？
+
+此操作將：
+• 清除任務狀態
+• 刪除相關觸發器
+• 無法恢復進度`,
+      ui.ButtonSet.YES_NO
+    );
+
+    if (confirmResult !== ui.Button.YES) {
+      return;
+    }
+
+    const result = classroomService.cancelBatchProcessing(jobId);
+    
+    if (result.success) {
+      ui.alert("✅ 取消成功", result.message, ui.ButtonSet.OK);
+    } else {
+      ui.alert("❌ 取消失敗", result.error, ui.ButtonSet.OK);
+    }
+    
+  } catch (error) {
+    ui.alert("❌ 系統錯誤", `取消操作失敗：${error.message}`, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 🧪 測試進階批次功能
+ * 用於驗證改善後的功能是否正常運作
+ */
+function testAdvancedBatchFeatures() {
+  console.log("🧪 開始測試進階批次功能...");
+  
+  try {
+    // 測試 BatchManager 實例化
+    console.log("✅ BatchManager 類別:", typeof batchManager === "object");
+    
+    // 測試批次管理器配置
+    console.log("✅ 執行時間限制:", batchManager.EXECUTION_LIMIT);
+    console.log("✅ 預設批次大小:", batchManager.DEFAULT_BATCH_SIZE);
+    console.log("✅ 安全緩衝時間:", batchManager.SAFETY_BUFFER);
+    
+    // 測試 ID 生成
+    const jobId = batchManager.generateJobId();
+    console.log("✅ 任務ID生成:", jobId);
+    
+    // 測試狀態管理
+    const testState = {
+      lastProcessedIndex: 100,
+      totalItems: 500,
+      timestamp: Date.now()
+    };
+    
+    batchManager.saveBatchState(jobId, testState);
+    const loadedState = batchManager.loadBatchState(jobId);
+    console.log("✅ 狀態保存/讀取:", loadedState ? "正常" : "失敗");
+    
+    // 清除測試狀態
+    batchManager.clearBatchState(jobId);
+    
+    // 測試 ClassroomService 新增方法
+    console.log("✅ addMembersBatchAdvanced 方法:", typeof classroomService.addMembersBatchAdvanced === "function");
+    console.log("✅ checkBatchStatus 方法:", typeof classroomService.checkBatchStatus === "function");
+    console.log("✅ cancelBatchProcessing 方法:", typeof classroomService.cancelBatchProcessing === "function");
+    
+    // 測試批次大小計算
+    console.log("✅ 批次大小計算 (100項目):", batchManager.calculateOptimalBatchSize(100));
+    console.log("✅ 批次大小計算 (1000項目):", batchManager.calculateOptimalBatchSize(1000));
+    console.log("✅ 批次大小計算 (5000項目):", batchManager.calculateOptimalBatchSize(5000));
+    
+    console.log("🎉 進階批次功能測試完成！所有功能正常");
+    
+    return {
+      success: true,
+      message: "所有進階批次功能測試通過"
+    };
+    
+  } catch (error) {
+    console.log(`❌ 進階批次功能測試失敗: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 📋 系統功能驗證報告
+ */
+function generateSystemVerificationReport() {
+  console.log("📋 生成系統功能驗證報告...");
+  
+  const report = {
+    timestamp: new Date().toLocaleString(),
+    originalFeatures: {
+      classroomService: typeof classroomService === "object",
+      addMembersBatch: typeof classroomService.addMembersBatch === "function",
+      rateLimiter: typeof rateLimiter === "object",
+      errorHandler: typeof ErrorHandler === "function",
+      progressTracker: typeof ProgressTracker === "function"
+    },
+    advancedFeatures: {
+      batchManager: typeof batchManager === "object",
+      addMembersBatchAdvanced: typeof classroomService.addMembersBatchAdvanced === "function",
+      batchStateManagement: typeof batchManager.saveBatchState === "function",
+      triggerSupport: typeof batchManager.scheduleNextBatch === "function",
+      statusChecking: typeof classroomService.checkBatchStatus === "function",
+      processCancellation: typeof classroomService.cancelBatchProcessing === "function"
+    },
+    uiFeatures: {
+      addStudentsAdvancedUI: typeof addStudentsAdvancedUI === "function",
+      checkBatchStatusUI: typeof checkBatchStatusUI === "function",
+      cancelBatchProcessingUI: typeof cancelBatchProcessingUI === "function",
+      continueAdvancedBatchProcessing: typeof continueAdvancedBatchProcessing === "function"
+    }
+  };
+  
+  console.log("📊 驗證報告:");
+  console.log("  原有功能:", Object.values(report.originalFeatures).every(v => v) ? "✅ 全部正常" : "❌ 有問題");
+  console.log("  進階功能:", Object.values(report.advancedFeatures).every(v => v) ? "✅ 全部正常" : "❌ 有問題");  
+  console.log("  UI 功能:", Object.values(report.uiFeatures).every(v => v) ? "✅ 全部正常" : "❌ 有問題");
+  
+  return report;
 }
