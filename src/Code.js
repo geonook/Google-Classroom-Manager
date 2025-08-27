@@ -12346,3 +12346,59 @@ async function resumeBatchDirect(jobId = null) {
     };
   }
 }
+
+/**
+ * 🔄 快速恢復當前中斷的批次處理
+ * 
+ * 此函式專門用於恢復最近中斷的學生批次新增任務
+ * 內建正確的任務 ID，可直接在 Apps Script 編輯器中執行
+ * 
+ * 使用方式：
+ * 1. 在 Google Apps Script 編輯器中選擇此函式
+ * 2. 點擊執行按鈕 ▶️
+ * 3. 監控執行日誌查看進度
+ * 
+ * 任務資訊：
+ * - 任務 ID: batch_1756283799443_xl71qczge
+ * - 當前進度: 100/4521 (2.2%)
+ * - 剩餘: 4421 筆學生資料
+ * - 預估完成時間: ~88 分鐘
+ */
+async function resumeCurrentBatch() {
+  console.log('🔄 ============================================');
+  console.log('🔄 快速恢復中斷的批次處理');
+  console.log('🔄 ============================================');
+  console.log('');
+  console.log('📊 任務資訊:');
+  console.log('  任務 ID: batch_1756283799443_xl71qczge');
+  console.log('  當前進度: 100/4521 (2.2%)');
+  console.log('  剩餘處理: 4421 筆學生資料');
+  console.log('  預估時間: ~88 分鐘');
+  console.log('');
+  
+  // 直接調用恢復函式，內建正確的任務 ID
+  const CURRENT_JOB_ID = 'batch_1756283799443_xl71qczge';
+  
+  try {
+    const result = await resumeBatchDirect(CURRENT_JOB_ID);
+    
+    console.log('✅ 恢復函式執行完成');
+    console.log('📊 執行結果:', JSON.stringify(result, null, 2));
+    
+    return result;
+  } catch (error) {
+    console.log('❌ 恢復過程中發生錯誤:', error.message);
+    
+    // 如果當前任務 ID 失效，提供替代方案
+    console.log('');
+    console.log('💡 替代解決方案:');
+    console.log('1. 執行 executeStudentBatchDirect() - 系統會跳過已處理記錄');
+    console.log('2. 檢查最新的任務 ID 並手動更新此函式');
+    
+    return {
+      success: false,
+      error: error.message,
+      alternativeSolution: 'executeStudentBatchDirect()',
+    };
+  }
+}
