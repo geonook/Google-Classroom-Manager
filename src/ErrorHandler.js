@@ -32,7 +32,10 @@ class ErrorHandler {
     if (showToUser) {
       try {
         // 如果有診斷資訊，顯示詳細診斷
-        if (errorInfo.diagnosticInfo && (errorInfo.type === 'CANNOT_DIRECT_ADD_USER' || errorInfo.type === 'PERMISSION_DENIED')) {
+        if (
+          errorInfo.diagnosticInfo &&
+          (errorInfo.type === 'CANNOT_DIRECT_ADD_USER' || errorInfo.type === 'PERMISSION_DENIED')
+        ) {
           this.showDetailedErrorDialog(operation, errorInfo);
         } else {
           SpreadsheetApp.getUi().alert('錯誤', message, SpreadsheetApp.getUi().ButtonSet.OK);
@@ -169,7 +172,10 @@ class ErrorHandler {
     }
 
     // 無法直接新增用戶錯誤
-    if (message.includes('CannotDirectAddUser') || message.includes('Unable to directly add the user')) {
+    if (
+      message.includes('CannotDirectAddUser') ||
+      message.includes('Unable to directly add the user')
+    ) {
       return {
         type: 'CANNOT_DIRECT_ADD_USER',
         userMessage: '無法直接新增此用戶到課程',
@@ -180,20 +186,24 @@ class ErrorHandler {
             '學生 Email 域與課程管理員域不匹配',
             '學生帳戶不存在或未啟用',
             '缺少域管理員權限',
-            '課程設定不允許直接新增學生'
+            '課程設定不允許直接新增學生',
           ],
           solutions: [
             '檢查學生 Email 是否正確',
             '確認學生帳戶已在 Google Workspace 中啟用',
             '使用具備域管理員權限的帳戶',
-            '聯絡 IT 管理員檢查域設定'
-          ]
-        }
+            '聯絡 IT 管理員檢查域設定',
+          ],
+        },
       };
     }
 
     // 權限相關錯誤
-    if (message.includes('403') || message.includes('Forbidden') || message.includes('permission denied')) {
+    if (
+      message.includes('403') ||
+      message.includes('Forbidden') ||
+      message.includes('permission denied')
+    ) {
       return {
         type: 'PERMISSION_DENIED',
         userMessage: '權限不足，無法執行此操作',
@@ -204,15 +214,15 @@ class ErrorHandler {
             '缺少 Google Classroom 權限',
             '不是課程擁有者或協同老師',
             '缺少域管理員權限',
-            'OAuth 範圍設定不完整'
+            'OAuth 範圍設定不完整',
           ],
           solutions: [
             '檢查 Google Classroom 存取權限',
             '確認是課程擁有者或已被授權管理',
             '使用域管理員帳戶執行操作',
-            '重新授權應用程式權限'
-          ]
-        }
+            '重新授權應用程式權限',
+          ],
+        },
       };
     }
 
@@ -288,20 +298,20 @@ class ErrorHandler {
    */
   static showDetailedErrorDialog(operation, errorInfo) {
     const ui = SpreadsheetApp.getUi();
-    
+
     let dialogMessage = `${operation}失敗：${errorInfo.userMessage}\n\n`;
-    
+
     if (errorInfo.diagnosticInfo) {
       dialogMessage += '🔍 可能原因：\n';
       errorInfo.diagnosticInfo.possibleCauses.forEach((cause, index) => {
         dialogMessage += `${index + 1}. ${cause}\n`;
       });
-      
+
       dialogMessage += '\n💡 建議解決方案：\n';
       errorInfo.diagnosticInfo.solutions.forEach((solution, index) => {
         dialogMessage += `${index + 1}. ${solution}\n`;
       });
-      
+
       if (errorInfo.type === 'CANNOT_DIRECT_ADD_USER') {
         dialogMessage += '\n⚠️ 特別說明：\n';
         dialogMessage += '• 此錯誤通常表示學生 Email 域與課程管理員域不匹配\n';
@@ -309,7 +319,7 @@ class ErrorHandler {
         dialogMessage += '• 或聯絡 IT 管理員確認域設定';
       }
     }
-    
+
     ui.alert('❌ 操作失敗', dialogMessage, ui.ButtonSet.OK);
   }
 
@@ -320,12 +330,12 @@ class ErrorHandler {
     if (!userEmail || !userEmail.includes('@')) {
       return {
         valid: false,
-        reason: 'Email 格式無效'
+        reason: 'Email 格式無效',
       };
     }
-    
+
     const domain = userEmail.split('@')[1].toLowerCase();
-    
+
     // 如果沒有指定允許的域，嘗試檢測當前用戶域
     if (allowedDomains.length === 0) {
       try {
@@ -337,14 +347,16 @@ class ErrorHandler {
         return { valid: true }; // 無法驗證則假設有效
       }
     }
-    
+
     const isValidDomain = allowedDomains.includes(domain);
-    
+
     return {
       valid: isValidDomain,
       userDomain: domain,
       allowedDomains: allowedDomains,
-      reason: isValidDomain ? null : `Email 域 ${domain} 不在允許的域清單中: ${allowedDomains.join(', ')}`
+      reason: isValidDomain
+        ? null
+        : `Email 域 ${domain} 不在允許的域清單中: ${allowedDomains.join(', ')}`,
     };
   }
 
@@ -353,62 +365,62 @@ class ErrorHandler {
    */
   static async validateUserAddition(userEmail, courseId) {
     console.log(`🔍 預檢用戶新增條件：${userEmail} → 課程 ${courseId}`);
-    
+
     const validations = [];
-    
+
     // 1. Email 格式檢查
     if (!userEmail || !userEmail.includes('@')) {
       validations.push({
         type: 'EMAIL_FORMAT',
         valid: false,
-        message: 'Email 格式無效'
+        message: 'Email 格式無效',
       });
     } else {
       validations.push({
         type: 'EMAIL_FORMAT',
         valid: true,
-        message: 'Email 格式正確'
+        message: 'Email 格式正確',
       });
     }
-    
+
     // 2. 域名匹配檢查
     const domainCheck = this.validateUserDomain(userEmail);
     validations.push({
       type: 'DOMAIN_MATCH',
       valid: domainCheck.valid,
       message: domainCheck.reason || '域名匹配',
-      details: domainCheck
+      details: domainCheck,
     });
-    
+
     // 3. 課程ID檢查
     if (!courseId || !/^\d{10,15}$/.test(courseId)) {
       validations.push({
         type: 'COURSE_ID',
         valid: false,
-        message: '課程 ID 格式無效'
+        message: '課程 ID 格式無效',
       });
     } else {
       validations.push({
         type: 'COURSE_ID',
         valid: true,
-        message: '課程 ID 格式正確'
+        message: '課程 ID 格式正確',
       });
     }
-    
-    const allValid = validations.every(v => v.valid);
-    const failedValidations = validations.filter(v => !v.valid);
-    
+
+    const allValid = validations.every((v) => v.valid);
+    const failedValidations = validations.filter((v) => !v.valid);
+
     console.log(`📊 預檢結果：${allValid ? '✅ 通過' : '❌ 失敗'}`);
     if (!allValid) {
-      failedValidations.forEach(v => {
+      failedValidations.forEach((v) => {
         console.log(`  ❌ ${v.type}: ${v.message}`);
       });
     }
-    
+
     return {
       valid: allValid,
       validations: validations,
-      failedValidations: failedValidations
+      failedValidations: failedValidations,
     };
   }
 }

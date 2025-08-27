@@ -72,16 +72,17 @@ const ValidationUtils = {
     if (!email || typeof email !== 'string') {
       return { valid: false, error: 'Email 不能為空或格式無效' };
     }
-    
-    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-    
+
+    const emailRegex =
+      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
     if (!emailRegex.test(email.trim())) {
       return { valid: false, error: '無效的 Email 格式' };
     }
-    
+
     return { valid: true, email: email.trim().toLowerCase() };
   },
-  
+
   /**
    * 驗證 Google Classroom 課程 ID 格式
    */
@@ -89,22 +90,22 @@ const ValidationUtils = {
     if (!courseId || typeof courseId !== 'string') {
       return { valid: false, error: '課程 ID 不能為空' };
     }
-    
+
     const trimmedId = courseId.trim();
-    
+
     // Google Classroom 課程 ID 通常是數字字符串，長度 10-15 位
     const courseIdRegex = /^[0-9]{10,15}$/;
-    
+
     if (!courseIdRegex.test(trimmedId)) {
-      return { 
-        valid: false, 
-        error: `無效的課程 ID 格式。收到："${trimmedId}"，應為 10-15 位純數字（例如：123456789012）。請檢查工作表中的課程 ID 是否為 Google Classroom 的實際課程編號。` 
+      return {
+        valid: false,
+        error: `無效的課程 ID 格式。收到："${trimmedId}"，應為 10-15 位純數字（例如：123456789012）。請檢查工作表中的課程 ID 是否為 Google Classroom 的實際課程編號。`,
       };
     }
-    
+
     return { valid: true, courseId: trimmedId };
   },
-  
+
   /**
    * 驗證多個 Email 地址
    */
@@ -112,14 +113,14 @@ const ValidationUtils = {
     const results = {
       valid: [],
       invalid: [],
-      duplicates: []
+      duplicates: [],
     };
-    
+
     const seen = new Set();
-    
+
     for (const email of emails) {
       const validation = this.validateEmail(email);
-      
+
       if (validation.valid) {
         if (seen.has(validation.email)) {
           results.duplicates.push(validation.email);
@@ -131,21 +132,21 @@ const ValidationUtils = {
         results.invalid.push({ email, error: validation.error });
       }
     }
-    
+
     return results;
   },
-  
+
   /**
    * 批次驗證學生資料
    */
   validateStudentBatch(students) {
     const errors = [];
     const validStudents = [];
-    
+
     for (let i = 0; i < students.length; i++) {
       const student = students[i];
       const rowIndex = i + 1;
-      
+
       // 驗證學生 Email
       const emailValidation = this.validateEmail(student.email);
       if (!emailValidation.valid) {
@@ -153,11 +154,11 @@ const ValidationUtils = {
           row: rowIndex,
           field: 'email',
           value: student.email,
-          error: emailValidation.error
+          error: emailValidation.error,
         });
         continue;
       }
-      
+
       // 驗證課程 ID
       const courseIdValidation = this.validateCourseId(student.courseId);
       if (!courseIdValidation.valid) {
@@ -165,53 +166,53 @@ const ValidationUtils = {
           row: rowIndex,
           field: 'courseId',
           value: student.courseId,
-          error: courseIdValidation.error
+          error: courseIdValidation.error,
         });
         continue;
       }
-      
+
       // 如果兩個驗證都通過，加入有效學生列表
       validStudents.push({
         ...student,
         email: emailValidation.email,
-        courseId: courseIdValidation.courseId
+        courseId: courseIdValidation.courseId,
       });
     }
-    
+
     return {
       valid: validStudents,
       errors: errors,
       summary: {
         total: students.length,
         valid: validStudents.length,
-        invalid: errors.length
-      }
+        invalid: errors.length,
+      },
     };
   },
-  
+
   /**
    * 顯示驗證錯誤報告
    */
   showValidationErrors(errors, title = '資料驗證錯誤') {
     if (errors.length === 0) return;
-    
+
     let message = `發現 ${errors.length} 個資料格式錯誤：\n\n`;
-    
+
     errors.slice(0, 10).forEach((error, index) => {
       message += `${index + 1}. 第 ${error.row} 行 - ${error.field}: ${error.error}\n`;
       if (error.value) {
         message += `   問題值: "${error.value}"\n`;
       }
     });
-    
+
     if (errors.length > 10) {
       message += `\n... 以及其他 ${errors.length - 10} 個錯誤\n`;
     }
-    
+
     message += '\n請修正這些錯誤後重新執行。';
-    
+
     SpreadsheetApp.getUi().alert(title, message, SpreadsheetApp.getUi().ButtonSet.OK);
-  }
+  },
 };
 
 /**
@@ -232,7 +233,7 @@ function initializeServices() {
     if (typeof ProgressTracker === 'undefined') {
       throw new Error('ProgressTracker 服務未正確初始化');
     }
-    
+
     console.log('✅ 所有核心服務已正確初始化');
     return { success: true, message: '系統初始化完成' };
   } catch (error) {
@@ -354,40 +355,55 @@ async function addTeachersWithCheck(spreadsheetId = null) {
     }
 
     console.log(`正在處理課程 ${courseIdValidation.courseId} 中的老師 ${emailValidation.email}...`);
-    const result = await classroomService.addTeacherIfNotExists(courseIdValidation.courseId, emailValidation.email);
+    const result = await classroomService.addTeacherIfNotExists(
+      courseIdValidation.courseId,
+      emailValidation.email
+    );
 
     if (result.success) {
       if (result.status === 'ADDED') {
-        console.log(`  ✅ 成功新增老師 ${emailValidation.email} 到課程 ${courseIdValidation.courseId}。`);
+        console.log(
+          `  ✅ 成功新增老師 ${emailValidation.email} 到課程 ${courseIdValidation.courseId}。`
+        );
       } else if (result.status === 'ALREADY_EXISTS') {
-        console.log(`  ☑️ 老師 ${emailValidation.email} 已存在於課程 ${courseIdValidation.courseId}。`);
+        console.log(
+          `  ☑️ 老師 ${emailValidation.email} 已存在於課程 ${courseIdValidation.courseId}。`
+        );
       }
       statusCell.check();
     } else {
       // 🔧 增強版智能錯誤處理與自動診斷
-      console.log(`  ❌ 新增老師失敗：${emailValidation.email} -> 課程 ${courseIdValidation.courseId}`);
-      
+      console.log(
+        `  ❌ 新增老師失敗：${emailValidation.email} -> 課程 ${courseIdValidation.courseId}`
+      );
+
       // 自動執行詳細錯誤分析
-      const errorAnalysis = analyzePermissionError(result.error, courseIdValidation.courseId, emailValidation.email);
-      console.log(`  🔍 錯誤類型：${errorAnalysis.errorType} (嚴重程度: ${errorAnalysis.severity})`);
+      const errorAnalysis = analyzePermissionError(
+        result.error,
+        courseIdValidation.courseId,
+        emailValidation.email
+      );
+      console.log(
+        `  🔍 錯誤類型：${errorAnalysis.errorType} (嚴重程度: ${errorAnalysis.severity})`
+      );
       console.log(`  📋 問題描述：${errorAnalysis.description}`);
-      
+
       if (errorAnalysis.errorType === 'PERMISSION_DENIED') {
         console.log(`  \n🔬 自動權限診斷：`);
-        
+
         // 自動檢查課程擁有者
         try {
           const course = Classroom.Courses.get(courseIdValidation.courseId);
           const currentUser = Session.getActiveUser().getEmail();
-          
+
           console.log(`     👤 當前執行者：${currentUser}`);
           console.log(`     📚 課程擁有者 ID：${course.ownerId}`);
-          
+
           // 嘗試查詢擁有者詳細資訊
           const ownerInfo = lookupUserById(course.ownerId);
           if (ownerInfo.success) {
             console.log(`     📧 課程擁有者 Email：${ownerInfo.email}`);
-            
+
             if (currentUser === ownerInfo.email) {
               console.log(`     ⚠️ 您是課程擁有者但仍失敗，這是常見情況！`);
               console.log(`     📋 原因分析：`);
@@ -413,19 +429,16 @@ async function addTeachersWithCheck(spreadsheetId = null) {
         } catch (e) {
           console.log(`     ❌ 課程查詢失敗：${e.message}`);
         }
-        
       } else if (errorAnalysis.errorType === 'NOT_FOUND') {
         console.log(`  \n🔍 資源檢查：`);
         console.log(`     📧 檢查老師 Email：${emailValidation.email}`);
         console.log(`     🎓 檢查課程 ID：${courseIdValidation.courseId}`);
-        
       } else if (errorAnalysis.errorType === 'QUOTA_EXCEEDED') {
         console.log(`  \n⏱️ 配額管理建議：`);
         console.log(`     • 等待 60 秒後重新嘗試`);
         console.log(`     • 考慮減少批次處理數量`);
-        
       }
-      
+
       // 顯示建議的解決方案
       if (errorAnalysis.suggestions.length > 0) {
         console.log(`  \n💡 建議解決方案：`);
@@ -433,7 +446,7 @@ async function addTeachersWithCheck(spreadsheetId = null) {
           console.log(`     ${index + 1}. ${suggestion}`);
         });
       }
-      
+
       // 提供快速診斷工具建議
       console.log(`  \n🛠️ 快速診斷工具：`);
       if (errorAnalysis.errorType === 'PERMISSION_DENIED') {
@@ -442,9 +455,11 @@ async function addTeachersWithCheck(spreadsheetId = null) {
         console.log(`     • reauthorizePermissions() - 重新授權`);
       } else {
         console.log(`     • testClassroomPermissions() - API 權限測試`);
-        console.log(`     • enhancedPermissionDiagnosis('${courseIdValidation.courseId}') - 課程權限診斷`);
+        console.log(
+          `     • enhancedPermissionDiagnosis('${courseIdValidation.courseId}') - 課程權限診斷`
+        );
       }
-      
+
       // 記錄詳細錯誤資訊（僅在高詳細度時）
       if (errorAnalysis.severity === 'high') {
         console.log(`  📊 詳細錯誤：${JSON.stringify(errorAnalysis, null, 2)}`);
@@ -495,23 +510,23 @@ async function addTeachersFromExternalSheet() {
   // 🔍 權限預檢：執行前檢查用戶權限等級
   console.log(`🔍 執行權限預檢...`);
   const permissionCheck = await performPermissionPrecheck(currentUser);
-  
+
   if (!permissionCheck.canProceed) {
     console.log(`\n⚠️ 權限預檢失敗！`);
     console.log(`📋 問題：${permissionCheck.issue}`);
     console.log(`💡 建議：${permissionCheck.recommendation}`);
-    
+
     if (permissionCheck.alternativeAccounts && permissionCheck.alternativeAccounts.length > 0) {
       console.log(`\n🎯 建議使用以下具備管理員權限的帳戶：`);
       permissionCheck.alternativeAccounts.forEach((account, index) => {
         console.log(`   ${index + 1}. ${account}`);
       });
     }
-    
+
     console.log(`\n🛠️ 立即診斷工具：`);
     console.log(`   • checkDomainAdminPermissions() - 檢查管理員權限`);
     console.log(`   • comprehensivePermissionTest() - 完整權限測試`);
-    
+
     // 詢問用戶是否要繼續
     const ui = SpreadsheetApp.getUi();
     const response = ui.alert(
@@ -519,12 +534,12 @@ async function addTeachersFromExternalSheet() {
       `檢測到您可能沒有足夠的權限執行此操作。\n\n問題：${permissionCheck.issue}\n建議：${permissionCheck.recommendation}\n\n是否仍要繼續嘗試？`,
       ui.ButtonSet.YES_NO
     );
-    
+
     if (response !== ui.Button.YES) {
       console.log(`\n❌ 用戶選擇取消操作`);
       return;
     }
-    
+
     console.log(`\n⚠️ 用戶選擇強制繼續，開始執行...`);
   } else {
     console.log(`✅ 權限預檢通過：${permissionCheck.status}`);
@@ -1429,7 +1444,16 @@ function populateSheetFromLog() {
         const courseLink = `https://classroom.google.com/c/${courseId}`;
 
         // 包含教師 Email 的完整資料行
-        const newRow = [subjectCode, grade, className, teacher, teacherEmail, courseId, courseLink, false];
+        const newRow = [
+          subjectCode,
+          grade,
+          className,
+          teacher,
+          teacherEmail,
+          courseId,
+          courseLink,
+          false,
+        ];
         logSheet.appendRow(newRow);
         writeSuccess++;
       } else {
@@ -1481,16 +1505,16 @@ function testAddTeacher() {
  */
 function deepPermissionDiagnosis() {
   console.log('=== 🔬 深度權限診斷工具 ===');
-  
+
   const results = {
     timestamp: new Date().toLocaleString(),
     currentUser: null,
     oauthScopes: [],
     apiPermissions: {},
     domainInfo: {},
-    recommendations: []
+    recommendations: [],
   };
-  
+
   // 步驟1: 檢查當前用戶
   try {
     results.currentUser = Session.getActiveUser().getEmail();
@@ -1499,7 +1523,7 @@ function deepPermissionDiagnosis() {
     console.log(`❌ 無法取得用戶資訊: ${e.message}`);
     results.recommendations.push('需要 userinfo.email 權限');
   }
-  
+
   // 步驟2: 檢查 OAuth 權限範圍
   console.log(`\n🔍 檢查 OAuth 權限範圍...`);
   try {
@@ -1508,48 +1532,47 @@ function deepPermissionDiagnosis() {
       {
         name: 'Classroom 課程讀取',
         test: () => Classroom.Courses.list({ pageSize: 1 }),
-        scope: 'https://www.googleapis.com/auth/classroom.courses'
+        scope: 'https://www.googleapis.com/auth/classroom.courses',
       },
       {
-        name: 'Classroom 名冊讀取', 
+        name: 'Classroom 名冊讀取',
         test: () => Classroom.Courses.Teachers.list('779922029471', { pageSize: 1 }),
-        scope: 'https://www.googleapis.com/auth/classroom.rosters'
+        scope: 'https://www.googleapis.com/auth/classroom.rosters',
       },
       {
         name: 'Admin Directory 用戶讀取',
         test: () => AdminDirectory.Users.get('me'),
-        scope: 'https://www.googleapis.com/auth/admin.directory.user.readonly'
+        scope: 'https://www.googleapis.com/auth/admin.directory.user.readonly',
       },
       {
         name: 'Spreadsheets 讀寫',
         test: () => SpreadsheetApp.getActiveSpreadsheet().getId(),
-        scope: 'https://www.googleapis.com/auth/spreadsheets'
-      }
+        scope: 'https://www.googleapis.com/auth/spreadsheets',
+      },
     ];
-    
+
     for (const test of permissionTests) {
       try {
         test.test();
         results.apiPermissions[test.name] = { status: '✅ 成功', scope: test.scope };
         console.log(`✅ ${test.name}: 權限正常`);
       } catch (error) {
-        results.apiPermissions[test.name] = { 
-          status: '❌ 失敗', 
-          error: error.message, 
-          scope: test.scope 
+        results.apiPermissions[test.name] = {
+          status: '❌ 失敗',
+          error: error.message,
+          scope: test.scope,
         };
         console.log(`❌ ${test.name}: ${error.message}`);
-        
+
         if (error.message.includes('403') || error.message.includes('permission')) {
           results.recommendations.push(`需要重新授權 ${test.scope}`);
         }
       }
     }
-    
   } catch (error) {
     console.log(`❌ 權限檢查失敗: ${error.message}`);
   }
-  
+
   // 步驟3: 檢查域管理員權限
   console.log(`\n🔍 檢查域管理員權限...`);
   try {
@@ -1558,39 +1581,39 @@ function deepPermissionDiagnosis() {
       isAdmin: userInfo.isAdmin || false,
       isDelegatedAdmin: userInfo.isDelegatedAdmin || false,
       orgUnitPath: userInfo.orgUnitPath || '未知',
-      domain: userInfo.primaryEmail ? userInfo.primaryEmail.split('@')[1] : '未知'
+      domain: userInfo.primaryEmail ? userInfo.primaryEmail.split('@')[1] : '未知',
     };
-    
+
     console.log(`👤 域管理員狀態: ${results.domainInfo.isAdmin ? '是' : '否'}`);
     console.log(`🎯 委派管理員: ${results.domainInfo.isDelegatedAdmin ? '是' : '否'}`);
     console.log(`🏢 組織單位: ${results.domainInfo.orgUnitPath}`);
     console.log(`🌐 域名: ${results.domainInfo.domain}`);
-    
   } catch (error) {
     console.log(`⚠️ 無法檢查域管理員權限: ${error.message}`);
     results.domainInfo.error = error.message;
   }
-  
+
   // 步驟4: 特定測試 - Classroom 教師新增權限
   console.log(`\n🎯 測試 Classroom 教師新增權限...`);
   try {
     // 嘗試獲取一個課程的教師列表來測試讀取權限
     const teachers = Classroom.Courses.Teachers.list('779922029471');
-    console.log(`✅ 可以讀取課程教師列表 (${teachers.teachers ? teachers.teachers.length : 0} 位教師)`);
+    console.log(
+      `✅ 可以讀取課程教師列表 (${teachers.teachers ? teachers.teachers.length : 0} 位教師)`
+    );
     results.apiPermissions['教師列表讀取'] = { status: '✅ 成功' };
-    
+
     // 注意：我們不會實際嘗試新增教師，因為這會產生副作用
     console.log(`⚠️ 教師新增權限需要實際執行才能測試`);
-    
   } catch (error) {
     console.log(`❌ 無法讀取教師列表: ${error.message}`);
     results.apiPermissions['教師列表讀取'] = { status: '❌ 失敗', error: error.message };
-    
+
     if (error.message.includes('403')) {
       results.recommendations.push('需要課程擁有者權限或域管理員權限');
     }
   }
-  
+
   // 步驟5: 生成建議
   console.log(`\n💡 診斷建議:`);
   if (results.recommendations.length === 0) {
@@ -1601,9 +1624,11 @@ function deepPermissionDiagnosis() {
       console.log(`${index + 1}. ${rec}`);
     });
   }
-  
+
   // 步驟6: 生成重新授權指引
-  const failedPermissions = Object.values(results.apiPermissions).filter(p => p.status.includes('❌'));
+  const failedPermissions = Object.values(results.apiPermissions).filter((p) =>
+    p.status.includes('❌')
+  );
   if (failedPermissions.length > 0) {
     console.log(`\n🔄 重新授權指引:`);
     console.log(`1. 開啟 Google Apps Script 編輯器`);
@@ -1612,7 +1637,7 @@ function deepPermissionDiagnosis() {
     console.log(`4. 確保授權包含：Classroom、Spreadsheets、Admin Directory`);
     results.recommendations.push('需要重新授權 Google Apps Script');
   }
-  
+
   console.log(`\n📊 診斷完成時間: ${results.timestamp}`);
   return results;
 }
@@ -1622,32 +1647,32 @@ function deepPermissionDiagnosis() {
  */
 function testClassroomPermissions(courseId = '779922029471') {
   console.log('=== 🎯 Classroom API 權限測試 ===');
-  
+
   const tests = [
     {
       name: '讀取課程資訊',
       action: () => Classroom.Courses.get(courseId),
-      required: '課程基本讀取權限'
+      required: '課程基本讀取權限',
     },
     {
       name: '列出所有課程',
       action: () => Classroom.Courses.list({ pageSize: 5 }),
-      required: '課程列表讀取權限'
+      required: '課程列表讀取權限',
     },
     {
       name: '讀取教師列表',
       action: () => Classroom.Courses.Teachers.list(courseId),
-      required: '名冊讀取權限'
+      required: '名冊讀取權限',
     },
     {
       name: '讀取學生列表',
       action: () => Classroom.Courses.Students.list(courseId),
-      required: '名冊讀取權限'
-    }
+      required: '名冊讀取權限',
+    },
   ];
-  
+
   const results = [];
-  
+
   for (const test of tests) {
     try {
       const result = test.action();
@@ -1655,7 +1680,7 @@ function testClassroomPermissions(courseId = '779922029471') {
       results.push({
         test: test.name,
         status: 'success',
-        result: result
+        result: result,
       });
     } catch (error) {
       console.log(`❌ ${test.name}: ${error.message}`);
@@ -1663,29 +1688,31 @@ function testClassroomPermissions(courseId = '779922029471') {
         test: test.name,
         status: 'failed',
         error: error.message,
-        required: test.required
+        required: test.required,
       });
     }
   }
-  
+
   // 分析結果
-  const successCount = results.filter(r => r.status === 'success').length;
-  const failCount = results.filter(r => r.status === 'failed').length;
-  
+  const successCount = results.filter((r) => r.status === 'success').length;
+  const failCount = results.filter((r) => r.status === 'failed').length;
+
   console.log(`\n📊 測試結果: ${successCount}/${tests.length} 通過`);
-  
+
   if (failCount > 0) {
     console.log(`\n❌ 失敗的測試需要以下權限:`);
-    results.filter(r => r.status === 'failed').forEach(r => {
-      console.log(`• ${r.test}: ${r.required}`);
-    });
-    
+    results
+      .filter((r) => r.status === 'failed')
+      .forEach((r) => {
+        console.log(`• ${r.test}: ${r.required}`);
+      });
+
     console.log(`\n💡 解決方案:`);
     console.log(`1. 檢查 appsscript.json 中的 oauthScopes 設定`);
     console.log(`2. 重新授權 Google Apps Script`);
     console.log(`3. 確認當前用戶有適當的 Classroom 權限`);
   }
-  
+
   return results;
 }
 
@@ -1694,7 +1721,7 @@ function testClassroomPermissions(courseId = '779922029471') {
  */
 function reauthorizePermissions() {
   console.log('=== 🔄 重新授權權限設定 ===');
-  
+
   // 顯示友善的 UI 提示
   try {
     const ui = SpreadsheetApp.getUi();
@@ -1703,7 +1730,7 @@ function reauthorizePermissions() {
       '即將開始重新授權流程，這將確保所有 API 權限正確配置。\n\n此過程包括：\n• Google Classroom 課程管理\n• Google Spreadsheets 操作\n• Admin Directory 用戶查詢\n\n是否要開始重新授權？',
       ui.ButtonSet.YES_NO
     );
-    
+
     if (response !== ui.Button.YES) {
       ui.alert('操作已取消', '重新授權已取消。', ui.ButtonSet.OK);
       return;
@@ -1711,7 +1738,7 @@ function reauthorizePermissions() {
   } catch (e) {
     console.log('🔧 在 Apps Script 編輯器中執行重新授權');
   }
-  
+
   console.log('📋 當前需要的權限範圍:');
   const requiredScopes = [
     'https://www.googleapis.com/auth/classroom.courses',
@@ -1724,13 +1751,13 @@ function reauthorizePermissions() {
     'https://www.googleapis.com/auth/admin.directory.user.readonly',
     'https://www.googleapis.com/auth/admin.directory.domain.readonly',
     'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile'
+    'https://www.googleapis.com/auth/userinfo.profile',
   ];
-  
+
   requiredScopes.forEach((scope, index) => {
     console.log(`${index + 1}. ${scope}`);
   });
-  
+
   console.log('\n🔧 重新授權步驟：');
   console.log('1. 系統會自動觸發授權對話框');
   console.log('2. 在彈出的授權對話框中點擊「檢查權限」');
@@ -1740,33 +1767,33 @@ function reauthorizePermissions() {
   console.log('   • Google Spreadsheets 讀寫');
   console.log('   • Admin Directory 用戶查詢');
   console.log('5. 點擊「允許」授權所有權限');
-  
+
   console.log('\n⚠️ 重要提醒：');
   console.log('• 必須使用具有 Google Workspace 管理員權限的帳戶');
   console.log('• 確保域設定允許第三方應用存取');
   console.log('• 如果仍然失敗，請聯絡 IT 管理員檢查域安全設定');
-  
+
   // 嘗試觸發權限請求
   console.log('\n🎯 開始權限檢查和授權...');
   let authSuccess = true;
   let authResults = [];
-  
+
   try {
     // 1. 檢查用戶資訊權限
     Session.getActiveUser().getEmail();
     console.log('✅ 用戶資訊權限正常');
     authResults.push('✅ 用戶資訊權限');
-    
+
     // 2. 檢查 Classroom 權限
     Classroom.Courses.list({ pageSize: 1 });
     console.log('✅ Classroom 課程權限正常');
     authResults.push('✅ Classroom 課程權限');
-    
+
     // 3. 檢查 Spreadsheet 權限
     SpreadsheetApp.getActiveSpreadsheet().getId();
     console.log('✅ Spreadsheets 權限正常');
     authResults.push('✅ Spreadsheets 權限');
-    
+
     // 4. 檢查 Admin Directory 權限
     try {
       AdminDirectory.Users.get('me');
@@ -1777,11 +1804,11 @@ function reauthorizePermissions() {
       authResults.push('⚠️ Admin Directory 權限需要授權');
       authSuccess = false;
     }
-    
+
     // 顯示最終結果
     console.log('\n📊 權限檢查結果:');
-    authResults.forEach(result => console.log(`  ${result}`));
-    
+    authResults.forEach((result) => console.log(`  ${result}`));
+
     if (authSuccess) {
       console.log('\n🎉 所有權限檢查通過！可以正常使用所有功能。');
       try {
@@ -1805,7 +1832,6 @@ function reauthorizePermissions() {
         console.log('✅ 核心權限授權完成，所有主要功能可用');
       }
     }
-    
   } catch (error) {
     authSuccess = false;
     console.log(`\n❌ 權限檢查失敗: ${error.message}`);
@@ -1814,7 +1840,7 @@ function reauthorizePermissions() {
     console.log('2. 檢查 Google Workspace 管理控制台的應用程式設定');
     console.log('3. 確認當前帳戶有適當的管理員權限');
     console.log('4. 聯絡 IT 支援檢查域安全政策');
-    
+
     try {
       SpreadsheetApp.getUi().alert(
         '❌ 授權失敗',
@@ -1825,10 +1851,10 @@ function reauthorizePermissions() {
       console.log('❌ 授權失敗，請檢查權限設定');
     }
   }
-  
+
   return {
     requiredScopes,
-    timestamp: new Date().toLocaleString()
+    timestamp: new Date().toLocaleString(),
   };
 }
 
@@ -1837,7 +1863,7 @@ function reauthorizePermissions() {
  */
 function showAuthorizationGuideUI() {
   const ui = SpreadsheetApp.getUi();
-  
+
   const message = `📋 Google Apps Script 權限設定指引
 
 🔧 重新授權步驟：
@@ -1854,7 +1880,7 @@ function showAuthorizationGuideUI() {
 
 🛠️ 需要協助？
 使用診斷工具：「🔬 深度權限診斷」檢查具體權限狀態。`;
-  
+
   ui.alert('🔄 權限設定指引', message, ui.ButtonSet.OK);
 }
 
@@ -1863,16 +1889,16 @@ function showAuthorizationGuideUI() {
  */
 function checkDomainAdminPermissions() {
   console.log('=== 👨‍💼 域管理員權限檢查 ===');
-  
+
   const results = {
     timestamp: new Date().toLocaleString(),
     currentUser: null,
     adminStatus: {},
     domainSettings: {},
     classroomSettings: {},
-    recommendations: []
+    recommendations: [],
   };
-  
+
   // 步驟1: 檢查當前用戶基本資訊
   try {
     results.currentUser = Session.getActiveUser().getEmail();
@@ -1882,7 +1908,7 @@ function checkDomainAdminPermissions() {
     console.log(`❌ 無法取得用戶資訊: ${e.message}`);
     results.recommendations.push('檢查 userinfo.email 權限設定');
   }
-  
+
   // 步驟2: 檢查管理員權限
   console.log('\n🔍 檢查管理員權限...');
   try {
@@ -1893,26 +1919,25 @@ function checkDomainAdminPermissions() {
       orgUnitPath: userInfo.orgUnitPath || '/',
       customSchemas: userInfo.customSchemas || {},
       suspended: userInfo.suspended || false,
-      primaryEmail: userInfo.primaryEmail
+      primaryEmail: userInfo.primaryEmail,
     };
-    
+
     console.log(`👤 超級管理員: ${results.adminStatus.isAdmin ? '✅ 是' : '❌ 否'}`);
     console.log(`🎯 委派管理員: ${results.adminStatus.isDelegatedAdmin ? '✅ 是' : '❌ 否'}`);
     console.log(`🏢 組織單位: ${results.adminStatus.orgUnitPath}`);
     console.log(`📊 帳戶狀態: ${results.adminStatus.suspended ? '❌ 已停用' : '✅ 活躍'}`);
-    
+
     if (!results.adminStatus.isAdmin && !results.adminStatus.isDelegatedAdmin) {
       console.log(`⚠️ 警告: 當前用戶不具備管理員權限`);
       results.recommendations.push('需要超級管理員或委派管理員權限');
       results.recommendations.push('聯絡 Google Workspace 管理員提升權限');
     }
-    
   } catch (error) {
     console.log(`❌ 無法檢查管理員權限: ${error.message}`);
     results.adminStatus.error = error.message;
     results.recommendations.push('檢查 Admin Directory API 權限');
   }
-  
+
   // 步驟3: 檢查域設定 (如果有管理員權限)
   if (results.adminStatus.isAdmin || results.adminStatus.isDelegatedAdmin) {
     console.log('\n🔍 檢查域級別設定...');
@@ -1920,14 +1945,16 @@ function checkDomainAdminPermissions() {
       // 嘗試獲取域資訊
       const domain = results.currentUser.split('@')[1];
       console.log(`🌐 檢查域: ${domain}`);
-      
+
       // 檢查是否能訪問域設定
       try {
-        const domainInfo = AdminDirectory.Domains.get(Session.getActiveUser().getEmail().split('@')[1]);
+        const domainInfo = AdminDirectory.Domains.get(
+          Session.getActiveUser().getEmail().split('@')[1]
+        );
         results.domainSettings = {
           domainName: domainInfo.domainName,
           verified: domainInfo.verified,
-          isPrimary: domainInfo.isPrimary
+          isPrimary: domainInfo.isPrimary,
         };
         console.log(`✅ 域驗證狀態: ${domainInfo.verified ? '已驗證' : '未驗證'}`);
         console.log(`🎯 主要域: ${domainInfo.isPrimary ? '是' : '否'}`);
@@ -1935,42 +1962,45 @@ function checkDomainAdminPermissions() {
         console.log(`⚠️ 無法獲取域詳細資訊: ${domainError.message}`);
         results.domainSettings.error = domainError.message;
       }
-      
     } catch (error) {
       console.log(`❌ 域設定檢查失敗: ${error.message}`);
       results.domainSettings.error = error.message;
     }
   }
-  
+
   // 步驟4: 檢查 Classroom 特定權限
   console.log('\n🎓 檢查 Classroom 管理權限...');
   try {
     // 測試是否能夠執行管理級別的 Classroom 操作
     const courses = Classroom.Courses.list({ pageSize: 1 });
     console.log(`✅ 可以列出課程`);
-    
+
     // 測試是否能查看其他用戶的課程 (管理員特權)
     try {
-      const allCourses = Classroom.Courses.list({ 
+      const allCourses = Classroom.Courses.list({
         pageSize: 10,
-        courseStates: ['ACTIVE', 'ARCHIVED', 'PROVISIONED', 'DECLINED']
+        courseStates: ['ACTIVE', 'ARCHIVED', 'PROVISIONED', 'DECLINED'],
       });
-      
+
       if (allCourses.courses && allCourses.courses.length > 0) {
-        const ownedCourses = allCourses.courses.filter(c => c.ownerId === results.adminStatus.primaryEmail);
-        const otherCourses = allCourses.courses.filter(c => c.ownerId !== results.adminStatus.primaryEmail);
-        
+        const ownedCourses = allCourses.courses.filter(
+          (c) => c.ownerId === results.adminStatus.primaryEmail
+        );
+        const otherCourses = allCourses.courses.filter(
+          (c) => c.ownerId !== results.adminStatus.primaryEmail
+        );
+
         console.log(`📚 可查看課程總數: ${allCourses.courses.length}`);
         console.log(`👤 自己擁有的課程: ${ownedCourses.length}`);
         console.log(`👥 其他人的課程: ${otherCourses.length}`);
-        
+
         results.classroomSettings = {
           totalCourses: allCourses.courses.length,
           ownedCourses: ownedCourses.length,
           otherCourses: otherCourses.length,
-          canViewAllCourses: otherCourses.length > 0
+          canViewAllCourses: otherCourses.length > 0,
         };
-        
+
         if (otherCourses.length > 0) {
           console.log(`✅ 具備域管理員級別的 Classroom 權限`);
         } else {
@@ -1978,21 +2008,19 @@ function checkDomainAdminPermissions() {
           results.recommendations.push('檢查 Classroom 域管理員權限設定');
         }
       }
-      
     } catch (courseError) {
       console.log(`⚠️ Classroom 權限限制: ${courseError.message}`);
       results.classroomSettings.error = courseError.message;
     }
-    
   } catch (error) {
     console.log(`❌ Classroom 權限檢查失敗: ${error.message}`);
     results.classroomSettings.error = error.message;
     results.recommendations.push('檢查 Classroom API 基本權限');
   }
-  
+
   // 步驟5: 生成具體建議
   console.log('\n💡 權限分析與建議:');
-  
+
   if (results.adminStatus.isAdmin) {
     console.log('✅ 您是超級管理員，應該具備所有必要權限');
     if (results.recommendations.length === 0) {
@@ -2006,7 +2034,7 @@ function checkDomainAdminPermissions() {
     results.recommendations.push('請聯絡超級管理員提升您的權限');
     results.recommendations.push('或請具備管理員權限的用戶執行此操作');
   }
-  
+
   // 輸出所有建議
   if (results.recommendations.length > 0) {
     console.log('\n🔧 具體建議:');
@@ -2014,7 +2042,7 @@ function checkDomainAdminPermissions() {
       console.log(`${index + 1}. ${rec}`);
     });
   }
-  
+
   console.log(`\n📊 檢查完成時間: ${results.timestamp}`);
   return results;
 }
@@ -2025,35 +2053,38 @@ function checkDomainAdminPermissions() {
 function analyzePermissionError(error, courseId = null, userEmail = null) {
   const errorMessage = error?.message || error?.toString() || '未知錯誤';
   const errorCode = error?.code || error?.details?.code || null;
-  
+
   let errorType = 'UNKNOWN';
   let description = '未知錯誤類型';
   let severity = 'medium';
   let suggestions = [];
-  
+
   // 分析不同類型的錯誤
-  if (errorCode === 403 || errorMessage.includes('permission') || errorMessage.includes('The caller does not have permission')) {
+  if (
+    errorCode === 403 ||
+    errorMessage.includes('permission') ||
+    errorMessage.includes('The caller does not have permission')
+  ) {
     errorType = 'PERMISSION_DENIED';
     severity = 'high';
-    
+
     if (errorMessage.includes('The caller does not have permission')) {
       description = '當前用戶缺少執行此操作的權限';
       suggestions = [
         '檢查是否為課程擁有者',
         '確認是否具備域管理員權限',
         '重新授權 Google Apps Script',
-        '聯絡課程擁有者或 IT 管理員'
+        '聯絡課程擁有者或 IT 管理員',
       ];
     } else {
       description = '權限不足或認證失效';
-      suggestions = [
-        '重新登入 Google 帳戶',
-        '檢查 OAuth 權限範圍',
-        '確認帳戶具備必要權限'
-      ];
+      suggestions = ['重新登入 Google 帳戶', '檢查 OAuth 權限範圍', '確認帳戶具備必要權限'];
     }
-    
-  } else if (errorCode === 404 || errorMessage.includes('not found') || errorMessage.includes('Not Found')) {
+  } else if (
+    errorCode === 404 ||
+    errorMessage.includes('not found') ||
+    errorMessage.includes('Not Found')
+  ) {
     errorType = 'NOT_FOUND';
     severity = 'medium';
     description = '找不到指定的資源（課程或用戶）';
@@ -2061,10 +2092,13 @@ function analyzePermissionError(error, courseId = null, userEmail = null) {
       '確認課程 ID 正確',
       '檢查用戶 Email 格式',
       '確認用戶存在於 Google Workspace',
-      '檢查課程是否已刪除或封存'
+      '檢查課程是否已刪除或封存',
     ];
-    
-  } else if (errorCode === 429 || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+  } else if (
+    errorCode === 429 ||
+    errorMessage.includes('quota') ||
+    errorMessage.includes('rate limit')
+  ) {
     errorType = 'QUOTA_EXCEEDED';
     severity = 'low';
     description = 'API 配額超限或請求頻率過高';
@@ -2072,10 +2106,13 @@ function analyzePermissionError(error, courseId = null, userEmail = null) {
       '等待一段時間後重試',
       '減少並行請求數量',
       '檢查 API 配額設定',
-      '聯絡管理員增加配額'
+      '聯絡管理員增加配額',
     ];
-    
-  } else if (errorCode === 401 || errorMessage.includes('unauthorized') || errorMessage.includes('authentication')) {
+  } else if (
+    errorCode === 401 ||
+    errorMessage.includes('unauthorized') ||
+    errorMessage.includes('authentication')
+  ) {
     errorType = 'AUTHENTICATION_FAILED';
     severity = 'high';
     description = '認證失敗或 token 過期';
@@ -2083,30 +2120,24 @@ function analyzePermissionError(error, courseId = null, userEmail = null) {
       '重新授權應用程式',
       '檢查登入狀態',
       '確認 OAuth 設定正確',
-      '聯絡管理員檢查帳戶狀態'
+      '聯絡管理員檢查帳戶狀態',
     ];
-    
-  } else if (errorMessage.includes('network') || errorMessage.includes('timeout') || errorMessage.includes('connection')) {
+  } else if (
+    errorMessage.includes('network') ||
+    errorMessage.includes('timeout') ||
+    errorMessage.includes('connection')
+  ) {
     errorType = 'NETWORK_ERROR';
     severity = 'low';
     description = '網路連線問題';
-    suggestions = [
-      '檢查網路連線',
-      '稍後重新嘗試',
-      '確認 Google 服務可用性'
-    ];
-    
+    suggestions = ['檢查網路連線', '稍後重新嘗試', '確認 Google 服務可用性'];
   } else if (errorMessage.includes('invalid') || errorMessage.includes('malformed')) {
     errorType = 'INVALID_REQUEST';
     severity = 'medium';
     description = '請求格式錯誤或參數無效';
-    suggestions = [
-      '檢查輸入參數格式',
-      '確認 API 呼叫語法正確',
-      '查看 API 文檔確認需求'
-    ];
+    suggestions = ['檢查輸入參數格式', '確認 API 呼叫語法正確', '查看 API 文檔確認需求'];
   }
-  
+
   return {
     errorType,
     description,
@@ -2117,8 +2148,8 @@ function analyzePermissionError(error, courseId = null, userEmail = null) {
     context: {
       courseId,
       userEmail,
-      timestamp: new Date().toISOString()
-    }
+      timestamp: new Date().toISOString(),
+    },
   };
 }
 
@@ -2128,18 +2159,18 @@ function analyzePermissionError(error, courseId = null, userEmail = null) {
 function comprehensivePermissionTest() {
   console.log('=== 🔬 綜合權限測試工具 ===');
   console.log('🚀 執行完整的權限診斷流程...\n');
-  
+
   const testResults = {
     timestamp: new Date().toLocaleString(),
     tests: {},
     summary: {
       passed: 0,
       failed: 0,
-      warnings: 0
+      warnings: 0,
     },
-    recommendations: []
+    recommendations: [],
   };
-  
+
   // 測試 1: 基本用戶資訊
   console.log('📋 測試 1: 基本用戶資訊');
   try {
@@ -2153,61 +2184,59 @@ function comprehensivePermissionTest() {
     testResults.summary.failed++;
     testResults.recommendations.push('檢查 userinfo.email 權限');
   }
-  
+
   // 測試 2: Admin Directory 權限
   console.log('\n📋 測試 2: Admin Directory 權限');
   try {
     const adminInfo = AdminDirectory.Users.get('me');
     const isAdmin = adminInfo.isAdmin || false;
     const isDelegatedAdmin = adminInfo.isDelegatedAdmin || false;
-    
+
     console.log(`✅ Admin Directory 存取正常`);
     console.log(`👤 超級管理員: ${isAdmin ? '是' : '否'}`);
     console.log(`🎯 委派管理員: ${isDelegatedAdmin ? '是' : '否'}`);
-    
-    testResults.tests.adminDirectory = { 
-      status: 'passed', 
-      isAdmin, 
+
+    testResults.tests.adminDirectory = {
+      status: 'passed',
+      isAdmin,
       isDelegatedAdmin,
-      orgUnit: adminInfo.orgUnitPath 
+      orgUnit: adminInfo.orgUnitPath,
     };
     testResults.summary.passed++;
-    
+
     if (!isAdmin && !isDelegatedAdmin) {
       testResults.summary.warnings++;
       testResults.recommendations.push('考慮申請管理員權限以獲得完整功能');
     }
-    
   } catch (e) {
     console.log(`❌ Admin Directory 存取失敗: ${e.message}`);
     testResults.tests.adminDirectory = { status: 'failed', error: e.message };
     testResults.summary.failed++;
     testResults.recommendations.push('檢查 Admin Directory API 權限設定');
   }
-  
+
   // 測試 3: Classroom 基本權限
   console.log('\n📋 測試 3: Classroom 基本權限');
   try {
     const courses = Classroom.Courses.list({ pageSize: 5 });
     const courseCount = courses.courses ? courses.courses.length : 0;
-    
+
     console.log(`✅ Classroom API 存取正常`);
     console.log(`📚 可查看課程數: ${courseCount}`);
-    
-    testResults.tests.classroomBasic = { 
-      status: 'passed', 
+
+    testResults.tests.classroomBasic = {
+      status: 'passed',
       courseCount,
-      courses: courses.courses || []
+      courses: courses.courses || [],
     };
     testResults.summary.passed++;
-    
   } catch (e) {
     console.log(`❌ Classroom 基本存取失敗: ${e.message}`);
     testResults.tests.classroomBasic = { status: 'failed', error: e.message };
     testResults.summary.failed++;
     testResults.recommendations.push('檢查 Classroom API 基本權限');
   }
-  
+
   // 測試 4: 特定課程權限測試
   console.log('\n📋 測試 4: 特定課程權限');
   const testCourseId = '779922029471';
@@ -2215,40 +2244,38 @@ function comprehensivePermissionTest() {
     const course = Classroom.Courses.get(testCourseId);
     console.log(`✅ 可讀取課程: ${course.name}`);
     console.log(`👤 課程擁有者 ID: ${course.ownerId}`);
-    
+
     // 測試教師列表讀取
     try {
       const teachers = Classroom.Courses.Teachers.list(testCourseId);
       const teacherCount = teachers.teachers ? teachers.teachers.length : 0;
       console.log(`✅ 可讀取教師列表: ${teacherCount} 位教師`);
-      
-      testResults.tests.specificCourse = { 
-        status: 'passed', 
+
+      testResults.tests.specificCourse = {
+        status: 'passed',
         courseName: course.name,
         ownerId: course.ownerId,
-        teacherCount
+        teacherCount,
       };
       testResults.summary.passed++;
-      
     } catch (teacherError) {
       console.log(`⚠️ 無法讀取教師列表: ${teacherError.message}`);
-      testResults.tests.specificCourse = { 
-        status: 'warning', 
+      testResults.tests.specificCourse = {
+        status: 'warning',
         courseName: course.name,
         ownerId: course.ownerId,
-        teacherError: teacherError.message
+        teacherError: teacherError.message,
       };
       testResults.summary.warnings++;
       testResults.recommendations.push('檢查課程名冊讀取權限');
     }
-    
   } catch (e) {
     console.log(`❌ 無法讀取測試課程: ${e.message}`);
     testResults.tests.specificCourse = { status: 'failed', error: e.message };
     testResults.summary.failed++;
     testResults.recommendations.push('檢查課程讀取權限或課程ID');
   }
-  
+
   // 測試 5: Spreadsheets 權限
   console.log('\n📋 測試 5: Spreadsheets 權限');
   try {
@@ -2256,31 +2283,31 @@ function comprehensivePermissionTest() {
     const ssName = SpreadsheetApp.getActiveSpreadsheet().getName();
     console.log(`✅ Spreadsheets 存取正常`);
     console.log(`📊 當前試算表: ${ssName}`);
-    
-    testResults.tests.spreadsheets = { 
-      status: 'passed', 
+
+    testResults.tests.spreadsheets = {
+      status: 'passed',
       spreadsheetId: ssId,
-      spreadsheetName: ssName
+      spreadsheetName: ssName,
     };
     testResults.summary.passed++;
-    
   } catch (e) {
     console.log(`❌ Spreadsheets 存取失敗: ${e.message}`);
     testResults.tests.spreadsheets = { status: 'failed', error: e.message };
     testResults.summary.failed++;
     testResults.recommendations.push('檢查 Spreadsheets API 權限');
   }
-  
+
   // 生成測試摘要
   console.log('\n📊 測試摘要:');
   console.log(`✅ 通過: ${testResults.summary.passed}`);
   console.log(`⚠️ 警告: ${testResults.summary.warnings}`);
   console.log(`❌ 失敗: ${testResults.summary.failed}`);
-  
-  const totalTests = testResults.summary.passed + testResults.summary.warnings + testResults.summary.failed;
+
+  const totalTests =
+    testResults.summary.passed + testResults.summary.warnings + testResults.summary.failed;
   const successRate = Math.round((testResults.summary.passed / totalTests) * 100);
   console.log(`🎯 成功率: ${successRate}%`);
-  
+
   // 生成建議
   if (testResults.recommendations.length > 0) {
     console.log('\n💡 改善建議:');
@@ -2288,7 +2315,7 @@ function comprehensivePermissionTest() {
       console.log(`${index + 1}. ${rec}`);
     });
   }
-  
+
   // 整體評估
   console.log('\n🔍 整體評估:');
   if (testResults.summary.failed === 0) {
@@ -2299,17 +2326,17 @@ function comprehensivePermissionTest() {
     }
   } else {
     console.log('⚠️ 發現權限問題，需要處理才能正常使用功能。');
-    
+
     // 提供快速修復建議
     console.log('\n🚀 快速修復建議:');
     console.log('1. 執行 reauthorizePermissions() 重新授權');
     console.log('2. 檢查 Google Workspace 管理控制台設定');
     console.log('3. 確認當前帳戶權限等級');
   }
-  
+
   testResults.overallStatus = testResults.summary.failed === 0 ? 'healthy' : 'needs_attention';
   console.log(`\n📈 測試完成: ${testResults.timestamp}`);
-  
+
   return testResults;
 }
 
@@ -2324,9 +2351,9 @@ async function performPermissionPrecheck(currentUser) {
     issue: '',
     recommendation: '',
     alternativeAccounts: [],
-    permissionLevel: 'core' // 新增：core/advanced/full
+    permissionLevel: 'core', // 新增：core/advanced/full
   };
-  
+
   try {
     // 檢查基本用戶資訊
     if (!currentUser || currentUser === 'unknown') {
@@ -2335,7 +2362,7 @@ async function performPermissionPrecheck(currentUser) {
       result.recommendation = '請確認已正確登入 Google 帳戶並重新授權';
       return result;
     }
-    
+
     // 先測試核心功能是否可用
     try {
       // 測試 Classroom API（核心功能）
@@ -2343,28 +2370,26 @@ async function performPermissionPrecheck(currentUser) {
       result.permissionLevel = 'core';
       result.status = '核心功能權限正常，所有主要操作都可執行';
       console.log('✅ 核心權限檢查通過：Classroom API 可用');
-      
+
       // 嘗試檢查管理員權限（進階功能，失敗不影響使用）
       try {
         const userInfo = getSmartUserInfo('me');
         if (userInfo.success) {
           const isAdmin = userInfo.isAdmin || false;
           const isDelegatedAdmin = userInfo.isDelegatedAdmin || false;
-          
+
           if (isAdmin) {
             result.userLevel = '超級管理員';
             result.permissionLevel = 'full';
             result.status = '具備完整管理員權限，可執行所有操作包括進階診斷';
             console.log('✅ 完整權限：超級管理員');
             return result;
-            
           } else if (isDelegatedAdmin) {
             result.userLevel = '委派管理員';
             result.permissionLevel = 'advanced';
             result.status = '具備委派管理員權限，可執行所有操作';
             console.log('✅ 進階權限：委派管理員');
             return result;
-          
           } else {
             // 非管理員但核心功能可用
             result.userLevel = '一般教師';
@@ -2377,14 +2402,12 @@ async function performPermissionPrecheck(currentUser) {
           result.status = '核心功能權限正常，使用 Session API 獲取基本用戶資訊';
           console.log('ℹ️ 使用 Session API 進行基本權限檢查');
         }
-        
       } catch (adminError) {
         // Admin Directory API 不可用，但這不是問題
         result.userLevel = '一般用戶（推薦等級）';
         result.status = '核心功能權限正常，Admin Directory 為進階功能，不影響日常使用';
         console.log('ℹ️ Admin Directory API 不可用，但不影響核心功能');
       }
-      
     } catch (coreError) {
       // 核心功能失敗才是真正的問題
       result.canProceed = false;
@@ -2392,14 +2415,13 @@ async function performPermissionPrecheck(currentUser) {
       result.recommendation = '請檢查 Google Classroom 權限設定和網路連線';
       console.log(`❌ 核心權限檢查失敗: ${coreError.message}`);
     }
-    
   } catch (error) {
     result.canProceed = false;
     result.userLevel = '錯誤';
     result.issue = `權限檢查失敗：${error.message}`;
     result.recommendation = '請檢查網路連線和 API 權限設定';
   }
-  
+
   return result;
 }
 
@@ -2408,18 +2430,18 @@ async function performPermissionPrecheck(currentUser) {
  */
 function showUserPermissionStatusUI() {
   const ui = SpreadsheetApp.getUi();
-  
+
   try {
     // 獲取當前用戶
     const currentUser = Session.getActiveUser().getEmail();
     let statusMessage = `👤 當前用戶：${currentUser}\n\n`;
-    
+
     // 檢查管理員權限
     try {
       const adminInfo = AdminDirectory.Users.get('me');
       const isAdmin = adminInfo.isAdmin || false;
       const isDelegatedAdmin = adminInfo.isDelegatedAdmin || false;
-      
+
       if (isAdmin) {
         statusMessage += `🎉 權限等級：超級管理員\n`;
         statusMessage += `✅ 狀態：具備完整管理權限\n`;
@@ -2428,7 +2450,6 @@ function showUserPermissionStatusUI() {
         statusMessage += `• 直接執行教師新增功能\n`;
         statusMessage += `• 管理所有課程和用戶\n`;
         statusMessage += `• 存取所有診斷工具`;
-        
       } else if (isDelegatedAdmin) {
         statusMessage += `🎯 權限等級：委派管理員\n`;
         statusMessage += `✅ 狀態：具備部分管理權限\n`;
@@ -2437,33 +2458,30 @@ function showUserPermissionStatusUI() {
         statusMessage += `• 執行教師新增功能\n`;
         statusMessage += `• 管理指定範圍的課程\n`;
         statusMessage += `• 使用所有診斷工具`;
-        
       } else {
         statusMessage += `⚠️ 權限等級：一般用戶\n`;
         statusMessage += `❌ 狀態：權限受限\n`;
         statusMessage += `🔧 功能：可能無法執行某些操作\n\n`;
-        
+
         // 檢查是否為課程擁有者
         try {
           const testCourseId = '779922029471';
           const course = Classroom.Courses.get(testCourseId);
           const ownerInfo = lookupUserById(course.ownerId);
-          
+
           if (ownerInfo.success && ownerInfo.email === currentUser) {
             statusMessage += `📚 您是課程擁有者但權限可能不足\n`;
             statusMessage += `⚠️ 注意：課程擁有者 ≠ 域管理員\n\n`;
           }
-          
         } catch (e) {
           statusMessage += `❌ 無法檢查課程擁有者狀態\n\n`;
         }
-        
+
         statusMessage += `💡 建議：\n`;
         statusMessage += `• 使用具備管理員權限的帳戶\n`;
         statusMessage += `• 成功案例：tsehunhchen@kcislk.ntpc.edu.tw\n`;
         statusMessage += `• 聲請 IT 管理員協助`;
       }
-      
     } catch (adminError) {
       statusMessage += `❌ 權限等級：無法確認\n`;
       statusMessage += `⚠️ 狀態：Admin Directory API 存取失敗\n\n`;
@@ -2474,7 +2492,6 @@ function showUserPermissionStatusUI() {
       statusMessage += `• 執行重新授權功能\n`;
       statusMessage += `• 檢查 Google Workspace 設定`;
     }
-    
   } catch (userError) {
     statusMessage = `❌ 無法獲取用戶資訊\n\n`;
     statusMessage += `錯誤：${userError.message}\n\n`;
@@ -2482,7 +2499,7 @@ function showUserPermissionStatusUI() {
     statusMessage += `• 是否已正確登入\n`;
     statusMessage += `• OAuth 權限設定`;
   }
-  
+
   ui.alert('👤 用戶權限狀態', statusMessage, ui.ButtonSet.OK);
 }
 
@@ -2491,23 +2508,23 @@ function showUserPermissionStatusUI() {
  */
 function quickPermissionCheckUI() {
   const ui = SpreadsheetApp.getUi();
-  
+
   // 執行快速檢查
   console.log('=== 🚀 快速權限檢查 ===');
-  
+
   try {
     const currentUser = Session.getActiveUser().getEmail();
     console.log(`👤 檢查用戶：${currentUser}`);
-    
+
     // 執行綜合測試
     const testResults = comprehensivePermissionTest();
-    
+
     // 生成 UI 訊息
     let message = `檢查完成！\n\n`;
     message += `✅ 通過：${testResults.summary.passed}\n`;
     message += `⚠️ 警告：${testResults.summary.warnings}\n`;
     message += `❌ 失敗：${testResults.summary.failed}\n\n`;
-    
+
     if (testResults.summary.failed === 0) {
       message += `🎉 權限狀態良好！\n\n`;
       message += `您可以：\n`;
@@ -2523,9 +2540,8 @@ function quickPermissionCheckUI() {
       }
       message += `\n🎯 成功案例：tsehunhchen@kcislk.ntpc.edu.tw`;
     }
-    
+
     ui.alert('🔍 快速權限檢查結果', message, ui.ButtonSet.OK);
-    
   } catch (error) {
     ui.alert('❌ 檢查失敗', `無法完成權限檢查：${error.message}`, ui.ButtonSet.OK);
   }
@@ -2536,26 +2552,26 @@ function quickPermissionCheckUI() {
  */
 function autoPermissionRecoveryFlow() {
   console.log('=== 🔧 自動權限修復流程 ===');
-  
+
   const ui = SpreadsheetApp.getUi();
   let currentUser = 'unknown';
-  
+
   try {
     currentUser = Session.getActiveUser().getEmail();
     console.log(`👤 當前用戶：${currentUser}`);
   } catch (e) {
     console.log(`❌ 無法識別用戶：${e.message}`);
   }
-  
+
   // 步驟1: 執行全面診斷
   console.log('\n📋 步驟 1: 執行全面權限診斷...');
   const diagnostics = {
     userInfo: null,
     adminStatus: null,
     permissionTest: null,
-    recommendations: []
+    recommendations: [],
   };
-  
+
   try {
     // 用戶資訊診斷
     try {
@@ -2563,31 +2579,34 @@ function autoPermissionRecoveryFlow() {
       diagnostics.adminStatus = {
         isAdmin: adminInfo.isAdmin || false,
         isDelegatedAdmin: adminInfo.isDelegatedAdmin || false,
-        orgUnit: adminInfo.orgUnitPath
+        orgUnit: adminInfo.orgUnitPath,
       };
-      console.log(`✅ 管理員狀態：${diagnostics.adminStatus.isAdmin ? '超級管理員' : diagnostics.adminStatus.isDelegatedAdmin ? '委派管理員' : '一般用戶'}`);
+      console.log(
+        `✅ 管理員狀態：${diagnostics.adminStatus.isAdmin ? '超級管理員' : diagnostics.adminStatus.isDelegatedAdmin ? '委派管理員' : '一般用戶'}`
+      );
     } catch (e) {
       console.log(`❌ 無法檢查管理員狀態：${e.message}`);
     }
-    
+
     // 權限測試
     try {
       diagnostics.permissionTest = comprehensivePermissionTest();
-      console.log(`✅ 權限測試完成：${diagnostics.permissionTest.summary.passed}/${diagnostics.permissionTest.summary.passed + diagnostics.permissionTest.summary.failed} 通過`);
+      console.log(
+        `✅ 權限測試完成：${diagnostics.permissionTest.summary.passed}/${diagnostics.permissionTest.summary.passed + diagnostics.permissionTest.summary.failed} 通過`
+      );
     } catch (e) {
       console.log(`❌ 權限測試失敗：${e.message}`);
     }
-    
   } catch (error) {
     console.log(`❌ 診斷過程錯誤：${error.message}`);
   }
-  
+
   // 步驟2: 分析問題並生成解決方案
   console.log('\n📋 步驟 2: 分析問題並生成解決方案...');
-  
+
   let recoveryPlan = [];
   let canAutoFix = false;
-  
+
   // 分析診斷結果
   if (diagnostics.adminStatus) {
     if (diagnostics.adminStatus.isAdmin || diagnostics.adminStatus.isDelegatedAdmin) {
@@ -2597,7 +2616,7 @@ function autoPermissionRecoveryFlow() {
           step: '重新授權 OAuth 權限',
           action: 'reauthorizePermissions',
           autoFixable: true,
-          description: '您有管理員權限但某些 API 存取失敗，需要重新授權'
+          description: '您有管理員權限但某些 API 存取失敗，需要重新授權',
         });
         canAutoFix = true;
       } else {
@@ -2605,7 +2624,7 @@ function autoPermissionRecoveryFlow() {
           step: '權限狀態正常',
           action: 'none',
           autoFixable: false,
-          description: '您的權限設定正常，可以直接執行功能'
+          description: '您的權限設定正常，可以直接執行功能',
         });
       }
     } else {
@@ -2615,7 +2634,7 @@ function autoPermissionRecoveryFlow() {
         action: 'switchAccount',
         autoFixable: false,
         description: '建議使用具備管理員權限的帳戶',
-        recommendedAccounts: ['tsehunhchen@kcislk.ntpc.edu.tw']
+        recommendedAccounts: ['tsehunhchen@kcislk.ntpc.edu.tw'],
       });
     }
   } else {
@@ -2624,18 +2643,18 @@ function autoPermissionRecoveryFlow() {
       step: '修復基本權限',
       action: 'reauthorizePermissions',
       autoFixable: true,
-      description: '無法存取 Admin Directory，需要重新授權基本權限'
+      description: '無法存取 Admin Directory，需要重新授權基本權限',
     });
     canAutoFix = true;
   }
-  
+
   // 步驟3: 顯示修復計劃
   console.log('\n📋 步驟 3: 顯示修復計劃...');
-  
+
   let planMessage = `🔧 自動修復計劃\n\n`;
   planMessage += `👤 當前用戶：${currentUser}\n`;
   planMessage += `📊 檢測結果：${recoveryPlan.length} 個修復步驟\n\n`;
-  
+
   recoveryPlan.forEach((plan, index) => {
     planMessage += `${index + 1}. ${plan.step}\n`;
     planMessage += `   ${plan.description}\n`;
@@ -2644,33 +2663,32 @@ function autoPermissionRecoveryFlow() {
     }
     planMessage += `\n`;
   });
-  
+
   if (canAutoFix) {
     planMessage += `🚀 可以自動修復某些問題\n`;
     planMessage += `是否要執行自動修復？`;
-    
+
     const response = ui.alert('🔧 自動權限修復', planMessage, ui.ButtonSet.YES_NO);
-    
+
     if (response === ui.Button.YES) {
       console.log('\n🚀 開始執行自動修復...');
-      
+
       // 執行自動修復
       for (const plan of recoveryPlan) {
         if (plan.autoFixable) {
           try {
             console.log(`📋 執行：${plan.step}`);
-            
+
             if (plan.action === 'reauthorizePermissions') {
               reauthorizePermissions();
               console.log('✅ 重新授權完成');
             }
-            
           } catch (error) {
             console.log(`❌ 修復失敗：${error.message}`);
           }
         }
       }
-      
+
       // 重新測試
       console.log('\n🔍 重新測試權限狀態...');
       try {
@@ -2678,30 +2696,31 @@ function autoPermissionRecoveryFlow() {
         let retestMessage = `修復完成！\n\n`;
         retestMessage += `✅ 通過：${retestResults.summary.passed}\n`;
         retestMessage += `❌ 失敗：${retestResults.summary.failed}\n\n`;
-        
+
         if (retestResults.summary.failed === 0) {
           retestMessage += `🎉 所有權限問題已解決！\n現在可以正常使用所有功能。`;
         } else {
           retestMessage += `⚠️ 仍有部分問題需要手動處理\n請參考診斷建議或聯絡管理員。`;
         }
-        
+
         ui.alert('🎯 修復結果', retestMessage, ui.ButtonSet.OK);
-        
       } catch (error) {
         ui.alert('❌ 重新測試失敗', `無法完成重新測試：${error.message}`, ui.ButtonSet.OK);
       }
-      
     } else {
       console.log('❌ 用戶取消自動修復');
-      ui.alert('ℹ️ 已取消', '自動修復已取消。您可以稍後再嘗試或手動執行建議的步驟。', ui.ButtonSet.OK);
+      ui.alert(
+        'ℹ️ 已取消',
+        '自動修復已取消。您可以稍後再嘗試或手動執行建議的步驟。',
+        ui.ButtonSet.OK
+      );
     }
-    
   } else {
     planMessage += `⚠️ 需要手動處理\n`;
     planMessage += `請按照上述步驟進行修復。`;
     ui.alert('🔧 權限修復計劃', planMessage, ui.ButtonSet.OK);
   }
-  
+
   console.log('\n📈 自動權限修復流程完成');
 }
 
@@ -2713,14 +2732,14 @@ function createExecutionReport(operationType, sheetName, results, errors = [], s
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const reportSheetName = `執行報告_${operationType}_${timestamp}`;
-    
+
     // 建立新的報告工作表
     const reportSheet = ss.insertSheet(reportSheetName);
-    
+
     // 設定報告標題和摘要
     const duration = endTime - startTime;
-    const durationMinutes = Math.round(duration / 60000 * 100) / 100;
-    
+    const durationMinutes = Math.round((duration / 60000) * 100) / 100;
+
     const summary = [
       ['📊 批次執行報告', ''],
       ['執行類型', operationType],
@@ -2729,26 +2748,39 @@ function createExecutionReport(operationType, sheetName, results, errors = [], s
       ['完成時間', new Date(endTime).toLocaleString('zh-TW')],
       ['執行時長', `${durationMinutes} 分鐘`],
       ['總處理數', results.length],
-      ['成功數量', results.filter(r => r.success).length],
-      ['失敗數量', results.filter(r => !r.success).length],
+      ['成功數量', results.filter((r) => r.success).length],
+      ['失敗數量', results.filter((r) => !r.success).length],
       [''],
-      ['詳細執行結果', '']
+      ['詳細執行結果', ''],
     ];
-    
+
     // 寫入摘要
     const summaryRange = reportSheet.getRange(1, 1, summary.length, 2);
     summaryRange.setValues(summary);
-    
+
     // 設定摘要樣式
     reportSheet.getRange(1, 1).setFontSize(14).setFontWeight('bold');
     reportSheet.getRange(2, 1, summary.length - 1, 1).setFontWeight('bold');
-    
+
     // 建立詳細結果表頭
     const headerRow = summary.length + 2;
-    const headers = ['序號', '學生Email', '課程ID', '課程名稱', '班級名稱', '執行狀態', '結果說明', '錯誤原因', '處理時間'];
+    const headers = [
+      '序號',
+      '學生Email',
+      '課程ID',
+      '課程名稱',
+      '班級名稱',
+      '執行狀態',
+      '結果說明',
+      '錯誤原因',
+      '處理時間',
+    ];
     reportSheet.getRange(headerRow, 1, 1, headers.length).setValues([headers]);
-    reportSheet.getRange(headerRow, 1, 1, headers.length).setFontWeight('bold').setBackground('#E8F0FE');
-    
+    reportSheet
+      .getRange(headerRow, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#E8F0FE');
+
     // 建立詳細結果資料
     const detailData = results.map((result, index) => [
       index + 1,
@@ -2757,18 +2789,20 @@ function createExecutionReport(operationType, sheetName, results, errors = [], s
       result.courseName || result.assignment?.courseName || '',
       result.className || result.assignment?.className || '',
       result.success ? '✅ 成功' : '❌ 失敗',
-      result.success ? 
-        (result.status === 'ALREADY_EXISTS' ? '學生已存在' : '新增成功') : 
-        '執行失敗',
-      result.success ? '' : (result.error || '未知錯誤'),
-      new Date().toLocaleString('zh-TW')
+      result.success
+        ? result.status === 'ALREADY_EXISTS'
+          ? '學生已存在'
+          : '新增成功'
+        : '執行失敗',
+      result.success ? '' : result.error || '未知錯誤',
+      new Date().toLocaleString('zh-TW'),
     ]);
-    
+
     // 寫入詳細結果
     if (detailData.length > 0) {
       const dataRange = reportSheet.getRange(headerRow + 1, 1, detailData.length, headers.length);
       dataRange.setValues(detailData);
-      
+
       // 設定條件格式 - 成功為綠色，失敗為紅色
       const statusRange = reportSheet.getRange(headerRow + 1, 6, detailData.length, 1);
       const successRule = SpreadsheetApp.newConditionalFormatRule()
@@ -2781,30 +2815,29 @@ function createExecutionReport(operationType, sheetName, results, errors = [], s
         .setBackground('#F8D7DA')
         .setRanges([statusRange])
         .build();
-      
+
       const rules = reportSheet.getConditionalFormatRules();
       rules.push(successRule, failRule);
       reportSheet.setConditionalFormatRules(rules);
     }
-    
+
     // 自動調整欄位寬度
     reportSheet.autoResizeColumns(1, headers.length);
-    
+
     // 凍結標題行
     reportSheet.setFrozenRows(headerRow);
-    
+
     console.log(`📊 執行報告已建立：${reportSheetName}`);
     return {
       success: true,
       sheetName: reportSheetName,
-      reportSheet: reportSheet
+      reportSheet: reportSheet,
     };
-    
   } catch (error) {
     console.log(`❌ 建立執行報告失敗：${error.message}`);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -2814,7 +2847,7 @@ function createExecutionReport(operationType, sheetName, results, errors = [], s
  */
 function analyzeFailuresAndSuggestRetry(errors, operationType = '批次新增學生') {
   console.log(`🔍 分析 ${errors.length} 個失敗項目...`);
-  
+
   const retryAnalysis = {
     retryableErrors: [],
     permanentErrors: [],
@@ -2822,15 +2855,15 @@ function analyzeFailuresAndSuggestRetry(errors, operationType = '批次新增學
     summary: {
       total: errors.length,
       retryable: 0,
-      permanent: 0
-    }
+      permanent: 0,
+    },
   };
-  
+
   // 分類錯誤類型
   errors.forEach((errorItem, index) => {
     const error = errorItem.error || errorItem.message || '未知錯誤';
     const errorLower = error.toLowerCase();
-    
+
     const failureInfo = {
       index: index + 1,
       studentEmail: errorItem.studentEmail,
@@ -2840,46 +2873,48 @@ function analyzeFailuresAndSuggestRetry(errors, operationType = '批次新增學
       error: error,
       category: '',
       retryable: false,
-      suggestion: ''
+      suggestion: '',
     };
-    
+
     // 分析錯誤類型
     if (errorLower.includes('quota') || errorLower.includes('rate limit')) {
       failureInfo.category = '配額限制';
       failureInfo.retryable = true;
       failureInfo.suggestion = '等待幾分鐘後重試，或降低批次處理速度';
       retryAnalysis.retryableErrors.push(failureInfo);
-      
     } else if (errorLower.includes('timeout') || errorLower.includes('network')) {
       failureInfo.category = '網路問題';
       failureInfo.retryable = true;
       failureInfo.suggestion = '檢查網路連線後重試';
       retryAnalysis.retryableErrors.push(failureInfo);
-      
-    } else if (errorLower.includes('503') || errorLower.includes('502') || errorLower.includes('500')) {
+    } else if (
+      errorLower.includes('503') ||
+      errorLower.includes('502') ||
+      errorLower.includes('500')
+    ) {
       failureInfo.category = '服務暫時無法使用';
       failureInfo.retryable = true;
       failureInfo.suggestion = 'Google 服務暫時不穩定，稍後重試';
       retryAnalysis.retryableErrors.push(failureInfo);
-      
-    } else if (errorLower.includes('unauthorized') || errorLower.includes('permission') || errorLower.includes('403')) {
+    } else if (
+      errorLower.includes('unauthorized') ||
+      errorLower.includes('permission') ||
+      errorLower.includes('403')
+    ) {
       failureInfo.category = '權限問題';
       failureInfo.retryable = false;
       failureInfo.suggestion = '檢查帳戶權限或聯絡管理員';
       retryAnalysis.permanentErrors.push(failureInfo);
-      
     } else if (errorLower.includes('not found') || errorLower.includes('404')) {
       failureInfo.category = '課程不存在';
       failureInfo.retryable = false;
       failureInfo.suggestion = '檢查課程 ID 是否正確';
       retryAnalysis.permanentErrors.push(failureInfo);
-      
     } else if (errorLower.includes('invalid') || errorLower.includes('malformed')) {
       failureInfo.category = '資料格式錯誤';
       failureInfo.retryable = false;
       failureInfo.suggestion = '檢查學生 Email 格式或課程 ID 格式';
       retryAnalysis.permanentErrors.push(failureInfo);
-      
     } else {
       failureInfo.category = '其他錯誤';
       failureInfo.retryable = true; // 未知錯誤預設為可重試
@@ -2887,22 +2922,30 @@ function analyzeFailuresAndSuggestRetry(errors, operationType = '批次新增學
       retryAnalysis.retryableErrors.push(failureInfo);
     }
   });
-  
+
   // 更新統計
   retryAnalysis.summary.retryable = retryAnalysis.retryableErrors.length;
   retryAnalysis.summary.permanent = retryAnalysis.permanentErrors.length;
-  
+
   // 生成建議
   if (retryAnalysis.summary.retryable > 0) {
     retryAnalysis.recommendations.push(`✅ ${retryAnalysis.summary.retryable} 個項目可以重試`);
-    
+
     // 根據錯誤類型提供具體建議
-    const quotaErrors = retryAnalysis.retryableErrors.filter(e => e.category === '配額限制').length;
-    const networkErrors = retryAnalysis.retryableErrors.filter(e => e.category === '網路問題').length;
-    const serviceErrors = retryAnalysis.retryableErrors.filter(e => e.category === '服務暫時無法使用').length;
-    
+    const quotaErrors = retryAnalysis.retryableErrors.filter(
+      (e) => e.category === '配額限制'
+    ).length;
+    const networkErrors = retryAnalysis.retryableErrors.filter(
+      (e) => e.category === '網路問題'
+    ).length;
+    const serviceErrors = retryAnalysis.retryableErrors.filter(
+      (e) => e.category === '服務暫時無法使用'
+    ).length;
+
     if (quotaErrors > 0) {
-      retryAnalysis.recommendations.push(`⏱️ 建議等待 10-15 分鐘後重試（${quotaErrors} 個配額問題）`);
+      retryAnalysis.recommendations.push(
+        `⏱️ 建議等待 10-15 分鐘後重試（${quotaErrors} 個配額問題）`
+      );
     }
     if (networkErrors > 0) {
       retryAnalysis.recommendations.push(`🌐 建議檢查網路連線（${networkErrors} 個網路問題）`);
@@ -2911,20 +2954,20 @@ function analyzeFailuresAndSuggestRetry(errors, operationType = '批次新增學
       retryAnalysis.recommendations.push(`🔄 建議稍後重試（${serviceErrors} 個服務問題）`);
     }
   }
-  
+
   if (retryAnalysis.summary.permanent > 0) {
     retryAnalysis.recommendations.push(`⚠️ ${retryAnalysis.summary.permanent} 個項目需要手動檢查`);
   }
-  
+
   // 輸出分析結果
   console.log(`📊 失敗分析結果：`);
   console.log(`  可重試項目：${retryAnalysis.summary.retryable}`);
   console.log(`  需檢查項目：${retryAnalysis.summary.permanent}`);
-  
-  retryAnalysis.recommendations.forEach(rec => {
+
+  retryAnalysis.recommendations.forEach((rec) => {
     console.log(`  ${rec}`);
   });
-  
+
   return retryAnalysis;
 }
 
@@ -2937,14 +2980,14 @@ function createRetryWorksheet(retryableErrors, operationType = '批次新增學�
       console.log('ℹ️ 沒有可重試的項目，不建立重試工作表');
       return { success: true, message: '沒有需要重試的項目' };
     }
-    
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const retrySheetName = `重試清單_${operationType}_${timestamp}`;
-    
+
     // 建立重試工作表
     const retrySheet = ss.insertSheet(retrySheetName);
-    
+
     // 設定標題和說明
     const headers = [
       ['📝 重試清單', ''],
@@ -2958,50 +3001,62 @@ function createRetryWorksheet(retryableErrors, operationType = '批次新增學�
       ['3. 清除原始工作表的狀態列', ''],
       ['4. 重新執行批次功能', ''],
       [''],
-      ['📋 重試項目清單', '']
+      ['📋 重試項目清單', ''],
     ];
-    
+
     // 寫入標題
     retrySheet.getRange(1, 1, headers.length, 2).setValues(headers);
     retrySheet.getRange(1, 1).setFontSize(14).setFontWeight('bold');
-    
+
     // 設定資料表頭
     const dataHeaderRow = headers.length + 1;
-    const dataHeaders = ['學生Email', '課程ID', '課程名稱', '班級名稱', '錯誤類型', '錯誤訊息', '建議解決方案'];
+    const dataHeaders = [
+      '學生Email',
+      '課程ID',
+      '課程名稱',
+      '班級名稱',
+      '錯誤類型',
+      '錯誤訊息',
+      '建議解決方案',
+    ];
     retrySheet.getRange(dataHeaderRow, 1, 1, dataHeaders.length).setValues([dataHeaders]);
-    retrySheet.getRange(dataHeaderRow, 1, 1, dataHeaders.length).setFontWeight('bold').setBackground('#FFF3CD');
-    
+    retrySheet
+      .getRange(dataHeaderRow, 1, 1, dataHeaders.length)
+      .setFontWeight('bold')
+      .setBackground('#FFF3CD');
+
     // 準備重試資料
-    const retryData = retryableErrors.map(item => [
+    const retryData = retryableErrors.map((item) => [
       item.studentEmail || '',
       item.courseId || '',
       item.courseName || '',
       item.className || '',
       item.category || '未知類型',
       item.error || '',
-      item.suggestion || '請檢查錯誤訊息'
+      item.suggestion || '請檢查錯誤訊息',
     ]);
-    
+
     // 寫入重試資料
     if (retryData.length > 0) {
-      retrySheet.getRange(dataHeaderRow + 1, 1, retryData.length, dataHeaders.length).setValues(retryData);
+      retrySheet
+        .getRange(dataHeaderRow + 1, 1, retryData.length, dataHeaders.length)
+        .setValues(retryData);
     }
-    
+
     // 自動調整欄位寬度
     retrySheet.autoResizeColumns(1, dataHeaders.length);
-    
+
     console.log(`📝 重試工作表已建立：${retrySheetName}`);
     return {
       success: true,
       sheetName: retrySheetName,
-      itemCount: retryableErrors.length
+      itemCount: retryableErrors.length,
     };
-    
   } catch (error) {
     console.log(`❌ 建立重試工作表失敗：${error.message}`);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -3012,39 +3067,38 @@ function createRetryWorksheet(retryableErrors, operationType = '批次新增學�
 async function advancedDiagnosticsAndReporting() {
   try {
     console.log('🔍 開始進階診斷和報告...');
-    
+
     const diagnostics = {
       timestamp: new Date().toLocaleString('zh-TW'),
       courseCapacity: null,
       studentPermissions: null,
       apiHealth: null,
-      recommendations: []
+      recommendations: [],
     };
-    
+
     // 1. 課程容量檢查
     diagnostics.courseCapacity = await checkCourseCapacityLimits();
-    
+
     // 2. 學生權限驗證
     diagnostics.studentPermissions = validateStudentPermissions();
-    
+
     // 3. API 健康狀態檢查
     diagnostics.apiHealth = checkApiHealthStatus();
-    
+
     // 4. 生成建議
     diagnostics.recommendations = generateDiagnosticRecommendations(diagnostics);
-    
+
     // 5. 建立診斷報告工作表
     const reportResult = createDiagnosticReport(diagnostics);
-    
+
     // 顯示摘要
     showDiagnosticSummary(diagnostics, reportResult);
-    
+
     return {
       success: true,
       diagnostics: diagnostics,
-      report: reportResult
+      report: reportResult,
     };
-    
   } catch (error) {
     console.log(`❌ 進階診斷失敗：${error.message}`);
     SpreadsheetApp.getUi().alert(
@@ -3054,7 +3108,7 @@ async function advancedDiagnosticsAndReporting() {
     );
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -3065,38 +3119,38 @@ async function advancedDiagnosticsAndReporting() {
 async function checkCourseCapacityLimits() {
   try {
     console.log('📊 檢查課程容量限制...');
-    
+
     // 獲取所有課程
     const coursesResult = await classroomService.listAllCourses();
     if (!coursesResult.success) {
       return { error: '無法獲取課程清單', details: coursesResult.error };
     }
-    
+
     const courses = coursesResult.data;
     const capacityInfo = {
       totalCourses: courses.length,
       checkedCourses: 0,
       warnings: [],
-      details: []
+      details: [],
     };
-    
+
     // 檢查前 20 個課程的容量（避免 API 配額問題）
     const coursesToCheck = courses.slice(0, 20);
-    
+
     for (const course of coursesToCheck) {
       try {
         const members = await classroomService.getCourseMembers(course.id);
         const studentCount = members.students ? members.students.length : 0;
         const teacherCount = members.teachers ? members.teachers.length : 0;
-        
+
         const courseInfo = {
           courseId: course.id,
           courseName: course.name,
           studentCount: studentCount,
           teacherCount: teacherCount,
-          status: 'normal'
+          status: 'normal',
         };
-        
+
         // Google Classroom 建議限制
         if (studentCount > 1000) {
           courseInfo.status = 'warning';
@@ -3104,29 +3158,27 @@ async function checkCourseCapacityLimits() {
         } else if (studentCount > 500) {
           courseInfo.status = 'caution';
         }
-        
+
         if (teacherCount > 20) {
           courseInfo.status = 'warning';
           capacityInfo.warnings.push(`課程 "${course.name}" 教師數量過多 (${teacherCount})`);
         }
-        
+
         capacityInfo.details.push(courseInfo);
         capacityInfo.checkedCourses++;
-        
       } catch (error) {
         console.log(`檢查課程 ${course.name} 容量時發生錯誤：${error.message}`);
         capacityInfo.details.push({
           courseId: course.id,
           courseName: course.name,
           error: error.message,
-          status: 'error'
+          status: 'error',
         });
       }
     }
-    
+
     console.log(`📊 容量檢查完成：檢查了 ${capacityInfo.checkedCourses} 個課程`);
     return capacityInfo;
-    
   } catch (error) {
     console.log(`❌ 課程容量檢查失敗：${error.message}`);
     return { error: error.message };
@@ -3139,40 +3191,40 @@ async function checkCourseCapacityLimits() {
 function validateStudentPermissions() {
   try {
     console.log('🔐 驗證學生權限...');
-    
+
     const permissionInfo = {
       currentUser: Session.getActiveUser().getEmail(),
       permissions: [],
       issues: [],
-      recommendations: []
+      recommendations: [],
     };
-    
+
     // 檢查基本 Classroom 權限
     try {
       const testResult = Classroom.Courses.list({ pageSize: 1 });
       permissionInfo.permissions.push({
         type: '課程列表存取',
         status: 'ok',
-        details: '可以存取課程清單'
+        details: '可以存取課程清單',
       });
     } catch (error) {
       permissionInfo.permissions.push({
         type: '課程列表存取',
         status: 'error',
-        details: error.message
+        details: error.message,
       });
       permissionInfo.issues.push('無法存取 Classroom API');
     }
-    
+
     // 檢查域管理員權限（嘗試訪問域級資源）
     try {
       const domainCheck = checkDomainAdminAccess();
       permissionInfo.permissions.push({
         type: '域管理員權限',
         status: domainCheck.success ? 'ok' : 'warning',
-        details: domainCheck.message
+        details: domainCheck.message,
       });
-      
+
       if (!domainCheck.success) {
         permissionInfo.issues.push('可能缺少域管理員權限');
         permissionInfo.recommendations.push('考慮使用具備域管理員權限的帳戶');
@@ -3181,29 +3233,28 @@ function validateStudentPermissions() {
       permissionInfo.permissions.push({
         type: '域管理員權限',
         status: 'error',
-        details: error.message
+        details: error.message,
       });
     }
-    
+
     // 檢查 OAuth 授權範圍
     const oauthScopes = [
       'https://www.googleapis.com/auth/classroom.courses',
       'https://www.googleapis.com/auth/classroom.rosters',
-      'https://www.googleapis.com/auth/classroom.profile.emails'
+      'https://www.googleapis.com/auth/classroom.profile.emails',
     ];
-    
-    oauthScopes.forEach(scope => {
+
+    oauthScopes.forEach((scope) => {
       // 這裡檢查 OAuth 範圍（實際實作需要更複雜的邏輯）
       permissionInfo.permissions.push({
         type: `OAuth 範圍: ${scope.split('/').pop()}`,
         status: 'assumed_ok',
-        details: '假設已正確授權（需要實際測試確認）'
+        details: '假設已正確授權（需要實際測試確認）',
       });
     });
-    
+
     console.log(`🔐 權限驗證完成：發現 ${permissionInfo.issues.length} 個問題`);
     return permissionInfo;
-    
   } catch (error) {
     console.log(`❌ 學生權限驗證失敗：${error.message}`);
     return { error: error.message };
@@ -3216,30 +3267,30 @@ function validateStudentPermissions() {
 function checkApiHealthStatus() {
   try {
     console.log('🏥 檢查 API 健康狀態...');
-    
+
     const healthInfo = {
       timestamp: new Date(),
       tests: [],
       overall: 'unknown',
-      recommendations: []
+      recommendations: [],
     };
-    
+
     // 測試 1: 基本 API 連線
     const basicTest = testBasicApiConnection();
     healthInfo.tests.push(basicTest);
-    
+
     // 測試 2: API 回應時間
     const responseTimeTest = testApiResponseTime();
     healthInfo.tests.push(responseTimeTest);
-    
+
     // 測試 3: 配額狀態
     const quotaTest = testApiQuotaStatus();
     healthInfo.tests.push(quotaTest);
-    
+
     // 計算整體健康狀態
-    const errorCount = healthInfo.tests.filter(test => test.status === 'error').length;
-    const warningCount = healthInfo.tests.filter(test => test.status === 'warning').length;
-    
+    const errorCount = healthInfo.tests.filter((test) => test.status === 'error').length;
+    const warningCount = healthInfo.tests.filter((test) => test.status === 'warning').length;
+
     if (errorCount > 0) {
       healthInfo.overall = 'error';
       healthInfo.recommendations.push('發現 API 連線問題，建議檢查網路連線');
@@ -3249,10 +3300,9 @@ function checkApiHealthStatus() {
     } else {
       healthInfo.overall = 'healthy';
     }
-    
+
     console.log(`🏥 API 健康檢查完成：狀態 ${healthInfo.overall}`);
     return healthInfo;
-    
   } catch (error) {
     console.log(`❌ API 健康檢查失敗：${error.message}`);
     return { error: error.message };
@@ -3264,41 +3314,49 @@ function checkApiHealthStatus() {
  */
 function generateDiagnosticRecommendations(diagnostics) {
   const recommendations = [];
-  
+
   // 基於課程容量的建議
-  if (diagnostics.courseCapacity && diagnostics.courseCapacity.warnings && diagnostics.courseCapacity.warnings.length > 0) {
+  if (
+    diagnostics.courseCapacity &&
+    diagnostics.courseCapacity.warnings &&
+    diagnostics.courseCapacity.warnings.length > 0
+  ) {
     recommendations.push({
       type: '課程容量',
       priority: 'high',
-      message: '某些課程成員數量接近建議上限，考慮分班或清理無效成員'
+      message: '某些課程成員數量接近建議上限，考慮分班或清理無效成員',
     });
   }
-  
+
   // 基於權限的建議
-  if (diagnostics.studentPermissions && diagnostics.studentPermissions.issues && diagnostics.studentPermissions.issues.length > 0) {
+  if (
+    diagnostics.studentPermissions &&
+    diagnostics.studentPermissions.issues &&
+    diagnostics.studentPermissions.issues.length > 0
+  ) {
     recommendations.push({
       type: '權限問題',
       priority: 'high',
-      message: '發現權限問題，建議檢查帳戶權限或聯絡管理員'
+      message: '發現權限問題，建議檢查帳戶權限或聯絡管理員',
     });
   }
-  
+
   // 基於 API 健康的建議
   if (diagnostics.apiHealth && diagnostics.apiHealth.overall !== 'healthy') {
     recommendations.push({
       type: 'API 健康',
       priority: 'medium',
-      message: 'API 狀態不佳，可能影響批次操作效率'
+      message: 'API 狀態不佳，可能影響批次操作效率',
     });
   }
-  
+
   // 一般性建議
   recommendations.push({
     type: '最佳實踐',
     priority: 'low',
-    message: '建議定期執行診斷以確保系統最佳性能'
+    message: '建議定期執行診斷以確保系統最佳性能',
   });
-  
+
   return recommendations;
 }
 
@@ -3308,18 +3366,18 @@ function testBasicApiConnection() {
     const startTime = Date.now();
     Classroom.Courses.list({ pageSize: 1 });
     const endTime = Date.now();
-    
+
     return {
       name: '基本 API 連線',
       status: 'ok',
       details: `連線成功，耗時 ${endTime - startTime}ms`,
-      responseTime: endTime - startTime
+      responseTime: endTime - startTime,
     };
   } catch (error) {
     return {
       name: '基本 API 連線',
       status: 'error',
-      details: error.message
+      details: error.message,
     };
   }
 }
@@ -3327,7 +3385,7 @@ function testBasicApiConnection() {
 function testApiResponseTime() {
   try {
     const tests = [];
-    
+
     // 進行 3 次測試取平均值
     for (let i = 0; i < 3; i++) {
       const startTime = Date.now();
@@ -3335,27 +3393,27 @@ function testApiResponseTime() {
       const endTime = Date.now();
       tests.push(endTime - startTime);
     }
-    
+
     const avgTime = tests.reduce((a, b) => a + b) / tests.length;
     let status = 'ok';
-    
+
     if (avgTime > 3000) {
       status = 'warning';
     } else if (avgTime > 5000) {
       status = 'error';
     }
-    
+
     return {
       name: 'API 回應時間',
       status: status,
       details: `平均回應時間：${Math.round(avgTime)}ms`,
-      responseTime: avgTime
+      responseTime: avgTime,
     };
   } catch (error) {
     return {
       name: 'API 回應時間',
       status: 'error',
-      details: error.message
+      details: error.message,
     };
   }
 }
@@ -3365,25 +3423,25 @@ function testApiQuotaStatus() {
     // 這裡可以檢查配額使用情況
     // Google Apps Script 沒有直接的配額查詢 API
     // 這裡使用間接方法
-    
+
     return {
       name: 'API 配額狀態',
       status: 'ok',
-      details: '配額狀態正常（間接檢測）'
+      details: '配額狀態正常（間接檢測）',
     };
   } catch (error) {
     if (error.message.includes('quota') || error.message.includes('rate limit')) {
       return {
         name: 'API 配額狀態',
         status: 'error',
-        details: '配額已達上限'
+        details: '配額已達上限',
       };
     }
-    
+
     return {
       name: 'API 配額狀態',
       status: 'warning',
-      details: '無法確定配額狀態'
+      details: '無法確定配額狀態',
     };
   }
 }
@@ -3394,15 +3452,15 @@ function checkDomainAdminAccess() {
     // 這裡是一個簡化的檢查
     const user = Session.getActiveUser().getEmail();
     const domain = user.split('@')[1];
-    
+
     return {
       success: true,
-      message: `使用者 ${user} 在域 ${domain} 中可能具備管理員權限`
+      message: `使用者 ${user} 在域 ${domain} 中可能具備管理員權限`,
     };
   } catch (error) {
     return {
       success: false,
-      message: '無法確認域管理員權限'
+      message: '無法確認域管理員權限',
     };
   }
 }
@@ -3415,60 +3473,63 @@ function createDiagnosticReport(diagnostics) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const reportSheetName = `診斷報告_${timestamp}`;
-    
+
     // 建立報告工作表
     const reportSheet = ss.insertSheet(reportSheetName);
-    
+
     let currentRow = 1;
-    
+
     // 標題區域
     const titleData = [
       ['🔍 系統診斷報告', ''],
       ['生成時間', diagnostics.timestamp],
       ['系統版本', 'Google Classroom Manager Pro v2.0.0'],
       ['執行者', Session.getActiveUser().getEmail()],
-      ['']
+      [''],
     ];
-    
+
     reportSheet.getRange(currentRow, 1, titleData.length, 2).setValues(titleData);
     reportSheet.getRange(1, 1).setFontSize(16).setFontWeight('bold');
     currentRow += titleData.length;
-    
+
     // 課程容量報告
     if (diagnostics.courseCapacity) {
       currentRow = addCapacityReportSection(reportSheet, diagnostics.courseCapacity, currentRow);
     }
-    
+
     // 權限驗證報告
     if (diagnostics.studentPermissions) {
-      currentRow = addPermissionReportSection(reportSheet, diagnostics.studentPermissions, currentRow);
+      currentRow = addPermissionReportSection(
+        reportSheet,
+        diagnostics.studentPermissions,
+        currentRow
+      );
     }
-    
+
     // API 健康報告
     if (diagnostics.apiHealth) {
       currentRow = addApiHealthReportSection(reportSheet, diagnostics.apiHealth, currentRow);
     }
-    
+
     // 建議報告
     if (diagnostics.recommendations && diagnostics.recommendations.length > 0) {
       currentRow = addRecommendationsSection(reportSheet, diagnostics.recommendations, currentRow);
     }
-    
+
     // 自動調整欄位寬度
     reportSheet.autoResizeColumns(1, 3);
-    
+
     console.log(`📋 診斷報告已建立：${reportSheetName}`);
     return {
       success: true,
       sheetName: reportSheetName,
-      timestamp: timestamp
+      timestamp: timestamp,
     };
-    
   } catch (error) {
     console.log(`❌ 建立診斷報告失敗：${error.message}`);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -3482,45 +3543,47 @@ function addCapacityReportSection(sheet, capacityData, startRow) {
     ['檢查課程總數', capacityData.totalCourses || 0],
     ['實際檢查數量', capacityData.checkedCourses || 0],
     ['發現警告數量', (capacityData.warnings && capacityData.warnings.length) || 0],
-    ['']
+    [''],
   ];
-  
+
   sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);
   sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#E3F2FD');
-  
+
   let currentRow = startRow + sectionData.length;
-  
+
   // 詳細課程資訊
   if (capacityData.details && capacityData.details.length > 0) {
     const detailHeaders = [['課程名稱', '學生數', '教師數', '狀態']];
     sheet.getRange(currentRow, 1, 1, 4).setValues(detailHeaders);
     sheet.getRange(currentRow, 1, 1, 4).setFontWeight('bold');
     currentRow++;
-    
-    const detailData = capacityData.details.slice(0, 10).map(course => [
-      course.courseName || 'N/A',
-      course.studentCount || 0,
-      course.teacherCount || 0,
-      course.status || 'unknown'
-    ]);
-    
+
+    const detailData = capacityData.details
+      .slice(0, 10)
+      .map((course) => [
+        course.courseName || 'N/A',
+        course.studentCount || 0,
+        course.teacherCount || 0,
+        course.status || 'unknown',
+      ]);
+
     sheet.getRange(currentRow, 1, detailData.length, 4).setValues(detailData);
     currentRow += detailData.length;
   }
-  
+
   // 警告訊息
   if (capacityData.warnings && capacityData.warnings.length > 0) {
     currentRow++;
     sheet.getRange(currentRow, 1).setValue('⚠️ 警告訊息：');
     sheet.getRange(currentRow, 1).setFontWeight('bold');
     currentRow++;
-    
-    capacityData.warnings.forEach(warning => {
+
+    capacityData.warnings.forEach((warning) => {
       sheet.getRange(currentRow, 1, 1, 2).setValues([[warning, '']]);
       currentRow++;
     });
   }
-  
+
   return currentRow + 1;
 }
 
@@ -3533,44 +3596,44 @@ function addPermissionReportSection(sheet, permissionData, startRow) {
     ['當前使用者', permissionData.currentUser],
     ['檢查項目數', (permissionData.permissions && permissionData.permissions.length) || 0],
     ['發現問題數', (permissionData.issues && permissionData.issues.length) || 0],
-    ['']
+    [''],
   ];
-  
+
   sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);
   sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#E8F5E8');
-  
+
   let currentRow = startRow + sectionData.length;
-  
+
   // 權限詳細資訊
   if (permissionData.permissions && permissionData.permissions.length > 0) {
     const permissionHeaders = [['權限類型', '狀態', '詳細資訊']];
     sheet.getRange(currentRow, 1, 1, 3).setValues(permissionHeaders);
     sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');
     currentRow++;
-    
-    const permissionDetails = permissionData.permissions.map(perm => [
+
+    const permissionDetails = permissionData.permissions.map((perm) => [
       perm.type,
       perm.status,
-      perm.details
+      perm.details,
     ]);
-    
+
     sheet.getRange(currentRow, 1, permissionDetails.length, 3).setValues(permissionDetails);
     currentRow += permissionDetails.length;
   }
-  
+
   // 問題列表
   if (permissionData.issues && permissionData.issues.length > 0) {
     currentRow++;
     sheet.getRange(currentRow, 1).setValue('❌ 發現問題：');
     sheet.getRange(currentRow, 1).setFontWeight('bold');
     currentRow++;
-    
-    permissionData.issues.forEach(issue => {
+
+    permissionData.issues.forEach((issue) => {
       sheet.getRange(currentRow, 1, 1, 2).setValues([[issue, '']]);
       currentRow++;
     });
   }
-  
+
   return currentRow + 1;
 }
 
@@ -3583,31 +3646,27 @@ function addApiHealthReportSection(sheet, apiData, startRow) {
     ['檢查時間', apiData.timestamp ? new Date(apiData.timestamp).toLocaleString('zh-TW') : 'N/A'],
     ['整體狀態', apiData.overall],
     ['測試項目數', (apiData.tests && apiData.tests.length) || 0],
-    ['']
+    [''],
   ];
-  
+
   sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);
   sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#FFF3E0');
-  
+
   let currentRow = startRow + sectionData.length;
-  
+
   // API 測試詳細資訊
   if (apiData.tests && apiData.tests.length > 0) {
     const testHeaders = [['測試項目', '狀態', '詳細資訊']];
     sheet.getRange(currentRow, 1, 1, 3).setValues(testHeaders);
     sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');
     currentRow++;
-    
-    const testDetails = apiData.tests.map(test => [
-      test.name,
-      test.status,
-      test.details
-    ]);
-    
+
+    const testDetails = apiData.tests.map((test) => [test.name, test.status, test.details]);
+
     sheet.getRange(currentRow, 1, testDetails.length, 3).setValues(testDetails);
     currentRow += testDetails.length;
   }
-  
+
   return currentRow + 1;
 }
 
@@ -3615,31 +3674,23 @@ function addApiHealthReportSection(sheet, apiData, startRow) {
  * 💡 新增建議區段
  */
 function addRecommendationsSection(sheet, recommendations, startRow) {
-  const sectionData = [
-    ['💡 改進建議', ''],
-    ['建議項目數', recommendations.length],
-    ['']
-  ];
-  
+  const sectionData = [['💡 改進建議', ''], ['建議項目數', recommendations.length], ['']];
+
   sheet.getRange(startRow, 1, sectionData.length, 2).setValues(sectionData);
   sheet.getRange(startRow, 1).setFontWeight('bold').setBackground('#F3E5F5');
-  
+
   let currentRow = startRow + sectionData.length;
-  
+
   const recHeaders = [['優先級', '類型', '建議內容']];
   sheet.getRange(currentRow, 1, 1, 3).setValues(recHeaders);
   sheet.getRange(currentRow, 1, 1, 3).setFontWeight('bold');
   currentRow++;
-  
-  const recDetails = recommendations.map(rec => [
-    rec.priority,
-    rec.type,
-    rec.message
-  ]);
-  
+
+  const recDetails = recommendations.map((rec) => [rec.priority, rec.type, rec.message]);
+
   sheet.getRange(currentRow, 1, recDetails.length, 3).setValues(recDetails);
   currentRow += recDetails.length;
-  
+
   return currentRow + 1;
 }
 
@@ -3648,7 +3699,7 @@ function addRecommendationsSection(sheet, recommendations, startRow) {
  */
 function showDiagnosticSummary(diagnostics, reportResult) {
   let summary = '🔍 系統診斷完成\n\n';
-  
+
   // 課程容量摘要
   if (diagnostics.courseCapacity && !diagnostics.courseCapacity.error) {
     const capacity = diagnostics.courseCapacity;
@@ -3657,7 +3708,7 @@ function showDiagnosticSummary(diagnostics, reportResult) {
       summary += `⚠️ 發現 ${capacity.warnings.length} 個容量警告\n`;
     }
   }
-  
+
   // 權限摘要
   if (diagnostics.studentPermissions && !diagnostics.studentPermissions.error) {
     const permissions = diagnostics.studentPermissions;
@@ -3666,29 +3717,27 @@ function showDiagnosticSummary(diagnostics, reportResult) {
       summary += `❌ 發現 ${permissions.issues.length} 個權限問題\n`;
     }
   }
-  
+
   // API 健康摘要
   if (diagnostics.apiHealth && !diagnostics.apiHealth.error) {
     const health = diagnostics.apiHealth;
     summary += `🏥 API 狀態：${health.overall}\n`;
   }
-  
+
   // 建議摘要
   if (diagnostics.recommendations && diagnostics.recommendations.length > 0) {
-    const highPriority = diagnostics.recommendations.filter(rec => rec.priority === 'high').length;
+    const highPriority = diagnostics.recommendations.filter(
+      (rec) => rec.priority === 'high'
+    ).length;
     summary += `💡 改進建議：共 ${diagnostics.recommendations.length} 項（高優先級：${highPriority}）\n`;
   }
-  
+
   // 報告資訊
   if (reportResult.success) {
     summary += `\n📋 詳細報告已建立：${reportResult.sheetName}`;
   }
-  
-  SpreadsheetApp.getUi().alert(
-    '🔍 系統診斷報告',
-    summary,
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
+
+  SpreadsheetApp.getUi().alert('🔍 系統診斷報告', summary, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
@@ -3700,7 +3749,7 @@ function getSmartUserInfo(userId = 'me') {
     if (userId === 'me') {
       const currentEmail = Session.getActiveUser().getEmail();
       console.log(`✅ 當前用戶資訊：${currentEmail}`);
-      
+
       // 嘗試從 Admin Directory 獲取詳細資訊（可選）
       try {
         const adminInfo = AdminDirectory.Users.get('me');
@@ -3710,7 +3759,7 @@ function getSmartUserInfo(userId = 'me') {
           name: adminInfo.name ? adminInfo.name.fullName : null,
           isAdmin: adminInfo.isAdmin || false,
           isDelegatedAdmin: adminInfo.isDelegatedAdmin || false,
-          method: 'Session+AdminDirectory'
+          method: 'Session+AdminDirectory',
         };
       } catch (adminError) {
         // Admin Directory 失敗，只返回基本資訊
@@ -3720,20 +3769,19 @@ function getSmartUserInfo(userId = 'me') {
           name: currentEmail.split('@')[0], // 從 email 推測用戶名
           isAdmin: false,
           isDelegatedAdmin: false,
-          method: 'Session-only'
+          method: 'Session-only',
         };
       }
     }
-    
+
     // 對於其他用戶 ID，嘗試現有的查詢方法
     return lookupUserById(userId);
-    
   } catch (error) {
     console.log(`❌ 智能用戶資訊獲取失敗: ${error.message}`);
     return {
       success: false,
       error: error.message,
-      method: 'failed'
+      method: 'failed',
     };
   }
 }
@@ -4065,7 +4113,7 @@ function addTeachersUI() {
  */
 async function addStudentsUI() {
   const ui = SpreadsheetApp.getUi();
-  
+
   try {
     // 步驟1: 獲取工作表名稱
     const sheetNameResult = ui.prompt(
@@ -4095,13 +4143,13 @@ async function addStudentsUI() {
     // 執行權限預檢
     console.log('🔍 執行權限預檢...');
     const currentUser = Session.getActiveUser().getEmail();
-    
+
     const permissionCheck = await performPermissionPrecheck(currentUser);
-    
+
     // 顯示權限檢查結果（現在主要是資訊性質）
     if (permissionCheck.permissionLevel) {
       console.log(`✅ 權限檢查：${permissionCheck.userLevel} - ${permissionCheck.status}`);
-      
+
       // 只有在真正無法執行時才阻止（現在很少發生）
       if (!permissionCheck.canProceed) {
         const continueResult = ui.alert(
@@ -4109,7 +4157,7 @@ async function addStudentsUI() {
           `檢測到權限問題：\n${permissionCheck.issue}\n\n💡 解決方法：\n1. 檢查網路連線\n2. 確認已正確登入 Google 帳戶\n3. 執行「🔄 重新授權權限」\n\n是否仍要嘗試執行？`,
           ui.ButtonSet.YES_NO
         );
-        
+
         if (continueResult !== ui.Button.YES) {
           ui.alert('操作已取消', '建議解決權限問題後再嘗試。', ui.ButtonSet.OK);
           return;
@@ -4119,18 +4167,17 @@ async function addStudentsUI() {
 
     // 執行一般批次新增 - 使用同步等待
     console.log('🚀 開始執行一般批次新增學生');
-    
+
     const result = await batchAddStudentsFromSheet(sheetName);
-    
+
     // 直接處理結果，確保用戶看到反饋
     handleBatchAddResult(result, ui);
-    
   } catch (error) {
     console.log(`[ERROR] 一般批次新增學生失敗: ${error.message}`);
-    
+
     // 詳細錯誤處理
     let errorMessage = '批次新增系統發生錯誤';
-    
+
     if (error.message.includes('權限')) {
       errorMessage = '權限不足，請檢查 Google Classroom 存取權限';
     } else if (error.message.includes('工作表')) {
@@ -4138,10 +4185,10 @@ async function addStudentsUI() {
     } else if (error.message.includes('課程')) {
       errorMessage = '課程操作錯誤，請檢查課程權限';
     }
-    
+
     ui.alert(
-      '❌ 執行錯誤', 
-      `${errorMessage}：\n\n技術詳情：${error.message}\n\n💡 建議：\n• 檢查網路連線\n• 確認 Google Classroom 權限\n• 驗證工作表格式正確\n• 稍後再試或聯繫管理員`, 
+      '❌ 執行錯誤',
+      `${errorMessage}：\n\n技術詳情：${error.message}\n\n💡 建議：\n• 檢查網路連線\n• 確認 Google Classroom 權限\n• 驗證工作表格式正確\n• 稍後再試或聯繫管理員`,
       ui.ButtonSet.OK
     );
   }
@@ -4153,7 +4200,8 @@ async function addStudentsUI() {
 function handleBatchAddResult(result, ui) {
   if (result.success) {
     const summary = result.summary;
-    const message = `🎉 一般批次新增學生完成！\n\n` +
+    const message =
+      `🎉 一般批次新增學生完成！\n\n` +
       `📊 處理統計：\n` +
       `• 總分配任務：${result.totalAssignments || 0}\n` +
       `• 已處理：${result.processedCount || 0}\n` +
@@ -4164,12 +4212,13 @@ function handleBatchAddResult(result, ui) {
       `• 處理時間：${summary.statistics.duration}ms\n\n` +
       `⏱️ 平均處理時間：${Math.round(summary.statistics.averageTime)}ms/任務\n\n` +
       `📊 詳細報告已保存至「一般新增報告」工作表`;
-    
+
     ui.alert('✅ 新增完成', message, ui.ButtonSet.OK);
   } else {
     // 顯示部分成功的情況
     if (result.processedCount && result.processedCount > 0) {
-      const message = `⚠️ 新增部分完成\n\n` +
+      const message =
+        `⚠️ 新增部分完成\n\n` +
         `📊 處理統計：\n` +
         `• 總任務：${result.totalAssignments || 0}\n` +
         `• 已處理：${result.processedCount || 0}\n` +
@@ -4178,10 +4227,14 @@ function handleBatchAddResult(result, ui) {
         `• 剩餘未處理：${(result.totalAssignments || 0) - (result.processedCount || 0)}\n\n` +
         `❌ 主要錯誤：${result.error || '未知錯誤'}\n\n` +
         `💡 建議：檢查「一般新增報告」工作表查看詳細結果`;
-      
+
       ui.alert('⚠️ 部分完成', message, ui.ButtonSet.OK);
     } else {
-      ui.alert('❌ 新增失敗', `新增過程中發生錯誤：\n${result.error || '未知錯誤'}`, ui.ButtonSet.OK);
+      ui.alert(
+        '❌ 新增失敗',
+        `新增過程中發生錯誤：\n${result.error || '未知錯誤'}`,
+        ui.ButtonSet.OK
+      );
     }
   }
 }
@@ -4192,7 +4245,7 @@ function handleBatchAddResult(result, ui) {
  */
 async function batchAddStudentsFromSheet(sheetName) {
   console.log(`🚀 開始一般批次新增學生: ${sheetName}`);
-  
+
   try {
     // 步驟1: 讀取學生-課程配對資料
     const studentCourseData = await readStudentCourseDataFromSheet(sheetName);
@@ -4204,26 +4257,25 @@ async function batchAddStudentsFromSheet(sheetName) {
 
     // 步驟2: 執行批次學生新增
     const batchResult = await executeBatchStudentAddition(studentCourseData.assignments, sheetName);
-    
+
     // 步驟3: 生成和保存詳細報告
     if (batchResult.processedCount > 0) {
       console.log('📈 生成新增報告...');
       const report = generateBatchAddReport(batchResult, studentCourseData.assignments);
       const saveResult = saveBatchAddReportToSheet(report);
-      
+
       if (saveResult.success) {
         console.log(`📊 詳細報告已保存至 "${saveResult.sheetName}" 工作表`);
       }
     }
-    
+
     return {
       success: batchResult.success,
       summary: batchResult.summary,
       error: batchResult.error,
       processedCount: batchResult.processedCount,
-      totalAssignments: studentCourseData.assignments.length
+      totalAssignments: studentCourseData.assignments.length,
     };
-
   } catch (error) {
     console.log(`[ERROR] 一般批次新增系統錯誤: ${error.message}`);
     return { success: false, error: error.message };
@@ -4238,7 +4290,7 @@ async function readStudentCourseDataFromSheet(sheetName) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       return { success: false, error: `找不到名為 "${sheetName}" 的工作表` };
     }
@@ -4256,9 +4308,11 @@ async function readStudentCourseDataFromSheet(sheetName) {
 
     data.forEach((row, index) => {
       const [email, courseIdOrName, status] = row;
-      
+
       if (!email || !courseIdOrName) {
-        console.log(`[WARN] 第 ${index + 2} 行資料不完整，跳過 (Email: ${email}, Course: ${courseIdOrName})`);
+        console.log(
+          `[WARN] 第 ${index + 2} 行資料不完整，跳過 (Email: ${email}, Course: ${courseIdOrName})`
+        );
         return;
       }
 
@@ -4271,7 +4325,7 @@ async function readStudentCourseDataFromSheet(sheetName) {
       // 🔄 使用課程映射功能轉換課程名稱為 ID
       const courseOriginal = courseIdOrName.toString().trim();
       const mappingResult = getCourseIdFromName(courseOriginal);
-      
+
       if (!mappingResult.success) {
         console.log(`[ERROR] 第 ${index + 2} 行課程映射失敗：${mappingResult.error}`);
         // 仍然加入到任務列表中，但會在後續處理時失敗
@@ -4281,7 +4335,7 @@ async function readStudentCourseDataFromSheet(sheetName) {
           originalCourseName: courseOriginal,
           rowIndex: index + 2,
           courseName: courseOriginal,
-          mappingError: mappingResult.error
+          mappingError: mappingResult.error,
         });
         return;
       }
@@ -4292,20 +4346,21 @@ async function readStudentCourseDataFromSheet(sheetName) {
         originalCourseName: courseOriginal, // 保留原始課程名稱
         rowIndex: index + 2,
         courseName: `${courseOriginal} (${mappingResult.courseId})`, // 顯示原名稱和 ID
-        subject: mappingResult.subject // 如果有的話
+        subject: mappingResult.subject, // 如果有的話
       };
 
-      console.log(`🔄 課程映射：第 ${index + 2} 行 "${courseOriginal}" → ID: ${mappingResult.courseId}`);
+      console.log(
+        `🔄 課程映射：第 ${index + 2} 行 "${courseOriginal}" → ID: ${mappingResult.courseId}`
+      );
       assignments.push(assignment);
     });
 
     console.log(`📊 讀取完成: ${assignments.length} 項新增任務 (跳過已處理項目)`);
-    return { 
-      success: true, 
+    return {
+      success: true,
       assignments,
-      totalAssignments: assignments.length
+      totalAssignments: assignments.length,
     };
-
   } catch (error) {
     return { success: false, error: `讀取學生-課程資料失敗: ${error.message}` };
   }
@@ -4318,15 +4373,15 @@ async function executeBatchStudentAddition(assignments, sheetName) {
   const totalAssignments = assignments.length;
   const startTime = Date.now();
   console.log(`⚡ 開始一般批次學生新增: ${totalAssignments} 項任務`);
-  
+
   const progress = new ProgressTracker(totalAssignments, '一般批次新增學生');
   const BATCH_SIZE = 20; // 每批處理20個新增任務
   const REST_INTERVAL = 1000; // 每批之間休息1秒
   const MAX_EXECUTION_TIME = 300000; // 5分鐘執行限制
   let processedCount = 0;
   let successCount = 0;
-  let addedCount = 0;        // 新增成功的數量
-  let existingCount = 0;     // 已存在的數量
+  let addedCount = 0; // 新增成功的數量
+  let existingCount = 0; // 已存在的數量
   let errorCount = 0;
   const errors = [];
 
@@ -4335,7 +4390,9 @@ async function executeBatchStudentAddition(assignments, sheetName) {
     for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
       // 檢查執行時間
       if (Date.now() - startTime > MAX_EXECUTION_TIME) {
-        console.log(`[WARN] 接近執行時間限制，停止處理。已處理 ${processedCount}/${totalAssignments}`);
+        console.log(
+          `[WARN] 接近執行時間限制，停止處理。已處理 ${processedCount}/${totalAssignments}`
+        );
         break;
       }
 
@@ -4346,13 +4403,13 @@ async function executeBatchStudentAddition(assignments, sheetName) {
       for (const assignment of batch) {
         const studentInfo = `👤 ${assignment.studentEmail}`;
         const courseInfo = `📚 ${assignment.courseName || assignment.courseId}`;
-        
+
         try {
           console.log(`🔄 處理中：${studentInfo} → ${courseInfo}`);
-          
+
           // 使用智能重複檢查新增學生
           const result = await classroomService.addStudentIfNotExists(
-            assignment.courseId, 
+            assignment.courseId,
             assignment.studentEmail
           );
 
@@ -4362,43 +4419,47 @@ async function executeBatchStudentAddition(assignments, sheetName) {
               progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName} (已存在)`);
               successCount++;
               existingCount++;
-              
+
               // 更新狀態到工作表 - 已存在，並打勾
               await updateStudentCourseStatus(assignment, sheetName, 'already_exists');
             } else if (result.status === 'ADDED') {
               console.log(`🎉 新增成功：${studentInfo} 已成功加入 ${courseInfo}`);
-              progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName} (新增成功)`);
+              progress.addSuccess(
+                `${assignment.studentEmail} → ${assignment.courseName} (新增成功)`
+              );
               successCount++;
               addedCount++;
-              
+
               // 更新狀態到工作表 - 新增成功，並打勾
               await updateStudentCourseStatus(assignment, sheetName, 'success');
             }
           } else {
             console.log(`❌ 新增失敗：${studentInfo} → ${courseInfo}，原因：${result.error}`);
-            progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, result.error);
-            errors.push({ 
-              assignment, 
+            progress.addError(
+              `${assignment.studentEmail} → ${assignment.courseName}`,
+              result.error
+            );
+            errors.push({
+              assignment,
               error: result.error,
               studentEmail: assignment.studentEmail,
               courseId: assignment.courseId,
-              courseName: assignment.courseName
+              courseName: assignment.courseName,
             });
             errorCount++;
-            
+
             // 記錄失敗狀態 - 不打勾
             await updateStudentCourseStatus(assignment, sheetName, 'failed', result.error);
           }
-
         } catch (error) {
           console.log(`💥 處理異常：${studentInfo} → ${courseInfo}，錯誤：${error.message}`);
           progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, error);
-          errors.push({ 
-            assignment, 
+          errors.push({
+            assignment,
             error: error.message,
             studentEmail: assignment.studentEmail,
             courseId: assignment.courseId,
-            courseName: assignment.courseName
+            courseName: assignment.courseName,
           });
           errorCount++;
           await updateStudentCourseStatus(assignment, sheetName, 'failed', error.message);
@@ -4415,9 +4476,9 @@ async function executeBatchStudentAddition(assignments, sheetName) {
     }
 
     const summary = progress.complete();
-    
+
     const endTime = Date.now();
-    
+
     console.log(`📊 一般批次新增完成統計:`);
     console.log(`  總任務: ${totalAssignments}`);
     console.log(`  已處理: ${processedCount}`);
@@ -4429,9 +4490,9 @@ async function executeBatchStudentAddition(assignments, sheetName) {
 
     // 準備執行報告資料
     const reportResults = [];
-    
+
     // 收集成功的結果
-    assignments.forEach(assignment => {
+    assignments.forEach((assignment) => {
       const wasProcessed = processedCount > 0; // 簡化的檢查
       if (wasProcessed) {
         // 根據工作表狀態判斷結果（這裡是簡化版，實際可以從工作表讀取狀態）
@@ -4441,20 +4502,20 @@ async function executeBatchStudentAddition(assignments, sheetName) {
           courseName: assignment.courseName,
           className: assignment.className,
           success: true,
-          status: 'ADDED' // 可以根據實際情況調整
+          status: 'ADDED', // 可以根據實際情況調整
         });
       }
     });
-    
+
     // 加入錯誤結果
-    errors.forEach(errorItem => {
+    errors.forEach((errorItem) => {
       reportResults.push({
         studentEmail: errorItem.studentEmail,
         courseId: errorItem.courseId,
         courseName: errorItem.courseName,
         className: errorItem.className,
         success: false,
-        error: errorItem.error
+        error: errorItem.error,
       });
     });
 
@@ -4468,7 +4529,7 @@ async function executeBatchStudentAddition(assignments, sheetName) {
         startTime,
         endTime
       );
-      
+
       if (reportResult.success) {
         console.log(`📊 詳細執行報告已建立：${reportResult.sheetName}`);
       }
@@ -4486,9 +4547,8 @@ async function executeBatchStudentAddition(assignments, sheetName) {
       errorCount,
       errors,
       totalTime: endTime - startTime,
-      reportResults
+      reportResults,
     };
-
   } catch (error) {
     console.log(`[ERROR] 一般批次新增系統錯誤: ${error.message}`);
     return { success: false, error: error.message };
@@ -4502,7 +4562,7 @@ async function updateStudentCourseStatus(assignment, sheetName, status, error = 
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(sheetName);
-    
+
     if (!sheet || !assignment.rowIndex) {
       return;
     }
@@ -4510,7 +4570,7 @@ async function updateStudentCourseStatus(assignment, sheetName, status, error = 
     let statusMessage = '';
     let shouldCheck = false;
     const timestamp = new Date().toLocaleString('zh-TW');
-    
+
     switch (status) {
       case 'success':
         statusMessage = `✅ 已新增 (${timestamp})`;
@@ -4531,7 +4591,7 @@ async function updateStudentCourseStatus(assignment, sheetName, status, error = 
 
     // 更新狀態列 (第3列)
     sheet.getRange(assignment.rowIndex, 3).setValue(statusMessage);
-    
+
     // 根據狀態決定是否打勾 (假設第4列是勾選欄)
     if (shouldCheck) {
       try {
@@ -4541,9 +4601,10 @@ async function updateStudentCourseStatus(assignment, sheetName, status, error = 
         console.log(`[WARN] 無法打勾: ${checkError.message}`);
       }
     }
-    
-    console.log(`[STATUS] 已更新 ${assignment.studentEmail} → ${assignment.courseId} 狀態: ${statusMessage}`);
-    
+
+    console.log(
+      `[STATUS] 已更新 ${assignment.studentEmail} → ${assignment.courseId} 狀態: ${statusMessage}`
+    );
   } catch (error) {
     console.log(`[WARN] 無法更新學生課程狀態: ${error.message}`);
   }
@@ -4563,20 +4624,20 @@ function generateBatchAddReport(batchResult, assignments) {
       errorCount: batchResult.errorCount,
       successRate: Math.round((batchResult.successCount / batchResult.processedCount) * 100),
       totalTime: batchResult.totalTime,
-      averageTimePerAssignment: Math.round(batchResult.totalTime / batchResult.processedCount)
+      averageTimePerAssignment: Math.round(batchResult.totalTime / batchResult.processedCount),
     },
     performance: {
       assignmentsPerSecond: Math.round(batchResult.processedCount / (batchResult.totalTime / 1000)),
-      timeEfficiency: batchResult.totalTime < 300000 ? 'excellent' : 'acceptable'
+      timeEfficiency: batchResult.totalTime < 300000 ? 'excellent' : 'acceptable',
     },
     errors: batchResult.errors || [],
-    recommendations: []
+    recommendations: [],
   };
 
   // 生成建議
   if (report.summary.errorCount > 0) {
     report.recommendations.push('檢查失敗的新增項目，確認課程ID和學生Email格式正確');
-    
+
     if (report.summary.successRate < 80) {
       report.recommendations.push('成功率較低，建議檢查權限設定或課程ID有效性');
     }
@@ -4600,15 +4661,23 @@ function saveBatchAddReportToSheet(report) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const reportSheetName = '一般新增報告';
-    
+
     let reportSheet = ss.getSheetByName(reportSheetName);
     if (!reportSheet) {
       reportSheet = ss.insertSheet(reportSheetName);
-      
+
       // 建立標題行
       const headers = [
-        '時間戳記', '總任務數', '已處理', '成功數', '失敗數', 
-        '成功率(%)', '總時間(ms)', '平均時間(ms)', '處理速度(/秒)', '建議'
+        '時間戳記',
+        '總任務數',
+        '已處理',
+        '成功數',
+        '失敗數',
+        '成功率(%)',
+        '總時間(ms)',
+        '平均時間(ms)',
+        '處理速度(/秒)',
+        '建議',
       ];
       reportSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       reportSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
@@ -4625,14 +4694,13 @@ function saveBatchAddReportToSheet(report) {
       report.summary.totalTime,
       report.summary.averageTimePerAssignment,
       report.performance.assignmentsPerSecond,
-      report.recommendations.join('; ')
+      report.recommendations.join('; '),
     ];
 
     reportSheet.appendRow(newRow);
     console.log(`📊 一般新增報告已保存到 "${reportSheetName}" 工作表`);
-    
+
     return { success: true, sheetName: reportSheetName };
-    
   } catch (error) {
     console.log(`[ERROR] 保存一般新增報告失敗: ${error.message}`);
     return { success: false, error: error.message };
@@ -4647,7 +4715,7 @@ async function distributeStudentsUI() {
   // 檢測執行環境：Sheets UI vs Apps Script 編輯器
   let ui;
   let isInEditor = false;
-  
+
   try {
     ui = SpreadsheetApp.getUi();
   } catch (e) {
@@ -4656,17 +4724,17 @@ async function distributeStudentsUI() {
     console.log('⚡ 將使用預設參數執行測試模式...');
     isInEditor = true;
   }
-  
+
   // 如果在編輯器中，直接調用測試函數
   if (isInEditor) {
     console.log('📋 編輯器模式 - 使用預設參數:');
     console.log('  - 工作表: "學生分配"');
     console.log('  - 模式: 自動配對');
     console.log('  - 跳過權限檢查');
-    
+
     return await testDistributeStudents('學生分配', true);
   }
-  
+
   try {
     // 步驟1: 獲取工作表名稱
     const sheetNameResult = ui.prompt(
@@ -4705,12 +4773,12 @@ async function distributeStudentsUI() {
     // 執行權限預檢
     console.log('🔍 執行權限預檢...');
     const currentUser = Session.getActiveUser().getEmail();
-    
+
     const permissionCheck = await performPermissionPrecheck(currentUser);
-    
+
     // 顯示權限檢查結果
     console.log(`✅ 權限檢查：${permissionCheck.userLevel} - ${permissionCheck.status}`);
-    
+
     // 只有在真正無法執行時才阻止
     if (!permissionCheck.canProceed) {
       const continueResult = ui.alert(
@@ -4718,7 +4786,7 @@ async function distributeStudentsUI() {
         `檢測到權限問題：\n${permissionCheck.issue}\n\n💡 解決方法：\n1. 檢查網路連線\n2. 確認已正確登入 Google 帳戶\n3. 執行「🔄 重新授權權限」\n\n是否仍要嘗試執行？`,
         ui.ButtonSet.YES_NO
       );
-      
+
       if (continueResult !== ui.Button.YES) {
         ui.alert('操作已取消', '建議解決權限問題後再嘗試。', ui.ButtonSet.OK);
         return;
@@ -4727,18 +4795,17 @@ async function distributeStudentsUI() {
 
     // 執行智能分配 - 使用同步等待
     console.log(`🚀 開始執行智能學生分配 (模式: ${isAutoMode ? '自動配對' : '自訂配對'})`);
-    
+
     const result = await distributeStudentsToCourses(sheetName, isAutoMode);
-    
+
     // 直接處理結果，確保用戶看到反饋
     handleDistributionResult(result, ui);
-    
   } catch (error) {
     console.log(`[ERROR] 智能學生分配失敗: ${error.message}`);
-    
+
     // 詳細錯誤處理和用戶友善的錯誤訊息
     let errorMessage = '智能分配系統發生錯誤';
-    
+
     if (error.message.includes('權限')) {
       errorMessage = '權限不足，請檢查 Google Classroom 存取權限';
     } else if (error.message.includes('工作表')) {
@@ -4746,10 +4813,10 @@ async function distributeStudentsUI() {
     } else if (error.message.includes('課程')) {
       errorMessage = '課程操作錯誤，請檢查課程權限';
     }
-    
+
     ui.alert(
-      '❌ 執行錯誤', 
-      `${errorMessage}：\n\n技術詳情：${error.message}\n\n💡 建議：\n• 檢查網路連線\n• 確認 Google Classroom 權限\n• 驗證工作表格式正確\n• 稍後再試或聯繫管理員`, 
+      '❌ 執行錯誤',
+      `${errorMessage}：\n\n技術詳情：${error.message}\n\n💡 建議：\n• 檢查網路連線\n• 確認 Google Classroom 權限\n• 驗證工作表格式正確\n• 稍後再試或聯繫管理員`,
       ui.ButtonSet.OK
     );
   }
@@ -4760,22 +4827,23 @@ async function distributeStudentsUI() {
  */
 function handleDistributionResult(result, ui) {
   console.log('[RESULT] 處理智能分配結果:', JSON.stringify(result, null, 2));
-  
+
   // 計算成功率和處理效率
   const totalTasks = result.totalAssignments || 0;
   const processedTasks = result.processedCount || 0;
-  const successfulTasks = (result.summary?.statistics?.successful) || 0;
-  const failedTasks = (result.summary?.statistics?.failed) || 0;
-  
+  const successfulTasks = result.summary?.statistics?.successful || 0;
+  const failedTasks = result.summary?.statistics?.failed || 0;
+
   const successRate = totalTasks > 0 ? Math.round((successfulTasks / totalTasks) * 100) : 0;
   const processingRate = totalTasks > 0 ? Math.round((processedTasks / totalTasks) * 100) : 0;
-  
+
   if (result.success && successfulTasks > 0) {
     // 完全成功的情況
     const duration = result.summary?.statistics?.duration || 0;
     const avgTime = Math.round(duration / Math.max(processedTasks, 1));
-    
-    const message = `🎉 智能學生分配完成！\n\n` +
+
+    const message =
+      `🎉 智能學生分配完成！\n\n` +
       `📊 執行統計：\n` +
       `• 總分配任務：${totalTasks}\n` +
       `• 成功處理：${successfulTasks} (${successRate}%)\n` +
@@ -4788,14 +4856,14 @@ function handleDistributionResult(result, ui) {
       `• 平均處理時間：${avgTime}ms/任務\n\n` +
       `📊 詳細報告已保存至「智能分配報告」工作表\n` +
       `📋 狀態更新已同步至「學生分配」工作表`;
-    
+
     ui.alert('✅ 分配成功完成', message, ui.ButtonSet.OK);
-    
   } else if (processedTasks > 0) {
     // 部分成功的情況
     const remainingTasks = totalTasks - processedTasks;
-    
-    const message = `⚠️ 智能學生分配部分完成\n\n` +
+
+    const message =
+      `⚠️ 智能學生分配部分完成\n\n` +
       `📊 執行統計：\n` +
       `• 總任務：${totalTasks}\n` +
       `• 已處理：${processedTasks} (${processingRate}%)\n` +
@@ -4809,48 +4877,54 @@ function handleDistributionResult(result, ui) {
       `• 驗證學生Email格式正確性\n` +
       `• 稍後重新執行未完成的任務\n\n` +
       `📋 已處理項目的狀態已更新至工作表`;
-    
+
     // 判斷是否需要立即重試
     if (successRate >= 80) {
       const retryResult = ui.alert(
-        '⚠️ 部分完成', 
-        message + '\n\n🔄 是否立即重試失敗的任務？', 
+        '⚠️ 部分完成',
+        message + '\n\n🔄 是否立即重試失敗的任務？',
         ui.ButtonSet.YES_NO
       );
-      
+
       if (retryResult === ui.Button.YES) {
-        ui.alert('💡 重試提示', '請稍後手動重新執行智能學生分配，系統會自動跳過已成功的項目。', ui.ButtonSet.OK);
+        ui.alert(
+          '💡 重試提示',
+          '請稍後手動重新執行智能學生分配，系統會自動跳過已成功的項目。',
+          ui.ButtonSet.OK
+        );
       }
     } else {
       ui.alert('⚠️ 部分完成', message, ui.ButtonSet.OK);
     }
-    
   } else {
     // 完全失敗的情況
     let errorCategory = '系統錯誤';
     let troubleshootingTips = '';
-    
+
     const errorMsg = (result.error || '未知錯誤').toLowerCase();
-    
+
     if (errorMsg.includes('權限') || errorMsg.includes('permission')) {
       errorCategory = '權限問題';
-      troubleshootingTips = '• 確認已授權 Google Classroom API\n• 檢查課程擁有者/老師權限\n• 重新授權應用程式';
+      troubleshootingTips =
+        '• 確認已授權 Google Classroom API\n• 檢查課程擁有者/老師權限\n• 重新授權應用程式';
     } else if (errorMsg.includes('工作表') || errorMsg.includes('sheet')) {
-      errorCategory = '工作表問題';  
-      troubleshootingTips = '• 確認工作表名稱正確\n• 檢查工作表格式（學生Email|班級名稱|狀態）\n• 驗證資料完整性';
+      errorCategory = '工作表問題';
+      troubleshootingTips =
+        '• 確認工作表名稱正確\n• 檢查工作表格式（學生Email|班級名稱|狀態）\n• 驗證資料完整性';
     } else if (errorMsg.includes('網路') || errorMsg.includes('network')) {
       errorCategory = '網路問題';
       troubleshootingTips = '• 檢查網路連線\n• 稍後再試\n• 確認 Google 服務正常';
     } else {
       troubleshootingTips = '• 檢查系統日誌\n• 驗證輸入資料格式\n• 聯繫技術支援';
     }
-    
-    const message = `❌ 智能學生分配失敗\n\n` +
+
+    const message =
+      `❌ 智能學生分配失敗\n\n` +
       `🔍 錯誤類型：${errorCategory}\n` +
       `📝 錯誤詳情：${result.error || '未知錯誤'}\n\n` +
       `🛠️ 故障排除建議：\n${troubleshootingTips}\n\n` +
       `💡 如問題持續存在，請截圖此訊息並聯繫系統管理員。`;
-    
+
     ui.alert('❌ 執行失敗', message, ui.ButtonSet.OK);
   }
 }
@@ -4862,39 +4936,38 @@ function handleDistributionResult(result, ui) {
 async function testDistributeStudents(sheetName = '學生分配', isAutoMode = true) {
   console.log('🧪 開始測試智能學生分配功能...');
   console.log(`📊 測試參數: 工作表="${sheetName}", 自動模式=${isAutoMode}`);
-  
+
   try {
     // 記錄開始時間
     const startTime = Date.now();
-    
+
     // 跳過權限檢查，直接執行核心分配功能
     console.log('⚡ 跳過權限檢查，直接執行核心分配...');
-    
+
     const result = await distributeStudentsToCourses(sheetName, isAutoMode);
-    
+
     // 計算執行時間
     const executionTime = Date.now() - startTime;
-    
+
     // 顯示測試結果
     console.log('\n🎉 測試完成！');
-    console.log(`⏱️ 執行時間: ${executionTime}ms (${Math.round(executionTime/1000)}秒)`);
+    console.log(`⏱️ 執行時間: ${executionTime}ms (${Math.round(executionTime / 1000)}秒)`);
     console.log('📊 測試結果摘要:');
     console.log(`  - 成功: ${result.success}`);
     console.log(`  - 總任務: ${result.totalAssignments || 0}`);
     console.log(`  - 已處理: ${result.processedCount || 0}`);
     console.log(`  - 分配課程: ${result.distributedCourses || 0}`);
-    
+
     if (result.error) {
       console.log(`  - 錯誤: ${result.error}`);
     }
-    
+
     return result;
-    
   } catch (error) {
     console.log('\n❌ 測試失敗!');
     console.log(`🔍 錯誤詳情: ${error.message}`);
     console.log(`📋 錯誤堆疊: ${error.stack}`);
-    
+
     // 提供調試建議
     if (error.message.includes('工作表')) {
       console.log('💡 建議: 檢查工作表名稱是否正確，格式是否為 "學生Email | 班級名稱 | 狀態"');
@@ -4903,7 +4976,7 @@ async function testDistributeStudents(sheetName = '學生分配', isAutoMode = t
     } else if (error.message.includes('課程')) {
       console.log('💡 建議: 確認課程存在且有操作權限');
     }
-    
+
     throw error;
   }
 }
@@ -4922,7 +4995,7 @@ async function quickTestDistribution() {
  */
 async function distributeStudentsToCourses(sheetName, isAutoMode = true) {
   console.log(`🚀 開始智能學生分配: ${sheetName} (模式: ${isAutoMode ? '自動配對' : '自訂配對'})`);
-  
+
   try {
     // 步驟1: 驗證和讀取學生資料
     const studentData = await readStudentDataFromSheet(sheetName);
@@ -4939,7 +5012,11 @@ async function distributeStudentsToCourses(sheetName, isAutoMode = true) {
 
     // 步驟3: 執行課程匹配算法
     console.log('🧠 執行智能課程匹配...');
-    const matchingResult = await performCourseMatching(studentData.students, coursesResult.data, isAutoMode);
+    const matchingResult = await performCourseMatching(
+      studentData.students,
+      coursesResult.data,
+      isAutoMode
+    );
     if (!matchingResult.success) {
       return { success: false, error: matchingResult.error };
     }
@@ -4947,27 +5024,26 @@ async function distributeStudentsToCourses(sheetName, isAutoMode = true) {
     // 步驟4: 執行批次學生分配
     console.log('⚡ 開始批次學生分配...');
     const distributionResult = await executeBatchDistribution(matchingResult.assignments);
-    
+
     // 步驟5: 生成和保存詳細報告
     if (distributionResult.processedCount > 0) {
       console.log('📈 生成分配報告...');
       const report = generateDistributionReport(distributionResult, matchingResult.assignments);
       const saveResult = saveDistributionReportToSheet(report);
-      
+
       if (saveResult.success) {
         console.log(`📊 詳細報告已保存至 "${saveResult.sheetName}" 工作表`);
       }
     }
-    
+
     return {
       success: distributionResult.success,
       summary: distributionResult.summary,
       distributedCourses: matchingResult.totalCourses,
       error: distributionResult.error,
       processedCount: distributionResult.processedCount,
-      totalAssignments: matchingResult.assignments.length
+      totalAssignments: matchingResult.assignments.length,
     };
-
   } catch (error) {
     console.log(`[ERROR] 智能分配系統錯誤: ${error.message}`);
     return { success: false, error: error.message };
@@ -4981,14 +5057,18 @@ function clearStudentStatusColumn(sheetName = 'stu_course') {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       throw new Error(`找不到名為 "${sheetName}" 的工作表`);
     }
 
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      SpreadsheetApp.getUi().alert('提示', '工作表中沒有學生資料。', SpreadsheetApp.getUi().ButtonSet.OK);
+      SpreadsheetApp.getUi().alert(
+        '提示',
+        '工作表中沒有學生資料。',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
       return;
     }
 
@@ -5010,11 +5090,18 @@ function clearStudentStatusColumn(sheetName = 'stu_course') {
     statusRange.clearContent();
 
     console.log(`✅ 已清除 ${lastRow - 1} 行學生的處理狀態`);
-    ui.alert('✅ 狀態已清除', `已成功清除 ${lastRow - 1} 名學生的處理狀態。\n\n現在可以重新執行智能學生分配功能。`, ui.ButtonSet.OK);
-
+    ui.alert(
+      '✅ 狀態已清除',
+      `已成功清除 ${lastRow - 1} 名學生的處理狀態。\n\n現在可以重新執行智能學生分配功能。`,
+      ui.ButtonSet.OK
+    );
   } catch (error) {
     console.log(`[ERROR] 清除狀態失敗: ${error.message}`);
-    SpreadsheetApp.getUi().alert('錯誤', `清除狀態失敗：${error.message}`, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert(
+      '錯誤',
+      `清除狀態失敗：${error.message}`,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
   }
 }
 
@@ -5025,7 +5112,7 @@ async function readStudentDataFromSheet(sheetName) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       return { success: false, error: `找不到名為 "${sheetName}" 的工作表` };
     }
@@ -5045,7 +5132,7 @@ async function readStudentDataFromSheet(sheetName) {
 
     data.forEach((row, index) => {
       const [email, className, status] = row;
-      
+
       if (!email || !className) {
         console.log(`[WARN] 第 ${index + 2} 行資料不完整，跳過`);
         return;
@@ -5062,7 +5149,7 @@ async function readStudentDataFromSheet(sheetName) {
         email: email.toString().trim(),
         className: className.toString().trim(),
         rowIndex: index + 2,
-        currentStatus: status ? status.toString().trim() : ''
+        currentStatus: status ? status.toString().trim() : '',
       };
 
       students.push(student);
@@ -5074,16 +5161,17 @@ async function readStudentDataFromSheet(sheetName) {
       classGroups.get(student.className).push(student);
     });
 
-    console.log(`📊 讀取完成: ${students.length} 名學生，${classGroups.size} 個班級 (跳過 ${skippedCount} 名已完成學生)`);
-    return { 
-      success: true, 
-      students, 
+    console.log(
+      `📊 讀取完成: ${students.length} 名學生，${classGroups.size} 個班級 (跳過 ${skippedCount} 名已完成學生)`
+    );
+    return {
+      success: true,
+      students,
       classGroups,
       totalStudents: students.length,
       totalClasses: classGroups.size,
-      skippedCount
+      skippedCount,
     };
-
   } catch (error) {
     return { success: false, error: `讀取學生資料失敗: ${error.message}` };
   }
@@ -5095,22 +5183,22 @@ async function readStudentDataFromSheet(sheetName) {
  */
 async function performCourseMatching(students, allCourses, isAutoMode) {
   console.log(`🧠 開始課程匹配 (共 ${allCourses.length} 門課程)`);
-  
+
   try {
     // 課程結構常數 (從現有系統提取)
-    const SUBJECTS = ['LT', 'IT', 'KCFS'];  // 三門主要課程
+    const SUBJECTS = ['LT', 'IT', 'KCFS']; // 三門主要課程
     const GRADES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'];
     const CLASS_NAMES = ['Achievers', 'Discoverers', 'Voyagers', 'Explorers', 'Navigators'];
 
     // 建立課程索引
     const courseIndex = new Map();
-    allCourses.forEach(course => {
+    allCourses.forEach((course) => {
       courseIndex.set(course.name, course);
     });
 
     // 按班級分組學生
     const classGroups = new Map();
-    students.forEach(student => {
+    students.forEach((student) => {
       if (!classGroups.has(student.className)) {
         classGroups.set(student.className, []);
       }
@@ -5123,9 +5211,16 @@ async function performCourseMatching(students, allCourses, isAutoMode) {
     // 為每個班級匹配課程
     for (const [className, classStudents] of classGroups) {
       console.log(`🎯 為班級 "${className}" 匹配課程 (${classStudents.length} 名學生)`);
-      
-      const matchedCourses = await findMatchingCourses(className, courseIndex, SUBJECTS, GRADES, CLASS_NAMES, isAutoMode);
-      
+
+      const matchedCourses = await findMatchingCourses(
+        className,
+        courseIndex,
+        SUBJECTS,
+        GRADES,
+        CLASS_NAMES,
+        isAutoMode
+      );
+
       if (matchedCourses.length === 0) {
         console.log(`[WARN] 班級 "${className}" 找不到匹配的課程`);
         continue;
@@ -5142,21 +5237,20 @@ async function performCourseMatching(students, allCourses, isAutoMode) {
             courseId: course.id,
             courseName: course.name,
             className: student.className,
-            rowIndex: student.rowIndex
+            rowIndex: student.rowIndex,
           });
         }
       }
     }
 
     console.log(`🎯 匹配完成: ${assignments.length} 項分配任務，涵蓋 ${totalCourses} 門課程`);
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       assignments,
       totalCourses,
-      classCount: classGroups.size
+      classCount: classGroups.size,
     };
-
   } catch (error) {
     return { success: false, error: `課程匹配失敗: ${error.message}` };
   }
@@ -5165,16 +5259,23 @@ async function performCourseMatching(students, allCourses, isAutoMode) {
 /**
  * 🔍 為班級尋找匹配的課程
  */
-async function findMatchingCourses(className, courseIndex, subjects, grades, classNames, isAutoMode) {
+async function findMatchingCourses(
+  className,
+  courseIndex,
+  subjects,
+  grades,
+  classNames,
+  isAutoMode
+) {
   const matchedCourses = [];
-  
+
   if (isAutoMode) {
     // 自動模式: 根據課程命名規則匹配
-    
+
     // 嘗試解析班級名稱 (例如: "G3 Explorers" -> G3, Explorers)
     let grade = null;
     let classType = null;
-    
+
     // 檢查是否包含年級信息
     for (const g of grades) {
       if (className.includes(g)) {
@@ -5182,7 +5283,7 @@ async function findMatchingCourses(className, courseIndex, subjects, grades, cla
         break;
       }
     }
-    
+
     // 檢查是否包含班級類型
     for (const ct of classNames) {
       if (className.includes(ct)) {
@@ -5190,9 +5291,11 @@ async function findMatchingCourses(className, courseIndex, subjects, grades, cla
         break;
       }
     }
-    
-    console.log(`🔍 班級解析: "${className}" -> 年級: ${grade || '未知'}, 類型: ${classType || '未知'}`);
-    
+
+    console.log(
+      `🔍 班級解析: "${className}" -> 年級: ${grade || '未知'}, 類型: ${classType || '未知'}`
+    );
+
     // 為每個科目尋找對應課程
     for (const subject of subjects) {
       if (grade && classType) {
@@ -5204,26 +5307,27 @@ async function findMatchingCourses(className, courseIndex, subjects, grades, cla
           continue;
         }
       }
-      
+
       // 模糊匹配: 尋找包含班級名稱的課程
       for (const [courseName, course] of courseIndex) {
-        if (courseName.includes(subject) && 
-            (courseName.includes(className) || 
-             (grade && courseName.includes(grade)) ||
-             (classType && courseName.includes(classType)))) {
+        if (
+          courseName.includes(subject) &&
+          (courseName.includes(className) ||
+            (grade && courseName.includes(grade)) ||
+            (classType && courseName.includes(classType)))
+        ) {
           matchedCourses.push(course);
           console.log(`  ✅ 模糊匹配: ${courseName}`);
           break;
         }
       }
     }
-    
   } else {
     // 自訂模式: 需要用戶手動指定匹配規則 (暫時使用自動模式邏輯)
     console.log(`[INFO] 自訂模式尚未實作，暫時使用自動模式`);
     return await findMatchingCourses(className, courseIndex, subjects, grades, classNames, true);
   }
-  
+
   return matchedCourses;
 }
 
@@ -5233,17 +5337,17 @@ async function findMatchingCourses(className, courseIndex, subjects, grades, cla
 async function executeBatchDistribution(assignments) {
   const totalAssignments = assignments.length;
   console.log(`⚡ 開始批次分配: ${totalAssignments} 項任務`);
-  
+
   const progress = new ProgressTracker(totalAssignments, '智能學生分配');
   const BATCH_SIZE = 20; // 每批處理20個分配
   const REST_INTERVAL = 1000; // 每批之間休息1秒
   const MAX_EXECUTION_TIME = 300000; // 5分鐘執行限制 (留1分鐘緩衝)
-  
+
   const startTime = Date.now();
   let processedCount = 0;
   let successCount = 0;
-  let addedCount = 0;        // 新增成功的數量
-  let existingCount = 0;     // 已存在的數量
+  let addedCount = 0; // 新增成功的數量
+  let existingCount = 0; // 已存在的數量
   let errorCount = 0;
   const errors = [];
 
@@ -5252,7 +5356,9 @@ async function executeBatchDistribution(assignments) {
     for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
       // 檢查執行時間
       if (Date.now() - startTime > MAX_EXECUTION_TIME) {
-        console.log(`[WARN] 接近執行時間限制，停止處理。已處理 ${processedCount}/${totalAssignments}`);
+        console.log(
+          `[WARN] 接近執行時間限制，停止處理。已處理 ${processedCount}/${totalAssignments}`
+        );
         break;
       }
 
@@ -5263,13 +5369,15 @@ async function executeBatchDistribution(assignments) {
       for (const assignment of batch) {
         const studentInfo = `👤 ${assignment.studentEmail}`;
         const courseInfo = `📚 ${assignment.courseName || assignment.courseId}`;
-        
+
         try {
-          console.log(`🔄 智能分配處理中：${studentInfo} → ${courseInfo} (${assignment.className})`);
-          
+          console.log(
+            `🔄 智能分配處理中：${studentInfo} → ${courseInfo} (${assignment.className})`
+          );
+
           // 使用智能重複檢查新增學生
           const result = await classroomService.addStudentIfNotExists(
-            assignment.courseId, 
+            assignment.courseId,
             assignment.studentEmail
           );
 
@@ -5279,45 +5387,49 @@ async function executeBatchDistribution(assignments) {
               progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName} (已存在)`);
               successCount++;
               existingCount++;
-              
+
               // 更新學生處理狀態 - 已存在
               await updateStudentStatus(assignment, 'already_exists');
             } else if (result.status === 'ADDED') {
               console.log(`🎉 智能分配成功：${studentInfo} 已成功加入 ${courseInfo}`);
-              progress.addSuccess(`${assignment.studentEmail} → ${assignment.courseName} (新增成功)`);
+              progress.addSuccess(
+                `${assignment.studentEmail} → ${assignment.courseName} (新增成功)`
+              );
               successCount++;
               addedCount++;
-              
+
               // 更新學生處理狀態 - 新增成功
               await updateStudentStatus(assignment, 'success');
             }
           } else {
             console.log(`❌ 智能分配失敗：${studentInfo} → ${courseInfo}，原因：${result.error}`);
-            progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, result.error);
-            errors.push({ 
-              assignment, 
+            progress.addError(
+              `${assignment.studentEmail} → ${assignment.courseName}`,
+              result.error
+            );
+            errors.push({
+              assignment,
               error: result.error,
               studentEmail: assignment.studentEmail,
               courseId: assignment.courseId,
               courseName: assignment.courseName,
-              className: assignment.className
+              className: assignment.className,
             });
             errorCount++;
-            
+
             // 記錄失敗狀態
             await updateStudentStatus(assignment, 'failed', result.error);
           }
-
         } catch (error) {
           console.log(`💥 智能分配異常：${studentInfo} → ${courseInfo}，錯誤：${error.message}`);
           progress.addError(`${assignment.studentEmail} → ${assignment.courseName}`, error);
-          errors.push({ 
-            assignment, 
+          errors.push({
+            assignment,
             error: error.message,
             studentEmail: assignment.studentEmail,
             courseId: assignment.courseId,
             courseName: assignment.courseName,
-            className: assignment.className
+            className: assignment.className,
           });
           errorCount++;
           await updateStudentStatus(assignment, 'failed', error.message);
@@ -5335,7 +5447,7 @@ async function executeBatchDistribution(assignments) {
 
     const summary = progress.complete();
     const endTime = Date.now();
-    
+
     console.log(`📊 分配完成統計:`);
     console.log(`  總任務: ${totalAssignments}`);
     console.log(`  已處理: ${processedCount}`);
@@ -5347,9 +5459,9 @@ async function executeBatchDistribution(assignments) {
 
     // 準備執行報告資料
     const reportResults = [];
-    
+
     // 收集成功的結果
-    assignments.forEach(assignment => {
+    assignments.forEach((assignment) => {
       const wasProcessed = processedCount > 0; // 簡化的檢查
       if (wasProcessed) {
         reportResults.push({
@@ -5358,20 +5470,20 @@ async function executeBatchDistribution(assignments) {
           courseName: assignment.courseName,
           className: assignment.className,
           success: true,
-          status: 'ADDED' // 可以根據實際情況調整
+          status: 'ADDED', // 可以根據實際情況調整
         });
       }
     });
-    
+
     // 加入錯誤結果
-    errors.forEach(errorItem => {
+    errors.forEach((errorItem) => {
       reportResults.push({
         studentEmail: errorItem.studentEmail,
         courseId: errorItem.courseId,
         courseName: errorItem.courseName,
         className: errorItem.className,
         success: false,
-        error: errorItem.error
+        error: errorItem.error,
       });
     });
 
@@ -5385,7 +5497,7 @@ async function executeBatchDistribution(assignments) {
         startTime,
         endTime
       );
-      
+
       if (reportResult.success) {
         console.log(`📊 詳細執行報告已建立：${reportResult.sheetName}`);
       }
@@ -5403,9 +5515,8 @@ async function executeBatchDistribution(assignments) {
       errorCount,
       errors,
       totalTime: endTime - startTime,
-      reportResults
+      reportResults,
     };
-
   } catch (error) {
     console.log(`[ERROR] 批次分配系統錯誤: ${error.message}`);
     return { success: false, error: error.message };
@@ -5420,7 +5531,7 @@ async function updateStudentStatus(assignment, status, error = null) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheetName = '學生分配'; // 預設工作表名稱
     const sheet = ss.getSheetByName(sheetName);
-    
+
     if (!sheet || !assignment.rowIndex) {
       return; // 如果沒有工作表或行索引，跳過狀態更新
     }
@@ -5429,7 +5540,7 @@ async function updateStudentStatus(assignment, status, error = null) {
     let statusMessage = '';
     let shouldCheck = false;
     const timestamp = new Date().toLocaleString('zh-TW');
-    
+
     switch (status) {
       case 'success':
         statusMessage = `✅ 已分配到 ${assignment.courseName} (${timestamp})`;
@@ -5454,7 +5565,7 @@ async function updateStudentStatus(assignment, status, error = null) {
 
     // 更新狀態列 (第3列是狀態列)
     sheet.getRange(assignment.rowIndex, 3).setValue(statusMessage);
-    
+
     // 根據狀態決定是否打勾 (假設第4列是勾選欄)
     if (shouldCheck) {
       try {
@@ -5464,9 +5575,8 @@ async function updateStudentStatus(assignment, status, error = null) {
         console.log(`[WARN] 無法打勾: ${checkError.message}`);
       }
     }
-    
+
     console.log(`[STATUS] 已更新學生 ${assignment.studentEmail} 狀態: ${statusMessage}`);
-    
   } catch (error) {
     console.log(`[WARN] 無法更新學生狀態: ${error.message}`);
   }
@@ -5483,23 +5593,29 @@ function generateDistributionReport(distributionResult, assignments) {
       processedCount: distributionResult.processedCount,
       successCount: distributionResult.successCount,
       errorCount: distributionResult.errorCount,
-      successRate: Math.round((distributionResult.successCount / distributionResult.processedCount) * 100),
+      successRate: Math.round(
+        (distributionResult.successCount / distributionResult.processedCount) * 100
+      ),
       totalTime: distributionResult.totalTime,
-      averageTimePerAssignment: Math.round(distributionResult.totalTime / distributionResult.processedCount)
+      averageTimePerAssignment: Math.round(
+        distributionResult.totalTime / distributionResult.processedCount
+      ),
     },
     performance: {
-      assignmentsPerSecond: Math.round(distributionResult.processedCount / (distributionResult.totalTime / 1000)),
+      assignmentsPerSecond: Math.round(
+        distributionResult.processedCount / (distributionResult.totalTime / 1000)
+      ),
       timeEfficiency: distributionResult.totalTime < 300000 ? 'excellent' : 'acceptable',
-      memoryUsage: 'within_limits' // Apps Script 自動管理
+      memoryUsage: 'within_limits', // Apps Script 自動管理
     },
     errors: distributionResult.errors || [],
-    recommendations: []
+    recommendations: [],
   };
 
   // 生成建議
   if (report.summary.errorCount > 0) {
     report.recommendations.push('檢查失敗的分配項目，可能需要手動處理');
-    
+
     if (report.summary.successRate < 80) {
       report.recommendations.push('成功率較低，建議檢查權限設定或課程配對規則');
     }
@@ -5528,15 +5644,23 @@ function saveDistributionReportToSheet(report) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const reportSheetName = '智能分配報告';
-    
+
     let reportSheet = ss.getSheetByName(reportSheetName);
     if (!reportSheet) {
       reportSheet = ss.insertSheet(reportSheetName);
-      
+
       // 建立標題行
       const headers = [
-        '時間戳記', '總任務數', '已處理', '成功數', '失敗數', 
-        '成功率(%)', '總時間(ms)', '平均時間(ms)', '處理速度(/秒)', '建議'
+        '時間戳記',
+        '總任務數',
+        '已處理',
+        '成功數',
+        '失敗數',
+        '成功率(%)',
+        '總時間(ms)',
+        '平均時間(ms)',
+        '處理速度(/秒)',
+        '建議',
       ];
       reportSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       reportSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
@@ -5553,14 +5677,13 @@ function saveDistributionReportToSheet(report) {
       report.summary.totalTime,
       report.summary.averageTimePerAssignment,
       report.performance.assignmentsPerSecond,
-      report.recommendations.join('; ')
+      report.recommendations.join('; '),
     ];
 
     reportSheet.appendRow(newRow);
     console.log(`📊 報告已保存到 "${reportSheetName}" 工作表`);
-    
+
     return { success: true, sheetName: reportSheetName };
-    
   } catch (error) {
     console.log(`[ERROR] 保存報告失敗: ${error.message}`);
     return { success: false, error: error.message };
@@ -5698,47 +5821,50 @@ function clearCacheUI() {
  * 修正版本：避免所有 UI 相關錯誤，適合編輯器執行
  */
 function testStuCourseBatchAdd() {
-  console.log("🚀 開始測試 stu_course 工作表的批次學生新增");
-  console.log("📊 讀取工作表：stu_course");
-  console.log("⚙️ 執行環境：Google Apps Script 編輯器（無UI模式）");
-  
+  console.log('🚀 開始測試 stu_course 工作表的批次學生新增');
+  console.log('📊 讀取工作表：stu_course');
+  console.log('⚙️ 執行環境：Google Apps Script 編輯器（無UI模式）');
+
   try {
     // 提前檢查工作表是否存在
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = spreadsheet.getSheetByName("stu_course");
-    
+    const sheet = spreadsheet.getSheetByName('stu_course');
+
     if (!sheet) {
-      console.log("❌ 錯誤：找不到 stu_course 工作表");
+      console.log('❌ 錯誤：找不到 stu_course 工作表');
       return { success: false, error: "工作表 'stu_course' 不存在" };
     }
-    
+
     console.log(`✅ 找到工作表：${sheet.getName()}`);
     console.log(`📏 工作表資料行數：${sheet.getLastRow()}`);
-    
+
     // 執行批次新增（使用 await，確保是異步函數）
-    const result = batchAddStudentsFromSheet("stu_course");
-    console.log("✅ 測試函數執行完成");
-    console.log(`📊 執行結果摘要：`, JSON.stringify({
-      success: result?.success || false,
-      processed: result?.processedCount || 0,
-      errors: result?.errors?.length || 0
-    }));
-    
+    const result = batchAddStudentsFromSheet('stu_course');
+    console.log('✅ 測試函數執行完成');
+    console.log(
+      `📊 執行結果摘要：`,
+      JSON.stringify({
+        success: result?.success || false,
+        processed: result?.processedCount || 0,
+        errors: result?.errors?.length || 0,
+      })
+    );
+
     return result;
   } catch (error) {
     console.log(`❌ 測試執行失敗: ${error.message}`);
     console.log(`🔍 錯誤類型: ${error.name}`);
     console.log(`🔍 錯誤堆疊: ${error.stack}`);
-    
+
     // 如果是 UI 相關錯誤，給出特別說明
-    if (error.message.includes("getUi")) {
-      console.log("💡 這是 UI 相關錯誤，在 Apps Script 編輯器執行時是正常的");
+    if (error.message.includes('getUi')) {
+      console.log('💡 這是 UI 相關錯誤，在 Apps Script 編輯器執行時是正常的');
     }
-    
-    return { 
-      success: false, 
-      error: error.message, 
-      context: "Google Apps Script 編輯器執行" 
+
+    return {
+      success: false,
+      error: error.message,
+      context: 'Google Apps Script 編輯器執行',
     };
   }
 }
@@ -5748,66 +5874,63 @@ function testStuCourseBatchAdd() {
  * 使用真實的 Google Classroom 課程 ID 進行測試
  */
 function createTestDataSheet() {
-  console.log("🚀 開始創建測試資料工作表");
-  
+  console.log('🚀 開始創建測試資料工作表');
+
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    
+
     // 檢查是否已有測試工作表，如有則刪除重建
-    let testSheet = spreadsheet.getSheetByName("test_stu_course");
+    let testSheet = spreadsheet.getSheetByName('test_stu_course');
     if (testSheet) {
-      console.log("🔄 刪除現有測試工作表");
+      console.log('🔄 刪除現有測試工作表');
       spreadsheet.deleteSheet(testSheet);
     }
-    
+
     // 創建新的測試工作表
-    testSheet = spreadsheet.insertSheet("test_stu_course");
-    console.log("✅ 已創建測試工作表：test_stu_course");
-    
+    testSheet = spreadsheet.insertSheet('test_stu_course');
+    console.log('✅ 已創建測試工作表：test_stu_course');
+
     // 設定標題行
-    const headers = [
-      ["學生Email", "課程ID", "狀態"]
-    ];
+    const headers = [['學生Email', '課程ID', '狀態']];
     testSheet.getRange(1, 1, 1, 3).setValues(headers);
-    testSheet.getRange(1, 1, 1, 3).setFontWeight("bold").setBackground("#E8F5E8");
-    
+    testSheet.getRange(1, 1, 1, 3).setFontWeight('bold').setBackground('#E8F5E8');
+
     // 創建測試資料（使用真實的課程 ID）
     const testData = [
       // 使用一些測試 Email 和真實的課程 ID
-      ["test1@kcislk.ntpc.edu.tw", "779922029471", "未處理"],  // LT-G1 Achievers
-      ["test2@kcislk.ntpc.edu.tw", "779921968089", "未處理"],  // IT-G1 Achievers  
-      ["test3@kcislk.ntpc.edu.tw", "779921948860", "未處理"],  // LT-G1 Adventurers
-      ["test4@kcislk.ntpc.edu.tw", "779922024070", "未處理"],  // LT-G1 Discoverers
-      ["test5@kcislk.ntpc.edu.tw", "779922003016", "未處理"],  // KCFS-G1 Achievers
+      ['test1@kcislk.ntpc.edu.tw', '779922029471', '未處理'], // LT-G1 Achievers
+      ['test2@kcislk.ntpc.edu.tw', '779921968089', '未處理'], // IT-G1 Achievers
+      ['test3@kcislk.ntpc.edu.tw', '779921948860', '未處理'], // LT-G1 Adventurers
+      ['test4@kcislk.ntpc.edu.tw', '779922024070', '未處理'], // LT-G1 Discoverers
+      ['test5@kcislk.ntpc.edu.tw', '779922003016', '未處理'], // KCFS-G1 Achievers
     ];
-    
+
     // 寫入測試資料
     testSheet.getRange(2, 1, testData.length, 3).setValues(testData);
-    
+
     // 格式化工作表
     testSheet.autoResizeColumns(1, 3);
     testSheet.setFrozenRows(1);
-    
+
     console.log(`✅ 已創建 ${testData.length} 筆測試資料`);
-    console.log("📋 測試資料課程對應：");
-    console.log("  • 779922029471: LT-G1 Achievers");
-    console.log("  • 779921968089: IT-G1 Achievers");
-    console.log("  • 779921948860: LT-G1 Adventurers"); 
-    console.log("  • 779922024070: LT-G1 Discoverers");
-    console.log("  • 779922003016: KCFS-G1 Achievers");
-    
+    console.log('📋 測試資料課程對應：');
+    console.log('  • 779922029471: LT-G1 Achievers');
+    console.log('  • 779921968089: IT-G1 Achievers');
+    console.log('  • 779921948860: LT-G1 Adventurers');
+    console.log('  • 779922024070: LT-G1 Discoverers');
+    console.log('  • 779922003016: KCFS-G1 Achievers');
+
     return {
       success: true,
-      sheetName: "test_stu_course",
+      sheetName: 'test_stu_course',
       dataCount: testData.length,
-      message: "測試資料工作表創建成功，可執行 testSmallScaleBatch() 進行測試"
+      message: '測試資料工作表創建成功，可執行 testSmallScaleBatch() 進行測試',
     };
-    
   } catch (error) {
     console.log(`❌ 創建測試資料失敗: ${error.message}`);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -5817,44 +5940,46 @@ function createTestDataSheet() {
  * 專門測試 test_stu_course 工作表的真實課程 ID
  */
 function testSmallScaleBatch() {
-  console.log("🧪 開始小規模批次學生新增測試");
-  console.log("📊 目標工作表：test_stu_course");
-  console.log("🎯 測試目標：驗證真實課程 ID 和修復效果");
-  
+  console.log('🧪 開始小規模批次學生新增測試');
+  console.log('📊 目標工作表：test_stu_course');
+  console.log('🎯 測試目標：驗證真實課程 ID 和修復效果');
+
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const testSheet = spreadsheet.getSheetByName("test_stu_course");
-    
+    const testSheet = spreadsheet.getSheetByName('test_stu_course');
+
     if (!testSheet) {
-      console.log("❌ 找不到測試工作表，請先執行 createTestDataSheet()");
-      return { 
-        success: false, 
-        error: "測試工作表不存在，請先執行 createTestDataSheet() 創建測試資料" 
+      console.log('❌ 找不到測試工作表，請先執行 createTestDataSheet()');
+      return {
+        success: false,
+        error: '測試工作表不存在，請先執行 createTestDataSheet() 創建測試資料',
       };
     }
-    
+
     console.log(`✅ 找到測試工作表，資料行數：${testSheet.getLastRow()}`);
-    
+
     // 執行小規模批次測試
-    const result = batchAddStudentsFromSheet("test_stu_course");
-    
-    console.log("✅ 小規模測試執行完成");
-    console.log(`📊 測試結果：`, JSON.stringify({
-      success: result?.success || false,
-      processed: result?.processedCount || 0,
-      errors: result?.errors?.length || 0
-    }));
-    
+    const result = batchAddStudentsFromSheet('test_stu_course');
+
+    console.log('✅ 小規模測試執行完成');
+    console.log(
+      `📊 測試結果：`,
+      JSON.stringify({
+        success: result?.success || false,
+        processed: result?.processedCount || 0,
+        errors: result?.errors?.length || 0,
+      })
+    );
+
     return result;
-    
   } catch (error) {
     console.log(`❌ 小規模測試失敗: ${error.message}`);
     console.log(`🔍 錯誤詳情: ${error.stack}`);
-    
+
     return {
       success: false,
       error: error.message,
-      context: "小規模批次測試"
+      context: '小規模批次測試',
     };
   }
 }
@@ -5866,35 +5991,37 @@ function executeRealStudentBatch() {
   console.log('🎯 開始執行真實學生批次新增');
   console.log('📊 目標工作表：stu_course');
   console.log('🚀 使用所有已修復的系統組件');
-  
+
   try {
     // 檢查工作表是否存在
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = spreadsheet.getSheetByName('stu_course');
-    
+
     if (!sheet) {
       console.log('❌ 找不到工作表 stu_course');
       console.log('💡 請確認工作表名稱是否正確');
       return { success: false, error: '找不到指定工作表' };
     }
-    
+
     const numRows = sheet.getLastRow();
     console.log(`✅ 找到目標工作表，資料行數：${numRows}`);
-    
+
     // 執行真實批次新增
     console.log('⏳ 正在執行批次新增學生操作...');
     const result = batchAddStudentsFromSheet('stu_course');
-    
+
     console.log('🎉 真實批次新增執行完成');
-    console.log('📊 最終結果：', JSON.stringify({
-      success: result?.success || false,
-      processed: result?.processedCount || 0,
-      successful: result?.successfulCount || 0,
-      errors: result?.errors?.length || 0
-    }));
-    
+    console.log(
+      '📊 最終結果：',
+      JSON.stringify({
+        success: result?.success || false,
+        processed: result?.processedCount || 0,
+        successful: result?.successfulCount || 0,
+        errors: result?.errors?.length || 0,
+      })
+    );
+
     return result;
-    
   } catch (error) {
     console.log(`❌ 執行真實批次新增失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -5907,7 +6034,7 @@ function executeRealStudentBatch() {
  */
 function getCourseIdFromName(courseName, preferredSubject = null) {
   console.log(`🔍 查詢課程映射：${courseName}`);
-  
+
   // 如果已經是數字 ID，直接返回
   if (/^\d{10,15}$/.test(courseName)) {
     console.log(`✅ 已是數字課程 ID：${courseName}`);
@@ -5919,31 +6046,31 @@ function getCourseIdFromName(courseName, preferredSubject = null) {
     const mappingData = readCourseMappingFromSheet();
     if (!mappingData.success) {
       console.log(`❌ 讀取課程映射工作表失敗：${mappingData.error}`);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: `無法讀取課程映射：${mappingData.error}`,
-        originalName: courseName 
+        originalName: courseName,
       };
     }
 
     // 查找匹配的課程
-    const matchingCourses = mappingData.courses.filter(course => 
-      course.courseName === courseName && course.status === 'ACTIVE'
+    const matchingCourses = mappingData.courses.filter(
+      (course) => course.courseName === courseName && course.status === 'ACTIVE'
     );
 
     if (matchingCourses.length === 0) {
       console.log(`❌ 找不到課程映射：${courseName}`);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: `找不到課程 "${courseName}" 的 ID 映射。請檢查 course_mapping 工作表。`,
-        originalName: courseName 
+        originalName: courseName,
       };
     }
 
     // 如果有指定科目偏好，優先使用
     let selectedCourse = matchingCourses[0];
     if (preferredSubject) {
-      const preferredCourse = matchingCourses.find(course => course.subject === preferredSubject);
+      const preferredCourse = matchingCourses.find((course) => course.subject === preferredSubject);
       if (preferredCourse) {
         selectedCourse = preferredCourse;
       }
@@ -5951,27 +6078,28 @@ function getCourseIdFromName(courseName, preferredSubject = null) {
 
     // 如果有多個科目版本，記錄資訊
     if (matchingCourses.length > 1) {
-      const subjects = matchingCourses.map(c => c.subject);
+      const subjects = matchingCourses.map((c) => c.subject);
       console.log(`⚠️ 課程 "${courseName}" 有多個科目版本：${subjects.join(', ')}`);
       console.log(`💡 使用科目：${selectedCourse.subject}`);
     }
 
-    console.log(`✅ 課程映射成功：${courseName} (${selectedCourse.subject}) → ${selectedCourse.courseId}`);
-    
-    return { 
-      success: true, 
+    console.log(
+      `✅ 課程映射成功：${courseName} (${selectedCourse.subject}) → ${selectedCourse.courseId}`
+    );
+
+    return {
+      success: true,
       courseId: selectedCourse.courseId,
       originalName: courseName,
       subject: selectedCourse.subject,
-      availableSubjects: matchingCourses.map(c => c.subject)
+      availableSubjects: matchingCourses.map((c) => c.subject),
     };
-
   } catch (error) {
     console.log(`❌ 課程映射查詢失敗：${error.message}`);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: `課程映射查詢失敗：${error.message}`,
-      originalName: courseName 
+      originalName: courseName,
     };
   }
 }
@@ -5983,7 +6111,7 @@ function readCourseMappingFromSheet() {
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = spreadsheet.getSheetByName('course_mapping');
-    
+
     // 如果工作表不存在，嘗試創建
     if (!sheet) {
       console.log('⚠️ course_mapping 工作表不存在，正在創建...');
@@ -5993,37 +6121,36 @@ function readCourseMappingFromSheet() {
       }
       sheet = createResult.sheet;
     }
-    
+
     // 檢查是否有資料
     const lastRow = sheet.getLastRow();
     if (lastRow <= 1) {
       console.log('⚠️ course_mapping 工作表沒有資料');
       return { success: true, courses: [] };
     }
-    
+
     // 讀取所有資料
     const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
     const courses = [];
-    
+
     data.forEach((row, index) => {
       const [courseName, subject, courseId, status] = row;
-      
+
       // 跳過空行
       if (!courseName || !courseId) {
         return;
       }
-      
+
       courses.push({
         courseName: courseName.toString().trim(),
         subject: subject ? subject.toString().trim() : 'LT',
         courseId: courseId.toString().trim(),
-        status: status ? status.toString().trim() : 'ACTIVE'
+        status: status ? status.toString().trim() : 'ACTIVE',
       });
     });
-    
+
     console.log(`✅ 成功讀取 ${courses.length} 條課程映射記錄`);
     return { success: true, courses: courses };
-    
   } catch (error) {
     console.log(`❌ 讀取課程映射工作表失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -6036,39 +6163,38 @@ function readCourseMappingFromSheet() {
 function createCourseMappingSheet() {
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    
+
     // 檢查是否已存在
     let sheet = spreadsheet.getSheetByName('course_mapping');
     if (sheet) {
       console.log('✅ course_mapping 工作表已存在');
       return { success: true, sheet: sheet };
     }
-    
+
     // 創建新工作表
     sheet = spreadsheet.insertSheet('course_mapping');
-    
+
     // 設定標題行
     const headers = ['課程名稱', '科目', '課程ID', '狀態'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    
+
     // 設定標題樣式
     const headerRange = sheet.getRange(1, 1, 1, headers.length);
     headerRange.setBackground('#4a90e2');
     headerRange.setFontColor('#ffffff');
     headerRange.setFontWeight('bold');
-    
+
     // 設定欄寬
     sheet.setColumnWidth(1, 150); // 課程名稱
-    sheet.setColumnWidth(2, 80);  // 科目
+    sheet.setColumnWidth(2, 80); // 科目
     sheet.setColumnWidth(3, 150); // 課程ID
-    sheet.setColumnWidth(4, 80);  // 狀態
-    
+    sheet.setColumnWidth(4, 80); // 狀態
+
     // 凍結標題行
     sheet.setFrozenRows(1);
-    
+
     console.log('✅ 成功創建 course_mapping 工作表');
     return { success: true, sheet: sheet };
-    
   } catch (error) {
     console.log(`❌ 創建課程映射工作表失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -6081,15 +6207,15 @@ function createCourseMappingSheet() {
 function initializeCourseMappingData() {
   try {
     console.log('🚀 開始初始化課程映射資料...');
-    
+
     // 確保工作表存在
     const createResult = createCourseMappingSheet();
     if (!createResult.success) {
       return createResult;
     }
-    
+
     const sheet = createResult.sheet;
-    
+
     // 準備初始資料
     const initialData = [
       // G1 年級課程
@@ -6129,7 +6255,7 @@ function initializeCourseMappingData() {
       ['G1 Inventors', 'LT', '779922048392', 'ACTIVE'],
       ['G1 Inventors', 'IT', '779922040087', 'ACTIVE'],
       ['G1 Inventors', 'KCFS', '779921999592', 'ACTIVE'],
-      
+
       // G3 年級課程
       ['G3 Achievers', 'LT', '779922075128', 'ACTIVE'],
       ['G3 Achievers', 'IT', '779922073859', 'ACTIVE'],
@@ -6137,36 +6263,35 @@ function initializeCourseMappingData() {
       ['G3 Pathfinders', 'LT', '779922010084', 'ACTIVE'],
       ['G3 Pathfinders', 'IT', '779922040641', 'ACTIVE'],
       ['G3 Pathfinders', 'KCFS', '779922072684', 'ACTIVE'],
-      
+
       // G6 年級課程
       ['G6 Voyagers', 'LT', '779922102231', 'ACTIVE'],
       ['G6 Voyagers', 'IT', '779922132705', 'ACTIVE'],
-      ['G6 Voyagers', 'KCFS', '779922020009', 'ACTIVE']
+      ['G6 Voyagers', 'KCFS', '779922020009', 'ACTIVE'],
     ];
-    
+
     // 檢查是否已有資料
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
       console.log('⚠️ 工作表已有資料，跳過初始化');
       return { success: true, message: '工作表已有資料' };
     }
-    
+
     // 寫入資料
     const startRow = 2;
     sheet.getRange(startRow, 1, initialData.length, 4).setValues(initialData);
-    
+
     // 設定資料格式
     const dataRange = sheet.getRange(startRow, 1, initialData.length, 4);
     dataRange.setBorder(true, true, true, true, true, true);
-    
+
     console.log(`✅ 成功初始化 ${initialData.length} 條課程映射記錄`);
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       message: `初始化完成，共 ${initialData.length} 條記錄`,
-      recordCount: initialData.length 
+      recordCount: initialData.length,
     };
-    
   } catch (error) {
     console.log(`❌ 初始化課程映射資料失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -6178,7 +6303,7 @@ function initializeCourseMappingData() {
  */
 function testCourseIdMapping() {
   console.log('🧪 開始測試課程 ID 映射功能');
-  
+
   try {
     // 首先確保映射資料已初始化
     console.log('📊 初始化課程映射資料...');
@@ -6188,23 +6313,23 @@ function testCourseIdMapping() {
       return { success: false, error: initResult.error };
     }
     console.log(`✅ ${initResult.message}`);
-    
+
     const testCases = [
       'G1 Achievers',
-      'G1 Discoverers', 
-      'G3 Achievers',    // 新增的 G3 課程
-      'G3 Pathfinders',  // 新增的 G3 課程
-      'G6 Voyagers',     // 新增的 G6 課程
-      '779922029471',    // 已經是數字 ID
-      'Unknown Course'   // 不存在的課程
+      'G1 Discoverers',
+      'G3 Achievers', // 新增的 G3 課程
+      'G3 Pathfinders', // 新增的 G3 課程
+      'G6 Voyagers', // 新增的 G6 課程
+      '779922029471', // 已經是數字 ID
+      'Unknown Course', // 不存在的課程
     ];
-    
+
     const results = [];
-    
-    testCases.forEach(courseName => {
+
+    testCases.forEach((courseName) => {
       console.log(`\n📝 測試課程：${courseName}`);
       const result = getCourseIdFromName(courseName);
-      
+
       if (result.success) {
         console.log(`✅ 映射成功：${result.originalName} → ${result.courseId}`);
         if (result.subject) {
@@ -6213,29 +6338,33 @@ function testCourseIdMapping() {
         if (result.availableSubjects && result.availableSubjects.length > 1) {
           console.log(`🔢 可用科目：${result.availableSubjects.join(', ')}`);
         }
-        results.push({ courseName, success: true, courseId: result.courseId, subject: result.subject });
+        results.push({
+          courseName,
+          success: true,
+          courseId: result.courseId,
+          subject: result.subject,
+        });
       } else {
         console.log(`❌ 映射失敗：${result.error}`);
         results.push({ courseName, success: false, error: result.error });
       }
     });
-    
+
     // 統計測試結果
-    const successCount = results.filter(r => r.success).length;
-    const failCount = results.filter(r => !r.success).length;
-    
+    const successCount = results.filter((r) => r.success).length;
+    const failCount = results.filter((r) => !r.success).length;
+
     console.log(`\n📊 測試結果統計：`);
     console.log(`✅ 成功：${successCount} 個`);
     console.log(`❌ 失敗：${failCount} 個`);
-    
+
     console.log('\n🎉 課程 ID 映射測試完成');
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       results: results,
-      statistics: { success: successCount, failed: failCount, total: testCases.length }
+      statistics: { success: successCount, failed: failCount, total: testCases.length },
     };
-    
   } catch (error) {
     console.log(`❌ 測試過程發生錯誤：${error.message}`);
     return { success: false, error: error.message };
@@ -6248,7 +6377,7 @@ function testCourseIdMapping() {
 async function testSmallBatchStudentAddition() {
   console.log('🧪 開始小批次學生新增測試');
   console.log('📊 目標：驗證課程映射和錯誤處理改善');
-  
+
   try {
     // 首先測試課程映射
     console.log('\n📍 步驟 1：測試課程映射功能');
@@ -6258,21 +6387,21 @@ async function testSmallBatchStudentAddition() {
       return { success: false, error: '課程映射測試失敗', details: mappingTest.error };
     }
     console.log('✅ 課程映射測試通過');
-    
+
     // 模擬學生新增測試（不執行真實操作）
     console.log('\n📍 步驟 2：模擬學生新增預檢');
     const testUsers = [
       { email: 'test1@kcislk.ntpc.edu.tw', courseName: 'G6 Voyagers' },
       { email: 'test2@kcislk.ntpc.edu.tw', courseName: 'G3 Achievers' },
       { email: 'invalid.email', courseName: 'G1 Achievers' }, // 格式錯誤
-      { email: 'test3@otherdomain.com', courseName: 'G1 Discoverers' } // 域名不匹配
+      { email: 'test3@otherdomain.com', courseName: 'G1 Discoverers' }, // 域名不匹配
     ];
-    
+
     const simulationResults = [];
-    
+
     for (const testUser of testUsers) {
       console.log(`\n🔍 測試用戶：${testUser.email} → ${testUser.courseName}`);
-      
+
       // 1. 課程映射測試
       const mappingResult = getCourseIdFromName(testUser.courseName);
       if (!mappingResult.success) {
@@ -6282,22 +6411,25 @@ async function testSmallBatchStudentAddition() {
           courseName: testUser.courseName,
           step: 'course_mapping',
           success: false,
-          error: mappingResult.error
+          error: mappingResult.error,
         });
         continue;
       }
       console.log(`✅ 課程映射成功：${mappingResult.courseId}`);
-      
+
       // 2. 用戶預檢測試
-      const validationResult = await ErrorHandler.validateUserAddition(testUser.email, mappingResult.courseId);
+      const validationResult = await ErrorHandler.validateUserAddition(
+        testUser.email,
+        mappingResult.courseId
+      );
       console.log(`📊 用戶預檢：${validationResult.valid ? '✅ 通過' : '❌ 失敗'}`);
-      
+
       if (!validationResult.valid) {
-        validationResult.failedValidations.forEach(v => {
+        validationResult.failedValidations.forEach((v) => {
           console.log(`  ❌ ${v.type}: ${v.message}`);
         });
       }
-      
+
       simulationResults.push({
         email: testUser.email,
         courseName: testUser.courseName,
@@ -6305,21 +6437,21 @@ async function testSmallBatchStudentAddition() {
         step: 'validation',
         success: validationResult.valid,
         validations: validationResult.validations,
-        failedValidations: validationResult.failedValidations
+        failedValidations: validationResult.failedValidations,
       });
     }
-    
+
     // 統計模擬結果
     const totalTests = simulationResults.length;
-    const passedTests = simulationResults.filter(r => r.success).length;
+    const passedTests = simulationResults.filter((r) => r.success).length;
     const failedTests = totalTests - passedTests;
-    
+
     console.log(`\n📊 小批次測試結果：`);
     console.log(`✅ 通過：${passedTests}/${totalTests}`);
     console.log(`❌ 失敗：${failedTests}/${totalTests}`);
-    
+
     console.log('\n🎉 小批次測試完成');
-    
+
     return {
       success: true,
       testType: 'simulation',
@@ -6329,10 +6461,9 @@ async function testSmallBatchStudentAddition() {
         total: totalTests,
         passed: passedTests,
         failed: failedTests,
-        passRate: Math.round((passedTests / totalTests) * 100)
-      }
+        passRate: Math.round((passedTests / totalTests) * 100),
+      },
     };
-    
   } catch (error) {
     console.log(`❌ 小批次測試失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -6347,7 +6478,7 @@ async function testSmallBatchStudentAddition() {
 async function oneClickCompleteMapping(options = {}) {
   console.log('🚀 啟動一鍵完整課程映射系統');
   console.log('📊 目標：處理 82 個班級 × 3 個科目 = 246 個課程');
-  
+
   const startTime = Date.now();
   const defaultOptions = {
     clearExisting: true,
@@ -6355,11 +6486,11 @@ async function oneClickCompleteMapping(options = {}) {
     enableTurboMode: true,
     maxExecutionTime: 5 * 60 * 1000, // 5 分鐘
     batchSize: 20,
-    showProgress: true
+    showProgress: true,
   };
-  
+
   const config = { ...defaultOptions, ...options };
-  
+
   try {
     // 📊 步驟 1: 快速系統健康檢查
     console.log('\n📍 步驟 1/4: 系統健康檢查');
@@ -6368,7 +6499,7 @@ async function oneClickCompleteMapping(options = {}) {
       throw new Error(`系統健康檢查失敗: ${healthCheck.error}`);
     }
     console.log('✅ 系統健康狀況良好');
-    
+
     // 🔍 步驟 2: 超高速課程發現
     console.log('\n📍 步驟 2/4: 超高速課程發現');
     const discoveryResult = await turboCourseDiscovery(config);
@@ -6376,7 +6507,7 @@ async function oneClickCompleteMapping(options = {}) {
       throw new Error(`課程發現失敗: ${discoveryResult.error}`);
     }
     console.log(`✅ 發現 ${discoveryResult.totalCourses} 個課程`);
-    
+
     // 🤖 步驟 3: AI 智能映射
     console.log('\n📍 步驟 3/4: AI 智能映射處理');
     const mappingResult = await turboIntelligentMapping(discoveryResult.courses, config);
@@ -6384,7 +6515,7 @@ async function oneClickCompleteMapping(options = {}) {
       throw new Error(`智能映射失敗: ${mappingResult.error}`);
     }
     console.log(`✅ 完成 ${mappingResult.successfulMappings} 個課程映射`);
-    
+
     // 💾 步驟 4: 高速映射表更新
     console.log('\n📍 步驟 4/4: 高速映射表更新');
     const updateResult = await turboMappingTableUpdate(mappingResult.mappings, config);
@@ -6392,10 +6523,10 @@ async function oneClickCompleteMapping(options = {}) {
       throw new Error(`映射表更新失敗: ${updateResult.error}`);
     }
     console.log(`✅ 映射表更新完成`);
-    
+
     const endTime = Date.now();
     const duration = Math.round((endTime - startTime) / 1000);
-    
+
     // 📊 最終統計報告
     const finalReport = {
       success: true,
@@ -6404,22 +6535,21 @@ async function oneClickCompleteMapping(options = {}) {
       successfulMappings: mappingResult.successfulMappings,
       failedMappings: mappingResult.failedMappings,
       accuracy: Math.round((mappingResult.successfulMappings / discoveryResult.totalCourses) * 100),
-      performance: duration < 360 ? '優秀' : duration < 480 ? '良好' : '需要優化'
+      performance: duration < 360 ? '優秀' : duration < 480 ? '良好' : '需要優化',
     };
-    
+
     console.log('\n🎉 一鍵完整映射執行完成！');
     console.log(`📊 處理時間：${finalReport.duration}`);
     console.log(`📈 成功率：${finalReport.accuracy}%`);
     console.log(`⚡ 性能評級：${finalReport.performance}`);
-    
+
     return finalReport;
-    
   } catch (error) {
     console.log(`❌ 一鍵完整映射失敗：${error.message}`);
     return {
       success: false,
       error: error.message,
-      duration: Math.round((Date.now() - startTime) / 1000)
+      duration: Math.round((Date.now() - startTime) / 1000),
     };
   }
 }
@@ -6429,23 +6559,22 @@ async function oneClickCompleteMapping(options = {}) {
  */
 async function turboCourseDiscovery(config) {
   console.log('🔍 啟動超高速課程發現...');
-  
+
   try {
     // 使用已有的智能發現系統
     const coursesResult = await getAllClassroomCourses();
     if (!coursesResult.success) {
       return { success: false, error: coursesResult.error };
     }
-    
+
     const courses = coursesResult.data || [];
     console.log(`✅ 發現 ${courses.length} 個課程`);
-    
+
     return {
       success: true,
       totalCourses: courses.length,
-      courses: courses
+      courses: courses,
     };
-    
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6456,57 +6585,123 @@ async function turboCourseDiscovery(config) {
  */
 async function turboIntelligentMapping(courses, config) {
   console.log('🤖 啟動 AI 智能映射處理...');
-  
+
   try {
     // 定義完整班級列表
     const allClasses = [
       // G1
-      'G1 Achievers', 'G1 Discoverers', 'G1 Voyagers', 'G1 Explorers', 'G1 Navigators', 
-      'G1 Adventurers', 'G1 Guardians', 'G1 Pioneers', 'G1 Innovators', 'G1 Visionaries', 
-      'G1 Pathfinders', 'G1 Seekers', 'G1 Trailblazers', 'G1 Inventors',
+      'G1 Achievers',
+      'G1 Discoverers',
+      'G1 Voyagers',
+      'G1 Explorers',
+      'G1 Navigators',
+      'G1 Adventurers',
+      'G1 Guardians',
+      'G1 Pioneers',
+      'G1 Innovators',
+      'G1 Visionaries',
+      'G1 Pathfinders',
+      'G1 Seekers',
+      'G1 Trailblazers',
+      'G1 Inventors',
       // G2
-      'G2 Pioneers', 'G2 Explorers', 'G2 Inventors', 'G2 Achievers', 'G2 Voyagers', 
-      'G2 Adventurers', 'G2 Innovators', 'G2 Guardians', 'G2 Pathfinders', 'G2 Visionaries', 
-      'G2 Navigators', 'G2 Discoverers', 'G2 Seekers', 'G2 Trailblazers',
+      'G2 Pioneers',
+      'G2 Explorers',
+      'G2 Inventors',
+      'G2 Achievers',
+      'G2 Voyagers',
+      'G2 Adventurers',
+      'G2 Innovators',
+      'G2 Guardians',
+      'G2 Pathfinders',
+      'G2 Visionaries',
+      'G2 Navigators',
+      'G2 Discoverers',
+      'G2 Seekers',
+      'G2 Trailblazers',
       // G3
-      'G3 Inventors', 'G3 Innovators', 'G3 Guardians', 'G3 Achievers', 'G3 Voyagers', 
-      'G3 Visionaries', 'G3 Trailblazers', 'G3 Discoverers', 'G3 Explorers', 'G3 Navigators', 
-      'G3 Adventurers', 'G3 Seekers', 'G3 Pathfinders', 'G3 Pioneers',
+      'G3 Inventors',
+      'G3 Innovators',
+      'G3 Guardians',
+      'G3 Achievers',
+      'G3 Voyagers',
+      'G3 Visionaries',
+      'G3 Trailblazers',
+      'G3 Discoverers',
+      'G3 Explorers',
+      'G3 Navigators',
+      'G3 Adventurers',
+      'G3 Seekers',
+      'G3 Pathfinders',
+      'G3 Pioneers',
       // G4
-      'G4 Seekers', 'G4 Voyagers', 'G4 Visionaries', 'G4 Achievers', 'G4 Navigators', 
-      'G4 Trailblazers', 'G4 Pathfinders', 'G4 Explorers', 'G4 Adventurers', 'G4 Innovators', 
-      'G4 Discoverers', 'G4 Guardians', 'G4 Inventors', 'G4 Pioneers',
+      'G4 Seekers',
+      'G4 Voyagers',
+      'G4 Visionaries',
+      'G4 Achievers',
+      'G4 Navigators',
+      'G4 Trailblazers',
+      'G4 Pathfinders',
+      'G4 Explorers',
+      'G4 Adventurers',
+      'G4 Innovators',
+      'G4 Discoverers',
+      'G4 Guardians',
+      'G4 Inventors',
+      'G4 Pioneers',
       // G5
-      'G5 Adventurers', 'G5 Navigators', 'G5 Pioneers', 'G5 Inventors', 'G5 Seekers', 
-      'G5 Discoverers', 'G5 Guardians', 'G5 Pathfinders', 'G5 Explorers', 'G5 Achievers', 
-      'G5 Voyagers', 'G5 Trailblazers', 'G5 Innovators', 'G5 Visionaries',
+      'G5 Adventurers',
+      'G5 Navigators',
+      'G5 Pioneers',
+      'G5 Inventors',
+      'G5 Seekers',
+      'G5 Discoverers',
+      'G5 Guardians',
+      'G5 Pathfinders',
+      'G5 Explorers',
+      'G5 Achievers',
+      'G5 Voyagers',
+      'G5 Trailblazers',
+      'G5 Innovators',
+      'G5 Visionaries',
       // G6
-      'G6 Explorers', 'G6 Inventors', 'G6 Adventurers', 'G6 Achievers', 'G6 Voyagers', 
-      'G6 Discoverers', 'G6 Innovators', 'G6 Guardians', 'G6 Pathfinders', 'G6 Seekers', 
-      'G6 Visionaries', 'G6 Pioneers', 'G6 Trailblazers', 'G6 Navigators'
+      'G6 Explorers',
+      'G6 Inventors',
+      'G6 Adventurers',
+      'G6 Achievers',
+      'G6 Voyagers',
+      'G6 Discoverers',
+      'G6 Innovators',
+      'G6 Guardians',
+      'G6 Pathfinders',
+      'G6 Seekers',
+      'G6 Visionaries',
+      'G6 Pioneers',
+      'G6 Trailblazers',
+      'G6 Navigators',
     ];
-    
+
     const subjects = ['LT', 'IT', 'KCFS'];
     const mappings = [];
     let successCount = 0;
     let failCount = 0;
-    
+
     // 批次處理映射
     console.log(`🔄 開始批次映射處理 (${config.batchSize} 項/批次)`);
-    
+
     for (const className of allClasses) {
       for (const subject of subjects) {
         try {
           // 使用已有的智能查找功能
           const foundCourse = findCourseByPattern(className, subject, courses);
-          
+
           if (foundCourse.success) {
             mappings.push({
               courseName: className,
               subject: subject,
               courseId: foundCourse.courseId,
               status: 'ACTIVE',
-              confidence: foundCourse.confidence || 100
+              confidence: foundCourse.confidence || 100,
             });
             successCount++;
           } else {
@@ -6515,33 +6710,33 @@ async function turboIntelligentMapping(courses, config) {
               subject: subject,
               courseId: null,
               status: 'MISSING',
-              confidence: 0
+              confidence: 0,
             });
             failCount++;
           }
-          
+
           // 進度報告
           if ((successCount + failCount) % config.batchSize === 0) {
-            const progress = Math.round(((successCount + failCount) / (allClasses.length * subjects.length)) * 100);
+            const progress = Math.round(
+              ((successCount + failCount) / (allClasses.length * subjects.length)) * 100
+            );
             console.log(`📈 進度：${progress}% (成功：${successCount}, 失敗：${failCount})`);
           }
-          
         } catch (error) {
           console.log(`❌ 映射失敗：${className} - ${subject}: ${error.message}`);
           failCount++;
         }
       }
     }
-    
+
     console.log(`✅ AI 映射完成：成功 ${successCount}, 失敗 ${failCount}`);
-    
+
     return {
       success: true,
       successfulMappings: successCount,
       failedMappings: failCount,
-      mappings: mappings
+      mappings: mappings,
     };
-    
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6552,32 +6747,31 @@ async function turboIntelligentMapping(courses, config) {
  */
 async function turboMappingTableUpdate(mappings, config) {
   console.log('💾 啟動映射表高速更新...');
-  
+
   try {
     // 備份現有資料
     if (config.backupExisting) {
       console.log('💾 正在備份現有映射資料...');
       await backupCourseMappingSheet();
     }
-    
+
     // 使用已有的更新功能
     const updateResult = await updateCourseMappingSheet(mappings, {
       clearExisting: config.clearExisting,
-      batchSize: config.batchSize
+      batchSize: config.batchSize,
     });
-    
+
     if (!updateResult.success) {
       return { success: false, error: updateResult.error };
     }
-    
+
     console.log('✅ 映射表更新完成');
-    
+
     return {
       success: true,
       updatedCount: mappings.length,
-      timestamp: new Date().toLocaleString('zh-TW')
+      timestamp: new Date().toLocaleString('zh-TW'),
     };
-    
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6588,23 +6782,22 @@ async function turboMappingTableUpdate(mappings, config) {
  */
 async function quickSystemHealthCheck() {
   console.log('❤️ 執行快速系統健康檢查...');
-  
+
   try {
     // 檢查基本 API 連線
     const testResult = Classroom.Courses.list({ pageSize: 1 });
-    
+
     // 檢查工作表存取
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const testSheet = spreadsheet.getSheetByName('course_mapping');
-    
+
     console.log('✅ 系統健康檢查通過');
-    return { 
-      success: true, 
+    return {
+      success: true,
       apiStatus: 'OK',
       sheetStatus: testSheet ? 'OK' : 'MISSING',
-      timestamp: new Date().toLocaleString('zh-TW')
+      timestamp: new Date().toLocaleString('zh-TW'),
     };
-    
   } catch (error) {
     console.log(`❌ 系統健康檢查失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -6617,48 +6810,50 @@ async function quickSystemHealthCheck() {
 async function rapidMappingValidator() {
   console.log('🧪 啟動快速映射驗證器');
   const startTime = Date.now();
-  
+
   try {
     // 讀取映射資料
     const mappingData = readCourseMappingFromSheet();
     if (!mappingData.success) {
       return { success: false, error: mappingData.error };
     }
-    
+
     const courses = mappingData.courses || [];
     const stats = {
       total: courses.length,
-      active: courses.filter(c => c.status === 'ACTIVE').length,
-      missing: courses.filter(c => c.status === 'MISSING').length,
+      active: courses.filter((c) => c.status === 'ACTIVE').length,
+      missing: courses.filter((c) => c.status === 'MISSING').length,
       duplicates: 0,
-      errors: []
+      errors: [],
     };
-    
+
     // 檢查重複
-    const courseIds = courses.map(c => c.courseId).filter(id => id);
+    const courseIds = courses.map((c) => c.courseId).filter((id) => id);
     const uniqueIds = new Set(courseIds);
     stats.duplicates = courseIds.length - uniqueIds.size;
-    
+
     // 檢查格式
     courses.forEach((course, index) => {
-      if (course.status === 'ACTIVE' && (!course.courseId || !/^\d{10,15}$/.test(course.courseId))) {
+      if (
+        course.status === 'ACTIVE' &&
+        (!course.courseId || !/^\d{10,15}$/.test(course.courseId))
+      ) {
         stats.errors.push(`第 ${index + 1} 行：課程 ID 格式錯誤`);
       }
     });
-    
+
     const endTime = Date.now();
     const duration = Math.round((endTime - startTime) / 1000);
-    
+
     console.log(`✅ 驗證完成 (${duration} 秒)`);
     console.log(`📊 總計：${stats.total}, 活躍：${stats.active}, 缺失：${stats.missing}`);
-    
+
     return {
       success: true,
       duration: duration,
       statistics: stats,
-      accuracy: Math.round((stats.active / stats.total) * 100)
+      accuracy: Math.round((stats.active / stats.total) * 100),
     };
-    
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -6672,13 +6867,13 @@ async function rapidMappingValidator() {
 async function testCompleteCourseMappingSystem() {
   console.log('🎯 啟動完整課程映射系統測試');
   console.log('📊 測試範圍：82 個班級 × 3 個科目 = 246 個課程映射');
-  
+
   const testResults = {
     startTime: new Date(),
     phases: [],
-    overall: { success: false, duration: 0 }
+    overall: { success: false, duration: 0 },
   };
-  
+
   try {
     // 🏥 階段 1: 系統健康檢查
     console.log('\n📍 階段 1/5: 系統健康檢查');
@@ -6686,107 +6881,106 @@ async function testCompleteCourseMappingSystem() {
     testResults.phases.push({
       phase: '系統健康檢查',
       success: healthResult.success,
-      details: healthResult
+      details: healthResult,
     });
-    
+
     if (!healthResult.success) {
       throw new Error(`系統健康檢查失敗: ${healthResult.error}`);
     }
     console.log('✅ 系統健康檢查通過');
-    
-    // 🔍 階段 2: 課程發現測試  
+
+    // 🔍 階段 2: 課程發現測試
     console.log('\n📍 階段 2/5: 課程發現系統測試');
     const discoveryResult = await turboCourseDiscovery({ batchSize: 20 });
     testResults.phases.push({
       phase: '課程發現測試',
       success: discoveryResult.success,
-      details: discoveryResult
+      details: discoveryResult,
     });
-    
+
     if (!discoveryResult.success) {
       throw new Error(`課程發現測試失敗: ${discoveryResult.error}`);
     }
     console.log(`✅ 課程發現測試通過 (發現 ${discoveryResult.totalCourses} 個課程)`);
-    
+
     // 🤖 階段 3: AI 映射測試
     console.log('\n📍 階段 3/5: AI 智能映射測試');
     const mappingResult = await turboIntelligentMapping(discoveryResult.courses, { batchSize: 20 });
     testResults.phases.push({
       phase: 'AI 映射測試',
       success: mappingResult.success,
-      details: mappingResult
+      details: mappingResult,
     });
-    
+
     if (!mappingResult.success) {
       throw new Error(`AI 映射測試失敗: ${mappingResult.error}`);
     }
     console.log(`✅ AI 映射測試通過 (成功映射 ${mappingResult.successfulMappings} 個)`);
-    
+
     // 💾 階段 4: 映射表更新測試
     console.log('\n📍 階段 4/5: 映射表更新測試');
-    const updateResult = await turboMappingTableUpdate(mappingResult.mappings, { 
-      clearExisting: false, 
-      backupExisting: true 
+    const updateResult = await turboMappingTableUpdate(mappingResult.mappings, {
+      clearExisting: false,
+      backupExisting: true,
     });
     testResults.phases.push({
       phase: '映射表更新測試',
       success: updateResult.success,
-      details: updateResult
+      details: updateResult,
     });
-    
+
     if (!updateResult.success) {
       throw new Error(`映射表更新測試失敗: ${updateResult.error}`);
     }
     console.log('✅ 映射表更新測試通過');
-    
+
     // 🧪 階段 5: 完整性驗證測試
     console.log('\n📍 階段 5/5: 完整性驗證測試');
     const validationResult = await rapidMappingValidator();
     testResults.phases.push({
       phase: '完整性驗證測試',
       success: validationResult.success,
-      details: validationResult
+      details: validationResult,
     });
-    
+
     if (!validationResult.success) {
       throw new Error(`完整性驗證測試失敗: ${validationResult.error}`);
     }
     console.log(`✅ 完整性驗證測試通過 (準確率: ${validationResult.accuracy}%)`);
-    
+
     // 📊 最終結果統計
     const endTime = new Date();
     const duration = Math.round((endTime - testResults.startTime) / 1000);
-    
+
     testResults.overall = {
       success: true,
       duration: duration,
       totalCourses: discoveryResult.totalCourses,
       successfulMappings: mappingResult.successfulMappings,
       accuracy: validationResult.accuracy,
-      performance: duration < 300 ? '優秀' : duration < 480 ? '良好' : '需優化'
+      performance: duration < 300 ? '優秀' : duration < 480 ? '良好' : '需優化',
     };
-    
+
     console.log('\n🎉 完整系統測試執行完成！');
     console.log(`📊 總處理時間：${duration} 秒`);
     console.log(`📈 映射準確率：${validationResult.accuracy}%`);
     console.log(`⚡ 系統性能：${testResults.overall.performance}`);
     console.log(`✅ 所有 ${testResults.phases.length} 個階段測試通過`);
-    
+
     return testResults;
-    
   } catch (error) {
     const endTime = new Date();
     const duration = Math.round((endTime - testResults.startTime) / 1000);
-    
+
     console.log(`❌ 完整系統測試失敗：${error.message}`);
     console.log(`⏱️ 測試持續時間：${duration} 秒`);
-    
+
     testResults.overall = {
       success: false,
       error: error.message,
-      duration: duration
+      duration: duration,
     };
-    
+
     return testResults;
   }
 }
@@ -6798,9 +6992,9 @@ async function ultimateOneClickSolution() {
   console.log('🚀 啟動終極一鍵解決方案');
   console.log('🎯 目標：完全解決 82 班級 × 3 科目的課程映射問題');
   console.log('⚡ 模式：超高速 + AI 智能 + 自動修復');
-  
+
   const startTime = Date.now();
-  
+
   try {
     // 執行完整的一鍵映射
     const mappingResult = await oneClickCompleteMapping({
@@ -6808,41 +7002,42 @@ async function ultimateOneClickSolution() {
       backupExisting: true,
       enableTurboMode: true,
       batchSize: 25,
-      showProgress: true
+      showProgress: true,
     });
-    
+
     if (!mappingResult.success) {
       throw new Error(`一鍵映射失敗: ${mappingResult.error}`);
     }
-    
+
     // 執行驗證確保品質
     const validationResult = await rapidMappingValidator();
-    
+
     const endTime = Date.now();
     const totalDuration = Math.round((endTime - startTime) / 1000);
-    
+
     // 生成最終報告
     const finalReport = {
       success: true,
       timestamp: new Date().toLocaleString('zh-TW'),
       execution: {
         duration: `${totalDuration} 秒`,
-        performance: totalDuration < 300 ? '🚀 優秀' : totalDuration < 480 ? '✅ 良好' : '⚠️ 需優化'
+        performance:
+          totalDuration < 300 ? '🚀 優秀' : totalDuration < 480 ? '✅ 良好' : '⚠️ 需優化',
       },
       results: {
         totalCourses: mappingResult.totalCourses || 0,
         successfulMappings: mappingResult.successfulMappings || 0,
         failedMappings: mappingResult.failedMappings || 0,
-        accuracy: mappingResult.accuracy || 0
+        accuracy: mappingResult.accuracy || 0,
       },
       validation: {
         accuracy: validationResult.accuracy || 0,
         errors: validationResult.statistics?.errors?.length || 0,
-        duplicates: validationResult.statistics?.duplicates || 0
+        duplicates: validationResult.statistics?.duplicates || 0,
       },
-      recommendations: generateRecommendations(mappingResult, validationResult)
+      recommendations: generateRecommendations(mappingResult, validationResult),
     };
-    
+
     // 顯示最終結果
     console.log('\n🎉 終極一鍵解決方案執行完成！');
     console.log('═'.repeat(50));
@@ -6852,25 +7047,24 @@ async function ultimateOneClickSolution() {
     console.log(`📈 準確率：${finalReport.results.accuracy}%`);
     console.log(`⚡ 性能評級：${finalReport.execution.performance}`);
     console.log('═'.repeat(50));
-    
+
     if (finalReport.recommendations.length > 0) {
       console.log('\n💡 改進建議：');
       finalReport.recommendations.forEach((rec, index) => {
         console.log(`${index + 1}. ${rec}`);
       });
     }
-    
+
     return finalReport;
-    
   } catch (error) {
     const duration = Math.round((Date.now() - startTime) / 1000);
     console.log(`❌ 終極解決方案失敗：${error.message}`);
     console.log(`⏱️ 執行時間：${duration} 秒`);
-    
+
     return {
       success: false,
       error: error.message,
-      duration: duration
+      duration: duration,
     };
   }
 }
@@ -6880,27 +7074,27 @@ async function ultimateOneClickSolution() {
  */
 function generateRecommendations(mappingResult, validationResult) {
   const recommendations = [];
-  
+
   if (mappingResult.accuracy < 90) {
     recommendations.push('映射準確率低於 90%，建議檢查課程命名規則');
   }
-  
+
   if (validationResult.statistics?.duplicates > 0) {
     recommendations.push(`發現 ${validationResult.statistics.duplicates} 個重複映射，建議清理`);
   }
-  
+
   if (validationResult.statistics?.errors?.length > 0) {
     recommendations.push(`發現 ${validationResult.statistics.errors.length} 個格式錯誤，建議修正`);
   }
-  
+
   if (mappingResult.failedMappings > mappingResult.successfulMappings * 0.1) {
     recommendations.push('失敗映射比例較高，建議檢查課程命名一致性');
   }
-  
+
   if (recommendations.length === 0) {
     recommendations.push('系統運行完美！所有映射均成功完成');
   }
-  
+
   return recommendations;
 }
 
@@ -6912,25 +7106,24 @@ function generateRecommendations(mappingResult, validationResult) {
  */
 async function getAllClassroomCourses(options = {}) {
   console.log('🚀 開始獲取所有 Google Classroom 課程...');
-  
+
   try {
     const result = await classroomService.listAllCourses(options);
-    
+
     if (!result.success) {
       console.log(`❌ 獲取課程列表失敗：${result.error}`);
       return { success: false, error: result.error };
     }
-    
+
     const courses = result.data || [];
     console.log(`✅ 成功獲取 ${courses.length} 個課程`);
-    
+
     return {
       success: true,
       courses: courses,
       count: courses.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
   } catch (error) {
     console.log(`❌ 獲取課程列表異常：${error.message}`);
     return { success: false, error: error.message };
@@ -6945,9 +7138,9 @@ function findCourseByPattern(className, subject, courses) {
   if (!className || !subject || !courses || courses.length === 0) {
     return { success: false, error: '缺少必要參數' };
   }
-  
+
   console.log(`🔍 搜索課程：${className} - ${subject}`);
-  
+
   // 定義可能的課程名稱模式
   const patterns = [
     // 標準格式：G1 Achievers - LT
@@ -6964,81 +7157,81 @@ function findCourseByPattern(className, subject, courses) {
     `${subject} ${className}`,
     // 簡化格式
     `${className} ${subject}`,
-    `${subject} ${className}`
+    `${subject} ${className}`,
   ];
-  
+
   // 完全匹配
   for (const pattern of patterns) {
-    const exactMatch = courses.find(course => 
-      course.name && course.name.trim() === pattern
-    );
-    
+    const exactMatch = courses.find((course) => course.name && course.name.trim() === pattern);
+
     if (exactMatch) {
       console.log(`✅ 完全匹配找到：${exactMatch.name} (ID: ${exactMatch.id})`);
       return {
         success: true,
         course: exactMatch,
         matchType: 'EXACT',
-        pattern: pattern
+        pattern: pattern,
       };
     }
   }
-  
+
   // 模糊匹配
   const fuzzyMatches = [];
-  
+
   for (const course of courses) {
     if (!course.name) continue;
-    
+
     const courseName = course.name.toLowerCase();
     const classNameLower = className.toLowerCase();
     const subjectLower = subject.toLowerCase();
-    
+
     // 檢查是否包含班級名稱和科目
     if (courseName.includes(classNameLower) && courseName.includes(subjectLower)) {
       // 計算匹配度分數
       let score = 0;
-      
+
       // 班級名稱完整匹配加分
       if (courseName.includes(classNameLower)) score += 50;
-      
+
       // 科目完整匹配加分
       if (courseName.includes(subjectLower)) score += 30;
-      
+
       // 位置相近加分
       const classIndex = courseName.indexOf(classNameLower);
       const subjectIndex = courseName.indexOf(subjectLower);
       if (Math.abs(classIndex - subjectIndex) < 10) score += 20;
-      
+
       fuzzyMatches.push({
         course: course,
         score: score,
-        matchType: 'FUZZY'
+        matchType: 'FUZZY',
       });
     }
   }
-  
+
   // 按分數排序，取最高分
   if (fuzzyMatches.length > 0) {
     fuzzyMatches.sort((a, b) => b.score - a.score);
     const bestMatch = fuzzyMatches[0];
-    
-    console.log(`🎯 模糊匹配找到：${bestMatch.course.name} (ID: ${bestMatch.course.id}, 分數: ${bestMatch.score})`);
-    
+
+    console.log(
+      `🎯 模糊匹配找到：${bestMatch.course.name} (ID: ${bestMatch.course.id}, 分數: ${bestMatch.score})`
+    );
+
     return {
       success: true,
       course: bestMatch.course,
       matchType: 'FUZZY',
       score: bestMatch.score,
-      alternatives: fuzzyMatches.slice(1, 3) // 提供前2個備選
+      alternatives: fuzzyMatches.slice(1, 3), // 提供前2個備選
     };
   }
-  
+
   console.log(`❌ 找不到匹配的課程：${className} - ${subject}`);
   return {
     success: false,
     error: `找不到匹配的課程：${className} - ${subject}`,
-    searchPatterns: patterns
+    searchPatterns: patterns,
   };
 }
 
@@ -7048,66 +7241,158 @@ function findCourseByPattern(className, subject, courses) {
  */
 async function createCompleteCourseMapping(options = {}) {
   console.log('🚀 開始創建完整課程映射系統...');
-  
+
   // 定義班級列表
   const classNames = {
-    G1: ['Achievers', 'Discoverers', 'Voyagers', 'Explorers', 'Navigators', 'Adventurers', 'Guardians', 'Pioneers', 'Innovators', 'Visionaries', 'Pathfinders', 'Seekers', 'Trailblazers', 'Inventors'],
-    G2: ['Pioneers', 'Explorers', 'Inventors', 'Achievers', 'Voyagers', 'Adventurers', 'Innovators', 'Guardians', 'Pathfinders', 'Visionaries', 'Navigators', 'Discoverers', 'Seekers', 'Trailblazers'],
-    G3: ['Inventors', 'Innovators', 'Guardians', 'Achievers', 'Voyagers', 'Visionaries', 'Trailblazers', 'Discoverers', 'Explorers', 'Navigators', 'Adventurers', 'Seekers', 'Pathfinders', 'Pioneers'],
-    G4: ['Seekers', 'Voyagers', 'Visionaries', 'Achievers', 'Navigators', 'Trailblazers', 'Pathfinders', 'Explorers', 'Adventurers', 'Innovators', 'Discoverers', 'Guardians', 'Inventors', 'Pioneers'],
-    G5: ['Adventurers', 'Navigators', 'Pioneers', 'Inventors', 'Seekers', 'Discoverers', 'Guardians', 'Pathfinders', 'Explorers', 'Achievers', 'Voyagers', 'Trailblazers', 'Innovators', 'Visionaries'],
-    G6: ['Explorers', 'Inventors', 'Adventurers', 'Achievers', 'Voyagers', 'Discoverers', 'Innovators', 'Guardians', 'Pathfinders', 'Seekers', 'Visionaries', 'Pioneers', 'Trailblazers', 'Navigators']
+    G1: [
+      'Achievers',
+      'Discoverers',
+      'Voyagers',
+      'Explorers',
+      'Navigators',
+      'Adventurers',
+      'Guardians',
+      'Pioneers',
+      'Innovators',
+      'Visionaries',
+      'Pathfinders',
+      'Seekers',
+      'Trailblazers',
+      'Inventors',
+    ],
+    G2: [
+      'Pioneers',
+      'Explorers',
+      'Inventors',
+      'Achievers',
+      'Voyagers',
+      'Adventurers',
+      'Innovators',
+      'Guardians',
+      'Pathfinders',
+      'Visionaries',
+      'Navigators',
+      'Discoverers',
+      'Seekers',
+      'Trailblazers',
+    ],
+    G3: [
+      'Inventors',
+      'Innovators',
+      'Guardians',
+      'Achievers',
+      'Voyagers',
+      'Visionaries',
+      'Trailblazers',
+      'Discoverers',
+      'Explorers',
+      'Navigators',
+      'Adventurers',
+      'Seekers',
+      'Pathfinders',
+      'Pioneers',
+    ],
+    G4: [
+      'Seekers',
+      'Voyagers',
+      'Visionaries',
+      'Achievers',
+      'Navigators',
+      'Trailblazers',
+      'Pathfinders',
+      'Explorers',
+      'Adventurers',
+      'Innovators',
+      'Discoverers',
+      'Guardians',
+      'Inventors',
+      'Pioneers',
+    ],
+    G5: [
+      'Adventurers',
+      'Navigators',
+      'Pioneers',
+      'Inventors',
+      'Seekers',
+      'Discoverers',
+      'Guardians',
+      'Pathfinders',
+      'Explorers',
+      'Achievers',
+      'Voyagers',
+      'Trailblazers',
+      'Innovators',
+      'Visionaries',
+    ],
+    G6: [
+      'Explorers',
+      'Inventors',
+      'Adventurers',
+      'Achievers',
+      'Voyagers',
+      'Discoverers',
+      'Innovators',
+      'Guardians',
+      'Pathfinders',
+      'Seekers',
+      'Visionaries',
+      'Pioneers',
+      'Trailblazers',
+      'Navigators',
+    ],
   };
-  
+
   const subjects = ['LT', 'IT', 'KCFS'];
-  
+
   // 計算總課程數
   const totalClasses = Object.values(classNames).reduce((sum, classes) => sum + classes.length, 0);
   const expectedCourses = totalClasses * subjects.length;
-  
-  console.log(`📊 預期映射課程數量：${totalClasses} 個班級 × ${subjects.length} 個科目 = ${expectedCourses} 個課程`);
-  
+
+  console.log(
+    `📊 預期映射課程數量：${totalClasses} 個班級 × ${subjects.length} 個科目 = ${expectedCourses} 個課程`
+  );
+
   try {
     // 1. 獲取所有 Classroom 課程
     console.log('🔍 步驟 1：獲取所有 Google Classroom 課程...');
     const coursesResult = await getAllClassroomCourses(options);
-    
+
     if (!coursesResult.success) {
       return { success: false, error: `獲取課程失敗：${coursesResult.error}` };
     }
-    
+
     const allCourses = coursesResult.courses;
     console.log(`✅ 獲取到 ${allCourses.length} 個 Classroom 課程`);
-    
+
     // 2. 初始化進度追蹤器
     const progress = new ProgressTracker(expectedCourses, '課程映射發現');
-    
+
     // 3. 構建課程映射資料
     const mappingData = [];
     const foundCourses = new Set();
     const missingCourses = [];
-    
+
     console.log('🎯 步驟 2：開始智能課程匹配...');
-    
+
     // 遍歷所有年級
     for (const [grade, classes] of Object.entries(classNames)) {
       console.log(`\n📚 處理 ${grade} 年級 (${classes.length} 個班級)...`);
-      
+
       // 遍歷每個班級
       for (const className of classes) {
         const fullClassName = `${grade} ${className}`;
-        
+
         // 遍歷每個科目
         for (const subject of subjects) {
           const searchKey = `${fullClassName}-${subject}`;
-          
+
           try {
             // 查找匹配的課程
             const matchResult = findCourseByPattern(fullClassName, subject, allCourses);
-            
+
             if (matchResult.success) {
               const course = matchResult.course;
-              
+
               // 避免重複映射
               if (!foundCourses.has(course.id)) {
                 mappingData.push({
@@ -7118,9 +7403,9 @@ async function createCompleteCourseMapping(options = {}) {
                   originalName: course.name,
                   matchType: matchResult.matchType,
                   score: matchResult.score || 100,
-                  discoveredAt: new Date().toISOString()
+                  discoveredAt: new Date().toISOString(),
                 });
-                
+
                 foundCourses.add(course.id);
                 progress.addSuccess(searchKey, `找到：${course.name}`);
               } else {
@@ -7130,42 +7415,41 @@ async function createCompleteCourseMapping(options = {}) {
               missingCourses.push({
                 className: fullClassName,
                 subject: subject,
-                error: matchResult.error
+                error: matchResult.error,
               });
               progress.addError(searchKey, matchResult.error);
             }
-            
+
             // API 限速控制
             if (options.respectRateLimit !== false) {
-              await new Promise(resolve => setTimeout(resolve, 100));
+              await new Promise((resolve) => setTimeout(resolve, 100));
             }
-            
           } catch (error) {
             missingCourses.push({
               className: fullClassName,
               subject: subject,
-              error: error.message
+              error: error.message,
             });
             progress.addError(searchKey, error.message);
           }
         }
       }
     }
-    
+
     const summary = progress.complete();
-    
+
     console.log('\n📊 步驟 3：更新課程映射工作表...');
-    
+
     // 4. 更新工作表
     const updateResult = await updateCourseMappingSheet(mappingData, {
       clearExisting: options.clearExisting || false,
-      backupExisting: options.backupExisting !== false
+      backupExisting: options.backupExisting !== false,
     });
-    
+
     if (!updateResult.success) {
       return { success: false, error: `更新工作表失敗：${updateResult.error}` };
     }
-    
+
     // 5. 生成報告
     const report = {
       summary: {
@@ -7173,26 +7457,27 @@ async function createCompleteCourseMapping(options = {}) {
         totalFound: mappingData.length,
         totalMissing: missingCourses.length,
         completionRate: Math.round((mappingData.length / expectedCourses) * 100),
-        classroomCoursesScanned: allCourses.length
+        classroomCoursesScanned: allCourses.length,
       },
       foundCourses: mappingData,
       missingCourses: missingCourses,
       statistics: summary.statistics,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     console.log('\n✅ 課程映射創建完成！');
-    console.log(`📈 完成率：${report.summary.completionRate}% (${report.summary.totalFound}/${report.summary.totalExpected})`);
+    console.log(
+      `📈 完成率：${report.summary.completionRate}% (${report.summary.totalFound}/${report.summary.totalExpected})`
+    );
     console.log(`🎯 找到課程：${report.summary.totalFound} 個`);
     console.log(`❌ 缺失課程：${report.summary.totalMissing} 個`);
-    
+
     return {
       success: true,
       report: report,
       mappingData: mappingData,
-      updateResult: updateResult
+      updateResult: updateResult,
     };
-    
   } catch (error) {
     console.log(`❌ 創建課程映射失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -7205,11 +7490,11 @@ async function createCompleteCourseMapping(options = {}) {
  */
 async function updateCourseMappingSheet(mappingData, options = {}) {
   console.log(`📝 開始更新課程映射工作表，共 ${mappingData.length} 條記錄...`);
-  
+
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = spreadsheet.getSheetByName('course_mapping');
-    
+
     // 如果工作表不存在，創建它
     if (!sheet) {
       console.log('🏗️ course_mapping 工作表不存在，正在創建...');
@@ -7219,7 +7504,7 @@ async function updateCourseMappingSheet(mappingData, options = {}) {
       }
       sheet = createResult.sheet;
     }
-    
+
     // 備份現有資料
     if (options.backupExisting) {
       console.log('💾 備份現有映射資料...');
@@ -7228,7 +7513,7 @@ async function updateCourseMappingSheet(mappingData, options = {}) {
         console.log(`✅ 備份完成：${backupResult.backupSheetName}`);
       }
     }
-    
+
     // 清除現有資料（保留標題行）
     if (options.clearExisting) {
       const lastRow = sheet.getLastRow();
@@ -7237,30 +7522,30 @@ async function updateCourseMappingSheet(mappingData, options = {}) {
         console.log('🧹 已清除現有映射資料');
       }
     }
-    
+
     // 準備寫入資料
     if (mappingData.length === 0) {
       console.log('⚠️ 沒有要更新的映射資料');
       return { success: true, updatedRows: 0 };
     }
-    
+
     // 轉換資料格式
-    const writeData = mappingData.map(item => [
+    const writeData = mappingData.map((item) => [
       item.courseName || '',
       item.subject || '',
       item.courseId || '',
-      item.status || 'ACTIVE'
+      item.status || 'ACTIVE',
     ]);
-    
+
     // 批次寫入資料
     const startRow = options.clearExisting ? 2 : sheet.getLastRow() + 1;
     const range = sheet.getRange(startRow, 1, writeData.length, 4);
     range.setValues(writeData);
-    
+
     // 設定資料格式
     range.setWrap(false);
     range.setHorizontalAlignment('left');
-    
+
     // 為新資料設定條件格式
     if (writeData.length > 0) {
       // ACTIVE 狀態設為綠色
@@ -7270,25 +7555,24 @@ async function updateCourseMappingSheet(mappingData, options = {}) {
         .setBackground('#d9ead3')
         .setRanges([statusRange])
         .build();
-      
+
       const rules = sheet.getConditionalFormatRules();
       rules.push(activeRule);
       sheet.setConditionalFormatRules(rules);
     }
-    
+
     // 自動調整欄寬
     sheet.autoResizeColumns(1, 4);
-    
+
     console.log(`✅ 成功更新 ${writeData.length} 條課程映射記錄`);
-    
+
     return {
       success: true,
       updatedRows: writeData.length,
       startRow: startRow,
       sheetName: 'course_mapping',
-      totalRows: sheet.getLastRow()
+      totalRows: sheet.getLastRow(),
     };
-    
   } catch (error) {
     console.log(`❌ 更新課程映射工作表失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -7302,33 +7586,32 @@ function backupCourseMappingSheet() {
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sourceSheet = spreadsheet.getSheetByName('course_mapping');
-    
+
     if (!sourceSheet) {
       return { success: false, error: 'course_mapping 工作表不存在' };
     }
-    
+
     // 生成備份工作表名稱
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
     const backupName = `course_mapping_backup_${timestamp}`;
-    
+
     // 複製工作表
     const backupSheet = sourceSheet.copyTo(spreadsheet);
     backupSheet.setName(backupName);
-    
+
     // 添加備份資訊
     const lastRow = backupSheet.getLastRow();
-    backupSheet.getRange(lastRow + 2, 1, 1, 2).setValues([[
-      '備份時間:', new Date().toLocaleString('zh-TW')
-    ]]);
-    
+    backupSheet
+      .getRange(lastRow + 2, 1, 1, 2)
+      .setValues([['備份時間:', new Date().toLocaleString('zh-TW')]]);
+
     console.log(`✅ 課程映射備份完成：${backupName}`);
-    
+
     return {
       success: true,
       backupSheetName: backupName,
-      originalRows: lastRow
+      originalRows: lastRow,
     };
-    
   } catch (error) {
     console.log(`❌ 備份課程映射工作表失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -7340,78 +7623,77 @@ function backupCourseMappingSheet() {
  */
 function generateCourseMappingReport() {
   console.log('📊 生成課程映射統計報告...');
-  
+
   try {
     const mappingResult = readCourseMappingFromSheet();
-    
+
     if (!mappingResult.success) {
       return { success: false, error: mappingResult.error };
     }
-    
+
     const courses = mappingResult.courses;
-    
+
     // 按年級統計
     const gradeStats = {};
     // 按科目統計
     const subjectStats = {};
     // 狀態統計
     const statusStats = {};
-    
-    courses.forEach(course => {
+
+    courses.forEach((course) => {
       // 解析年級
       const gradeMatch = course.courseName.match(/G(\d)/);
       const grade = gradeMatch ? `G${gradeMatch[1]}` : 'Unknown';
-      
+
       // 年級統計
       if (!gradeStats[grade]) gradeStats[grade] = 0;
       gradeStats[grade]++;
-      
+
       // 科目統計
       const subject = course.subject || 'Unknown';
       if (!subjectStats[subject]) subjectStats[subject] = 0;
       subjectStats[subject]++;
-      
+
       // 狀態統計
       const status = course.status || 'Unknown';
       if (!statusStats[status]) statusStats[status] = 0;
       statusStats[status]++;
     });
-    
+
     // 完成度分析
     const expectedPerGrade = 14; // 每年級 14 個班級
     const expectedPerSubject = 3; // 每個科目 3 個
     const totalExpected = 82 * 3; // 82 個班級 × 3 個科目
-    
+
     const completionRate = Math.round((courses.length / totalExpected) * 100);
-    
+
     const report = {
       summary: {
         totalMapped: courses.length,
         totalExpected: totalExpected,
         completionRate: completionRate,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       },
       byGrade: gradeStats,
       bySubject: subjectStats,
       byStatus: statusStats,
       missingAnalysis: {
         expectedPerGrade: expectedPerGrade,
-        expectedPerSubject: expectedPerSubject
-      }
+        expectedPerSubject: expectedPerSubject,
+      },
     };
-    
+
     console.log('📈 課程映射統計報告：');
     console.log(`   總課程數：${report.summary.totalMapped}/${report.summary.totalExpected}`);
     console.log(`   完成率：${report.summary.completionRate}%`);
     console.log(`   年級分佈：`, gradeStats);
     console.log(`   科目分佈：`, subjectStats);
     console.log(`   狀態分佈：`, statusStats);
-    
+
     return {
       success: true,
-      report: report
+      report: report,
     };
-    
   } catch (error) {
     console.log(`❌ 生成統計報告失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -7424,38 +7706,38 @@ function generateCourseMappingReport() {
  */
 async function resyncCourseMappings(options = {}) {
   console.log('🔄 開始重新同步課程映射...');
-  
+
   try {
     // 讀取現有映射
     const mappingResult = readCourseMappingFromSheet();
     if (!mappingResult.success) {
       return { success: false, error: mappingResult.error };
     }
-    
+
     const currentMappings = mappingResult.courses;
     console.log(`📋 現有映射記錄：${currentMappings.length} 個`);
-    
+
     // 獲取最新課程列表
     const coursesResult = await getAllClassroomCourses({ forceRefresh: true });
     if (!coursesResult.success) {
       return { success: false, error: coursesResult.error };
     }
-    
+
     const latestCourses = coursesResult.courses;
-    const activeCourseIds = new Set(latestCourses.map(c => c.id));
-    
+    const activeCourseIds = new Set(latestCourses.map((c) => c.id));
+
     // 檢查映射狀態
     const progress = new ProgressTracker(currentMappings.length, '同步課程映射');
     const syncResults = [];
-    
+
     for (const mapping of currentMappings) {
       try {
         const courseId = mapping.courseId;
-        const currentCourse = latestCourses.find(c => c.id === courseId);
-        
+        const currentCourse = latestCourses.find((c) => c.id === courseId);
+
         let newStatus = mapping.status;
         let syncType = 'UNCHANGED';
-        
+
         if (!activeCourseIds.has(courseId)) {
           // 課程不存在或已封存
           newStatus = 'ARCHIVED';
@@ -7472,55 +7754,55 @@ async function resyncCourseMappings(options = {}) {
           }
           progress.addSuccess(`${mapping.courseName} (${mapping.subject})`, `狀態：${syncType}`);
         }
-        
+
         syncResults.push({
           ...mapping,
           status: newStatus,
           syncType: syncType,
-          lastSyncAt: new Date().toISOString()
+          lastSyncAt: new Date().toISOString(),
         });
-        
       } catch (error) {
         progress.addError(`${mapping.courseName} (${mapping.subject})`, error.message);
         syncResults.push({
           ...mapping,
           syncType: 'ERROR',
-          syncError: error.message
+          syncError: error.message,
         });
       }
     }
-    
+
     const summary = progress.complete();
-    
+
     // 更新工作表
     if (options.updateSheet !== false) {
       const updateResult = await updateCourseMappingSheet(syncResults, {
         clearExisting: true,
-        backupExisting: true
+        backupExisting: true,
       });
-      
+
       if (!updateResult.success) {
         return { success: false, error: `更新工作表失敗：${updateResult.error}` };
       }
     }
-    
+
     const syncStats = {
       total: syncResults.length,
-      active: syncResults.filter(r => r.status === 'ACTIVE').length,
-      archived: syncResults.filter(r => r.status === 'ARCHIVED').length,
-      errors: syncResults.filter(r => r.syncType === 'ERROR').length
+      active: syncResults.filter((r) => r.status === 'ACTIVE').length,
+      archived: syncResults.filter((r) => r.status === 'ARCHIVED').length,
+      errors: syncResults.filter((r) => r.syncType === 'ERROR').length,
     };
-    
+
     console.log('✅ 課程映射同步完成');
-    console.log(`📊 同步統計：活躍 ${syncStats.active}、封存 ${syncStats.archived}、錯誤 ${syncStats.errors}`);
-    
+    console.log(
+      `📊 同步統計：活躍 ${syncStats.active}、封存 ${syncStats.archived}、錯誤 ${syncStats.errors}`
+    );
+
     return {
       success: true,
       syncResults: syncResults,
       statistics: syncStats,
-      summary: summary
+      summary: summary,
     };
-    
   } catch (error) {
     console.log(`❌ 重新同步課程映射失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -7543,10 +7825,10 @@ class AutoMappingUpdateEngine {
     this.versionControl = new MappingVersionControl();
     this.qualityMonitor = new MappingQualityMonitor();
     this.updateIntervals = {
-      FAST: 15 * 60 * 1000,      // 15分鐘 - 快速更新
-      REGULAR: 60 * 60 * 1000,   // 1小時 - 常規更新
+      FAST: 15 * 60 * 1000, // 15分鐘 - 快速更新
+      REGULAR: 60 * 60 * 1000, // 1小時 - 常規更新
       DAILY: 24 * 60 * 60 * 1000, // 24小時 - 每日更新
-      WEEKLY: 7 * 24 * 60 * 60 * 1000 // 7天 - 每週更新
+      WEEKLY: 7 * 24 * 60 * 60 * 1000, // 7天 - 每週更新
     };
   }
 
@@ -7556,10 +7838,10 @@ class AutoMappingUpdateEngine {
    */
   async performIncrementalUpdate(options = {}) {
     this.logger.info('🚀 開始執行增量映射更新...');
-    
+
     const startTime = Date.now();
     const updateId = `update_${Date.now()}`;
-    
+
     try {
       // 1. 獲取當前映射狀態
       const currentMapping = await this.getCurrentMappingState();
@@ -7575,26 +7857,26 @@ class AutoMappingUpdateEngine {
 
       // 3. 分析需要更新的項目
       const updatePlan = this.createUpdatePlan(classroomChanges.changes, options);
-      
+
       if (updatePlan.totalUpdates === 0) {
         this.logger.info('✅ 無需更新 - 所有映射都是最新的');
         return {
           success: true,
           type: 'NO_UPDATES_NEEDED',
           message: '映射表已是最新狀態',
-          executionTime: Date.now() - startTime
+          executionTime: Date.now() - startTime,
         };
       }
 
       // 4. 執行增量更新
       const updateResults = await this.executeIncrementalUpdates(updatePlan, updateId);
-      
+
       // 5. 記錄版本控制
       await this.versionControl.recordUpdate(updateId, updateResults);
-      
+
       // 6. 品質檢查
       const qualityCheck = await this.qualityMonitor.validateUpdates(updateResults);
-      
+
       const executionTime = Date.now() - startTime;
       this.logger.info(`✅ 增量更新完成 - 耗時: ${executionTime}ms`);
 
@@ -7604,16 +7886,15 @@ class AutoMappingUpdateEngine {
         updatePlan: updatePlan,
         updateResults: updateResults,
         qualityCheck: qualityCheck,
-        executionTime: executionTime
+        executionTime: executionTime,
       };
-      
     } catch (error) {
       this.logger.error(`❌ 增量更新失敗: ${error.message}`);
       return {
         success: false,
         error: error.message,
         updateId: updateId,
-        executionTime: Date.now() - startTime
+        executionTime: Date.now() - startTime,
       };
     }
   }
@@ -7625,7 +7906,7 @@ class AutoMappingUpdateEngine {
     try {
       const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
       const sheet = spreadsheet.getSheetByName('course_mapping');
-      
+
       if (!sheet) {
         return { success: false, error: '找不到 course_mapping 工作表' };
       }
@@ -7633,15 +7914,15 @@ class AutoMappingUpdateEngine {
       const data = sheet.getDataRange().getValues();
       const headers = data[0];
       const mappings = [];
-      
+
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
         const mapping = {};
-        
+
         headers.forEach((header, index) => {
           mapping[header] = row[index];
         });
-        
+
         mappings.push(mapping);
       }
 
@@ -7649,9 +7930,8 @@ class AutoMappingUpdateEngine {
         success: true,
         data: mappings,
         timestamp: new Date().toISOString(),
-        count: mappings.length
+        count: mappings.length,
       };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -7669,19 +7949,19 @@ class AutoMappingUpdateEngine {
       }
 
       const currentCourses = coursesResult.courses;
-      const mappedCourseIds = new Set(currentMappings.map(m => m.courseId).filter(Boolean));
-      
+      const mappedCourseIds = new Set(currentMappings.map((m) => m.courseId).filter(Boolean));
+
       const changes = {
         new: [], // 新增的課程
         updated: [], // 更新的課程
         deleted: [], // 刪除的課程
-        unchanged: [] // 未變更的課程
+        unchanged: [], // 未變更的課程
       };
 
       // 檢查新增和更新的課程
       for (const course of currentCourses) {
-        const existingMapping = currentMappings.find(m => m.courseId === course.id);
-        
+        const existingMapping = currentMappings.find((m) => m.courseId === course.id);
+
         if (!existingMapping) {
           // 嘗試智能匹配
           const aiMatch = await this.tryIntelligentMatching(course);
@@ -7689,7 +7969,7 @@ class AutoMappingUpdateEngine {
             changes.new.push({
               course: course,
               suggestedMapping: aiMatch.mapping,
-              confidence: aiMatch.confidence
+              confidence: aiMatch.confidence,
             });
           }
         } else {
@@ -7698,12 +7978,12 @@ class AutoMappingUpdateEngine {
             changes.updated.push({
               course: course,
               existingMapping: existingMapping,
-              changes: this.identifyChanges(course, existingMapping)
+              changes: this.identifyChanges(course, existingMapping),
             });
           } else {
             changes.unchanged.push({
               course: course,
-              mapping: existingMapping
+              mapping: existingMapping,
             });
           }
         }
@@ -7711,15 +7991,17 @@ class AutoMappingUpdateEngine {
 
       // 檢查已刪除的課程
       for (const mapping of currentMappings) {
-        if (mapping.courseId && !currentCourses.find(c => c.id === mapping.courseId)) {
+        if (mapping.courseId && !currentCourses.find((c) => c.id === mapping.courseId)) {
           changes.deleted.push({
             mapping: mapping,
-            reason: 'COURSE_NOT_FOUND_IN_CLASSROOM'
+            reason: 'COURSE_NOT_FOUND_IN_CLASSROOM',
           });
         }
       }
 
-      this.logger.info(`🔍 課程變更檢測完成: 新增 ${changes.new.length}, 更新 ${changes.updated.length}, 刪除 ${changes.deleted.length}, 未變更 ${changes.unchanged.length}`);
+      this.logger.info(
+        `🔍 課程變更檢測完成: 新增 ${changes.new.length}, 更新 ${changes.updated.length}, 刪除 ${changes.deleted.length}, 未變更 ${changes.unchanged.length}`
+      );
 
       return {
         success: true,
@@ -7729,10 +8011,9 @@ class AutoMappingUpdateEngine {
           new: changes.new.length,
           updated: changes.updated.length,
           deleted: changes.deleted.length,
-          unchanged: changes.unchanged.length
-        }
+          unchanged: changes.unchanged.length,
+        },
       };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -7747,7 +8028,7 @@ class AutoMappingUpdateEngine {
       if (typeof window !== 'undefined' && window.AICourseClassifier) {
         const classifier = new window.AICourseClassifier();
         const analysis = classifier.analyzeCourse(course.name);
-        
+
         if (analysis.success && analysis.confidence.overall > 0.7) {
           const mapping = {
             courseName: `${analysis.grade} ${analysis.className}`,
@@ -7758,31 +8039,31 @@ class AutoMappingUpdateEngine {
             matchType: 'AI_INTELLIGENT',
             confidence: analysis.confidence.overall,
             discoveredAt: new Date().toISOString(),
-            source: 'AUTO_UPDATE_ENGINE'
+            source: 'AUTO_UPDATE_ENGINE',
           };
-          
+
           return {
             success: true,
             mapping: mapping,
             confidence: analysis.confidence.overall,
-            analysis: analysis
+            analysis: analysis,
           };
         }
       }
-      
+
       // 降級使用現有的模糊匹配邏輯
       const gradeMatches = course.name.match(/G([1-6])/);
       const subjectMatches = course.name.match(/(LT|IT|KCFS)/);
-      
+
       if (gradeMatches && subjectMatches) {
         const grade = `G${gradeMatches[1]}`;
         const subject = subjectMatches[1];
-        
+
         // 嘗試提取班級名稱
         const classNameMatch = course.name.match(new RegExp(`${grade}\\s+(\\w+)`));
         if (classNameMatch) {
           const className = classNameMatch[1];
-          
+
           const mapping = {
             courseName: `${grade} ${className}`,
             subject: subject,
@@ -7792,19 +8073,18 @@ class AutoMappingUpdateEngine {
             matchType: 'PATTERN_MATCH',
             confidence: 0.8,
             discoveredAt: new Date().toISOString(),
-            source: 'AUTO_UPDATE_ENGINE'
+            source: 'AUTO_UPDATE_ENGINE',
           };
-          
+
           return {
             success: true,
             mapping: mapping,
-            confidence: 0.8
+            confidence: 0.8,
           };
         }
       }
-      
+
       return { success: false, reason: 'INSUFFICIENT_CONFIDENCE' };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -7825,8 +8105,8 @@ class AutoMappingUpdateEngine {
       items: {
         toAdd: changes.new,
         toUpdate: changes.updated,
-        toDelete: changes.deleted
-      }
+        toDelete: changes.deleted,
+      },
     };
 
     this.logger.info(`📋 更新計劃: ${plan.adds} 新增, ${plan.updates} 更新, ${plan.deletes} 刪除`);
@@ -7841,7 +8121,7 @@ class AutoMappingUpdateEngine {
       added: [],
       updated: [],
       deleted: [],
-      errors: []
+      errors: [],
     };
 
     try {
@@ -7857,7 +8137,7 @@ class AutoMappingUpdateEngine {
         } catch (error) {
           results.errors.push({ type: 'ADD', item, error: error.message });
         }
-        
+
         await this.rateLimiter.throttle();
       }
 
@@ -7873,7 +8153,7 @@ class AutoMappingUpdateEngine {
         } catch (error) {
           results.errors.push({ type: 'UPDATE', item, error: error.message });
         }
-        
+
         await this.rateLimiter.throttle();
       }
 
@@ -7889,7 +8169,7 @@ class AutoMappingUpdateEngine {
         } catch (error) {
           results.errors.push({ type: 'DELETE', item, error: error.message });
         }
-        
+
         await this.rateLimiter.throttle();
       }
 
@@ -7899,7 +8179,6 @@ class AutoMappingUpdateEngine {
       }
 
       return results;
-      
     } catch (error) {
       this.logger.error(`執行增量更新失敗: ${error.message}`);
       throw error;
@@ -7911,7 +8190,7 @@ class AutoMappingUpdateEngine {
    */
   calculateOptimalBatchSize(changes) {
     const totalItems = changes.new.length + changes.updated.length + changes.deleted.length;
-    
+
     if (totalItems <= 10) return totalItems;
     if (totalItems <= 50) return 10;
     if (totalItems <= 200) return 25;
@@ -7925,7 +8204,7 @@ class AutoMappingUpdateEngine {
     const totalItems = changes.new.length + changes.updated.length + changes.deleted.length;
     const baseTime = 200; // 每項基本時間 (ms)
     const apiDelay = 100; // API 限速延遲 (ms)
-    
+
     return (totalItems * (baseTime + apiDelay)) / 1000; // 返回秒數
   }
 
@@ -7946,23 +8225,23 @@ class AutoMappingUpdateEngine {
    */
   identifyChanges(course, existingMapping) {
     const changes = [];
-    
+
     if (course.name !== existingMapping.originalName) {
       changes.push({
         field: 'originalName',
         oldValue: existingMapping.originalName,
-        newValue: course.name
+        newValue: course.name,
       });
     }
-    
+
     if (course.courseState !== existingMapping.status) {
       changes.push({
         field: 'status',
         oldValue: existingMapping.status,
-        newValue: course.courseState
+        newValue: course.courseState,
       });
     }
-    
+
     return changes;
   }
 
@@ -7975,12 +8254,11 @@ class AutoMappingUpdateEngine {
         ...item.suggestedMapping,
         addedBy: 'AUTO_UPDATE_ENGINE',
         addedAt: new Date().toISOString(),
-        updateId: updateId
+        updateId: updateId,
       };
-      
+
       this.logger.info(`➕ 新增映射: ${mapping.courseName} - ${mapping.subject}`);
       return { success: true, mapping: mapping };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -7992,19 +8270,18 @@ class AutoMappingUpdateEngine {
   async updateMappingItem(item, updateId) {
     try {
       const updatedMapping = { ...item.existingMapping };
-      
+
       // 應用變更
       for (const change of item.changes) {
         updatedMapping[change.field] = change.newValue;
       }
-      
+
       updatedMapping.lastUpdated = new Date().toISOString();
       updatedMapping.updatedBy = 'AUTO_UPDATE_ENGINE';
       updatedMapping.updateId = updateId;
-      
+
       this.logger.info(`🔄 更新映射: ${updatedMapping.courseName} - ${updatedMapping.subject}`);
       return { success: true, mapping: updatedMapping };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -8021,12 +8298,11 @@ class AutoMappingUpdateEngine {
         deletedAt: new Date().toISOString(),
         deletedBy: 'AUTO_UPDATE_ENGINE',
         deleteReason: item.reason,
-        updateId: updateId
+        updateId: updateId,
       };
-      
+
       this.logger.info(`🗑️ 標記刪除映射: ${deletedMapping.courseName} - ${deletedMapping.subject}`);
       return { success: true, mapping: deletedMapping };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -8038,12 +8314,8 @@ class AutoMappingUpdateEngine {
   async updateMappingSheet(results, updateId) {
     try {
       // 收集所有需要寫入的數據
-      const allMappings = [
-        ...results.added,
-        ...results.updated,
-        ...results.deleted
-      ];
-      
+      const allMappings = [...results.added, ...results.updated, ...results.deleted];
+
       if (allMappings.length === 0) {
         return { success: true, message: '無數據需要更新' };
       }
@@ -8052,11 +8324,10 @@ class AutoMappingUpdateEngine {
       const updateResult = await updateCourseMappingSheet(allMappings, {
         clearExisting: false, // 不清空現有數據，僅更新
         backupExisting: true,
-        updateId: updateId
+        updateId: updateId,
       });
-      
+
       return updateResult;
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -8086,23 +8357,22 @@ class MappingVersionControl {
           added: updateResults.added.length,
           updated: updateResults.updated.length,
           deleted: updateResults.deleted.length,
-          errors: updateResults.errors.length
+          errors: updateResults.errors.length,
         },
-        details: updateResults
+        details: updateResults,
       };
-      
+
       // 儲存到版本歷史工作表
       await this.saveVersionHistory(version);
-      
+
       // 創建備份快照
       await this.createBackupSnapshot(updateId);
-      
+
       // 清理舊版本
       await this.cleanupOldVersions();
-      
+
       this.logger.info(`📝 版本記錄完成: ${updateId}`);
       return { success: true, versionId: updateId };
-      
     } catch (error) {
       this.logger.error(`版本記錄失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -8116,37 +8386,36 @@ class MappingVersionControl {
     try {
       const backupId = `backup_${Date.now()}`;
       const timestamp = new Date().toISOString();
-      
+
       this.logger.info(`💾 創建完整備份: ${backupId}`);
-      
+
       // 獲取當前完整映射數據
       const currentData = await this.getCurrentMappingData();
       if (!currentData.success) {
         throw new Error(`無法獲取當前數據: ${currentData.error}`);
       }
-      
+
       // 創建備份工作表
       const backupSheet = await this.createBackupSheet(backupId, timestamp);
-      
+
       // 寫入數據到備份工作表
       await this.writeDataToBackupSheet(backupSheet, currentData.data);
-      
+
       // 記錄備份資訊
       await this.recordBackupInfo({
         id: backupId,
         timestamp: timestamp,
         reason: reason,
         recordCount: currentData.data.length,
-        sheetName: backupSheet.getName()
+        sheetName: backupSheet.getName(),
       });
-      
+
       return {
         success: true,
         backupId: backupId,
         recordCount: currentData.data.length,
-        sheetName: backupSheet.getName()
+        sheetName: backupSheet.getName(),
       };
-      
     } catch (error) {
       this.logger.error(`創建完整備份失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -8159,46 +8428,45 @@ class MappingVersionControl {
   async rollbackToVersion(versionId) {
     try {
       this.logger.info(`🔄 開始回滾到版本: ${versionId}`);
-      
+
       // 查找版本資訊
       const versionInfo = await this.getVersionInfo(versionId);
       if (!versionInfo.success) {
         throw new Error(`找不到版本: ${versionId}`);
       }
-      
+
       // 創建當前狀態備份
       const preRollbackBackup = await this.createFullBackup(`PRE_ROLLBACK_${versionId}`);
       if (!preRollbackBackup.success) {
         throw new Error(`創建回滾前備份失敗: ${preRollbackBackup.error}`);
       }
-      
+
       // 讀取目標版本數據
       const versionData = await this.getVersionData(versionId);
       if (!versionData.success) {
         throw new Error(`讀取版本數據失敗: ${versionData.error}`);
       }
-      
+
       // 執行回滾
       const rollbackResult = await this.performRollback(versionData.data);
       if (!rollbackResult.success) {
         throw new Error(`執行回滾失敗: ${rollbackResult.error}`);
       }
-      
+
       // 記錄回滾操作
       await this.recordRollback({
         fromVersion: 'CURRENT',
         toVersion: versionId,
         timestamp: new Date().toISOString(),
-        preRollbackBackup: preRollbackBackup.backupId
+        preRollbackBackup: preRollbackBackup.backupId,
       });
-      
+
       this.logger.info(`✅ 回滾完成: ${versionId}`);
       return {
         success: true,
         rolledBackTo: versionId,
-        preRollbackBackup: preRollbackBackup.backupId
+        preRollbackBackup: preRollbackBackup.backupId,
       };
-      
     } catch (error) {
       this.logger.error(`回滾失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -8212,22 +8480,21 @@ class MappingVersionControl {
     try {
       const [version1, version2] = await Promise.all([
         this.getVersionData(versionId1),
-        this.getVersionData(versionId2)
+        this.getVersionData(versionId2),
       ]);
-      
+
       if (!version1.success || !version2.success) {
         throw new Error('無法獲取版本數據');
       }
-      
+
       const comparison = this.analyzeVersionDifferences(version1.data, version2.data);
-      
+
       return {
         success: true,
         comparison: comparison,
         version1Id: versionId1,
-        version2Id: versionId2
+        version2Id: versionId2,
       };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -8237,20 +8504,20 @@ class MappingVersionControl {
    * 🔍 分析版本差異
    */
   analyzeVersionDifferences(data1, data2) {
-    const map1 = new Map(data1.map(item => [`${item.courseName}-${item.subject}`, item]));
-    const map2 = new Map(data2.map(item => [`${item.courseName}-${item.subject}`, item]));
-    
+    const map1 = new Map(data1.map((item) => [`${item.courseName}-${item.subject}`, item]));
+    const map2 = new Map(data2.map((item) => [`${item.courseName}-${item.subject}`, item]));
+
     const differences = {
       added: [], // 在 version2 中新增的
       removed: [], // 在 version2 中移除的
       modified: [], // 在兩個版本中都存在但有修改的
-      unchanged: [] // 完全相同的
+      unchanged: [], // 完全相同的
     };
-    
+
     // 檢查所有在 version1 中的項目
     for (const [key, item1] of map1) {
       const item2 = map2.get(key);
-      
+
       if (!item2) {
         differences.removed.push(item1);
       } else {
@@ -8262,14 +8529,14 @@ class MappingVersionControl {
         }
       }
     }
-    
+
     // 檢查在 version2 中新增的項目
     for (const [key, item2] of map2) {
       if (!map1.has(key)) {
         differences.added.push(item2);
       }
     }
-    
+
     return differences;
   }
 
@@ -8282,21 +8549,20 @@ class MappingVersionControl {
       if (allVersions.length <= this.maxVersions) {
         return { success: true, message: '無需清理' };
       }
-      
+
       // 按時間排序，保留最新的版本
       allVersions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       const versionsToDelete = allVersions.slice(this.maxVersions);
-      
+
       for (const version of versionsToDelete) {
         await this.deleteVersion(version.id);
       }
-      
+
       this.logger.info(`🧹 清理了 ${versionsToDelete.length} 個舊版本`);
       return {
         success: true,
-        deletedCount: versionsToDelete.length
+        deletedCount: versionsToDelete.length,
       };
-      
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -8309,14 +8575,16 @@ class MappingVersionControl {
     try {
       const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
       let historySheet = spreadsheet.getSheetByName('mapping_version_history');
-      
+
       if (!historySheet) {
         historySheet = spreadsheet.insertSheet('mapping_version_history');
-        historySheet.getRange(1, 1, 1, 7).setValues([[
-          'Version ID', 'Timestamp', 'Type', 'Added', 'Updated', 'Deleted', 'Errors'
-        ]]);
+        historySheet
+          .getRange(1, 1, 1, 7)
+          .setValues([
+            ['Version ID', 'Timestamp', 'Type', 'Added', 'Updated', 'Deleted', 'Errors'],
+          ]);
       }
-      
+
       const newRow = [
         version.id,
         version.timestamp,
@@ -8324,11 +8592,10 @@ class MappingVersionControl {
         version.summary.added,
         version.summary.updated,
         version.summary.deleted,
-        version.summary.errors
+        version.summary.errors,
       ];
-      
+
       historySheet.appendRow(newRow);
-      
     } catch (error) {
       throw new Error(`儲存版本歷史失敗: ${error.message}`);
     }
@@ -8339,7 +8606,7 @@ class MappingVersionControl {
     // 實作快照創建邏輯
     return { success: true };
   }
-  
+
   async getCurrentMappingData() {
     // 實作獲取當前數據邏輯
     try {
@@ -8354,7 +8621,7 @@ class MappingVersionControl {
       return { success: false, error: error.message };
     }
   }
-  
+
   async getVersionInfo(versionId) {
     // 實作獲取版本資訊邏輯
     return { success: true };
@@ -8370,9 +8637,9 @@ class MappingQualityMonitor {
     this.logger = new Logger('MappingQualityMonitor');
     this.qualityThresholds = {
       completeness: 0.95, // 完整性閾值 95%
-      accuracy: 0.90,     // 準確性閾值 90%
-      consistency: 0.95,  // 一致性閾值 95%
-      freshness: 24 * 60 * 60 * 1000 // 數據新鮮度 24 小時
+      accuracy: 0.9, // 準確性閾值 90%
+      consistency: 0.95, // 一致性閾值 95%
+      freshness: 24 * 60 * 60 * 1000, // 數據新鮮度 24 小時
     };
   }
 
@@ -8382,35 +8649,36 @@ class MappingQualityMonitor {
   async validateUpdates(updateResults) {
     try {
       this.logger.info('🔍 開始品質驗證...');
-      
+
       const qualityReport = {
         overall: { score: 0, status: 'UNKNOWN' },
         completeness: await this.checkCompleteness(updateResults),
         accuracy: await this.checkAccuracy(updateResults),
         consistency: await this.checkConsistency(updateResults),
         freshness: await this.checkFreshness(updateResults),
-        anomalies: await this.detectAnomalies(updateResults)
+        anomalies: await this.detectAnomalies(updateResults),
       };
-      
+
       // 計算總體品質分數
       const scores = [
         qualityReport.completeness.score,
         qualityReport.accuracy.score,
         qualityReport.consistency.score,
-        qualityReport.freshness.score
+        qualityReport.freshness.score,
       ];
-      
+
       qualityReport.overall.score = scores.reduce((sum, score) => sum + score, 0) / scores.length;
       qualityReport.overall.status = this.determineOverallStatus(qualityReport.overall.score);
-      
-      this.logger.info(`🔍 品質驗證完成 - 總體分數: ${(qualityReport.overall.score * 100).toFixed(1)}%`);
-      
+
+      this.logger.info(
+        `🔍 品質驗證完成 - 總體分數: ${(qualityReport.overall.score * 100).toFixed(1)}%`
+      );
+
       return {
         success: true,
         qualityReport: qualityReport,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-      
     } catch (error) {
       this.logger.error(`品質驗證失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -8423,26 +8691,22 @@ class MappingQualityMonitor {
   async checkCompleteness(updateResults) {
     try {
       const totalItems = updateResults.added.length + updateResults.updated.length;
-      const completeItems = [...updateResults.added, ...updateResults.updated].filter(item => 
-        item.courseName && 
-        item.subject && 
-        item.courseId && 
-        item.status
+      const completeItems = [...updateResults.added, ...updateResults.updated].filter(
+        (item) => item.courseName && item.subject && item.courseId && item.status
       ).length;
-      
+
       const score = totalItems > 0 ? completeItems / totalItems : 1;
       const status = score >= this.qualityThresholds.completeness ? 'PASS' : 'FAIL';
-      
+
       return {
         score: score,
         status: status,
         details: {
           total: totalItems,
           complete: completeItems,
-          missing: totalItems - completeItems
-        }
+          missing: totalItems - completeItems,
+        },
       };
-      
     } catch (error) {
       return { score: 0, status: 'ERROR', error: error.message };
     }
@@ -8455,7 +8719,7 @@ class MappingQualityMonitor {
     try {
       let accurateItems = 0;
       let totalItems = 0;
-      
+
       // 檢查新增項目的準確性
       for (const item of updateResults.added) {
         totalItems++;
@@ -8463,7 +8727,7 @@ class MappingQualityMonitor {
           accurateItems++;
         }
       }
-      
+
       // 檢查更新項目的準確性
       for (const item of updateResults.updated) {
         totalItems++;
@@ -8471,20 +8735,19 @@ class MappingQualityMonitor {
           accurateItems++;
         }
       }
-      
+
       const score = totalItems > 0 ? accurateItems / totalItems : 1;
       const status = score >= this.qualityThresholds.accuracy ? 'PASS' : 'FAIL';
-      
+
       return {
         score: score,
         status: status,
         details: {
           total: totalItems,
           accurate: accurateItems,
-          inaccurate: totalItems - accurateItems
-        }
+          inaccurate: totalItems - accurateItems,
+        },
       };
-      
     } catch (error) {
       return { score: 0, status: 'ERROR', error: error.message };
     }
@@ -8498,11 +8761,12 @@ class MappingQualityMonitor {
       const allItems = [...updateResults.added, ...updateResults.updated];
       const duplicates = this.findDuplicateMappings(allItems);
       const inconsistencies = this.findInconsistencies(allItems);
-      
+
       const totalIssues = duplicates.length + inconsistencies.length;
-      const score = allItems.length > 0 ? Math.max(0, (allItems.length - totalIssues) / allItems.length) : 1;
+      const score =
+        allItems.length > 0 ? Math.max(0, (allItems.length - totalIssues) / allItems.length) : 1;
       const status = score >= this.qualityThresholds.consistency ? 'PASS' : 'FAIL';
-      
+
       return {
         score: score,
         status: status,
@@ -8510,10 +8774,9 @@ class MappingQualityMonitor {
           total: allItems.length,
           duplicates: duplicates.length,
           inconsistencies: inconsistencies.length,
-          issues: [...duplicates, ...inconsistencies]
-        }
+          issues: [...duplicates, ...inconsistencies],
+        },
       };
-      
     } catch (error) {
       return { score: 0, status: 'ERROR', error: error.message };
     }
@@ -8525,25 +8788,24 @@ class MappingQualityMonitor {
   async checkFreshness(updateResults) {
     try {
       const now = new Date();
-      const freshItems = [...updateResults.added, ...updateResults.updated].filter(item => {
+      const freshItems = [...updateResults.added, ...updateResults.updated].filter((item) => {
         const itemTime = new Date(item.discoveredAt || item.lastUpdated || item.addedAt);
-        return (now - itemTime) <= this.qualityThresholds.freshness;
+        return now - itemTime <= this.qualityThresholds.freshness;
       }).length;
-      
+
       const totalItems = updateResults.added.length + updateResults.updated.length;
       const score = totalItems > 0 ? freshItems / totalItems : 1;
       const status = score >= 0.8 ? 'PASS' : 'FAIL'; // 較寬鬆的新鮮度要求
-      
+
       return {
         score: score,
         status: status,
         details: {
           total: totalItems,
           fresh: freshItems,
-          stale: totalItems - freshItems
-        }
+          stale: totalItems - freshItems,
+        },
       };
-      
     } catch (error) {
       return { score: 0, status: 'ERROR', error: error.message };
     }
@@ -8554,7 +8816,7 @@ class MappingQualityMonitor {
    */
   async detectAnomalies(updateResults) {
     const anomalies = [];
-    
+
     try {
       // 檢測課程名稱異常
       for (const item of [...updateResults.added, ...updateResults.updated]) {
@@ -8562,34 +8824,35 @@ class MappingQualityMonitor {
           anomalies.push({
             type: 'INVALID_COURSE_NAME_FORMAT',
             item: item,
-            message: `課程名稱格式異常: ${item.courseName}`
+            message: `課程名稱格式異常: ${item.courseName}`,
           });
         }
-        
+
         if (item.subject && !['LT', 'IT', 'KCFS'].includes(item.subject)) {
           anomalies.push({
             type: 'INVALID_SUBJECT',
             item: item,
-            message: `科目異常: ${item.subject}`
+            message: `科目異常: ${item.subject}`,
           });
         }
-        
+
         if (item.confidence && item.confidence < 0.5) {
           anomalies.push({
             type: 'LOW_CONFIDENCE',
             item: item,
-            message: `匹配信心度過低: ${item.confidence}`
+            message: `匹配信心度過低: ${item.confidence}`,
           });
         }
       }
-      
+
       return anomalies;
-      
     } catch (error) {
-      return [{
-        type: 'DETECTION_ERROR',
-        message: `異常檢測失敗: ${error.message}`
-      }];
+      return [
+        {
+          type: 'DETECTION_ERROR',
+          message: `異常檢測失敗: ${error.message}`,
+        },
+      ];
     }
   }
 
@@ -8601,22 +8864,22 @@ class MappingQualityMonitor {
     if (!mapping.courseName || !mapping.subject || !mapping.courseId) {
       return false;
     }
-    
+
     // 課程名稱格式檢查
     if (!/^G[1-6]\s+\w+$/.test(mapping.courseName)) {
       return false;
     }
-    
+
     // 科目檢查
     if (!['LT', 'IT', 'KCFS'].includes(mapping.subject)) {
       return false;
     }
-    
+
     // 狀態檢查
     if (!['ACTIVE', 'ARCHIVED', 'DELETED'].includes(mapping.status)) {
       return false;
     }
-    
+
     return true;
   }
 
@@ -8626,20 +8889,20 @@ class MappingQualityMonitor {
   findDuplicateMappings(items) {
     const seen = new Map();
     const duplicates = [];
-    
+
     for (const item of items) {
       const key = `${item.courseName}-${item.subject}`;
       if (seen.has(key)) {
         duplicates.push({
           type: 'DUPLICATE_MAPPING',
           key: key,
-          items: [seen.get(key), item]
+          items: [seen.get(key), item],
         });
       } else {
         seen.set(key, item);
       }
     }
-    
+
     return duplicates;
   }
 
@@ -8648,7 +8911,7 @@ class MappingQualityMonitor {
    */
   findInconsistencies(items) {
     const inconsistencies = [];
-    
+
     for (const item of items) {
       // 檢查課程名稱與年級的一致性
       const gradeMatch = item.courseName?.match(/^(G[1-6])/);
@@ -8657,7 +8920,7 @@ class MappingQualityMonitor {
         // 這裡可以添加更多一致性檢查
       }
     }
-    
+
     return inconsistencies;
   }
 
@@ -8667,8 +8930,8 @@ class MappingQualityMonitor {
   determineOverallStatus(score) {
     if (score >= 0.95) return 'EXCELLENT';
     if (score >= 0.85) return 'GOOD';
-    if (score >= 0.70) return 'FAIR';
-    if (score >= 0.50) return 'POOR';
+    if (score >= 0.7) return 'FAIR';
+    if (score >= 0.5) return 'POOR';
     return 'CRITICAL';
   }
 }
@@ -8686,7 +8949,7 @@ class BatchUpdateOptimizer {
       SMALL: 10,
       MEDIUM: 25,
       LARGE: 50,
-      XLARGE: 100
+      XLARGE: 100,
     };
   }
 
@@ -8697,52 +8960,53 @@ class BatchUpdateOptimizer {
     try {
       const strategy = this.determineBatchStrategy(items.length, options);
       const batches = this.createOptimalBatches(items, strategy);
-      
+
       this.logger.info(`⚡ 開始批次處理: ${batches.length} 個批次, 每批 ${strategy.batchSize} 項`);
-      
+
       const progress = new ProgressTracker(items.length, '批次更新');
       const results = {
         successful: [],
         failed: [],
-        retried: []
+        retried: [],
       };
 
       // 處理所有批次
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
         const batchId = `batch_${i + 1}`;
-        
+
         this.logger.info(`🚀 處理批次 ${i + 1}/${batches.length} (${batch.length} 項)`);
-        
+
         const batchResult = await this.processBatchWithRetry(
-          batch, 
-          operation, 
-          batchId, 
+          batch,
+          operation,
+          batchId,
           strategy,
           progress
         );
-        
+
         results.successful.push(...batchResult.successful);
         results.failed.push(...batchResult.failed);
         results.retried.push(...batchResult.retried);
-        
+
         // 批次間延遲
         if (i < batches.length - 1) {
           await this.rateLimiter.throttle();
         }
       }
-      
+
       const summary = progress.complete();
-      
-      this.logger.info(`✅ 批次處理完成: 成功 ${results.successful.length}, 失敗 ${results.failed.length}, 重試 ${results.retried.length}`);
-      
+
+      this.logger.info(
+        `✅ 批次處理完成: 成功 ${results.successful.length}, 失敗 ${results.failed.length}, 重試 ${results.retried.length}`
+      );
+
       return {
         success: true,
         results: results,
         summary: summary,
-        strategy: strategy
+        strategy: strategy,
       };
-      
     } catch (error) {
       this.logger.error(`批次處理失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -8756,7 +9020,7 @@ class BatchUpdateOptimizer {
     let batchSize;
     let concurrency = 1; // 預設序列處理
     let retryAttempts = 3;
-    
+
     // 根據項目數量決定批次大小
     if (totalItems <= 20) {
       batchSize = this.batchSizes.SMALL;
@@ -8767,7 +9031,7 @@ class BatchUpdateOptimizer {
     } else {
       batchSize = this.batchSizes.XLARGE;
     }
-    
+
     // 根據優先級調整策略
     if (options.priority === 'HIGH') {
       batchSize = Math.min(batchSize, this.batchSizes.SMALL); // 小批次高頻
@@ -8776,17 +9040,17 @@ class BatchUpdateOptimizer {
       batchSize = this.batchSizes.LARGE; // 大批次低頻
       retryAttempts = 2;
     }
-    
+
     // 考慮錯誤率調整
     if (options.expectedErrorRate && options.expectedErrorRate > 0.1) {
       batchSize = Math.ceil(batchSize * 0.7); // 縮小批次以減少錯誤影響
     }
-    
+
     return {
       batchSize: batchSize,
       concurrency: concurrency,
       retryAttempts: retryAttempts,
-      delayBetweenBatches: this.calculateOptimalDelay(totalItems, batchSize)
+      delayBetweenBatches: this.calculateOptimalDelay(totalItems, batchSize),
     };
   }
 
@@ -8795,12 +9059,12 @@ class BatchUpdateOptimizer {
    */
   createOptimalBatches(items, strategy) {
     const batches = [];
-    
+
     for (let i = 0; i < items.length; i += strategy.batchSize) {
       const batch = items.slice(i, i + strategy.batchSize);
       batches.push(batch);
     }
-    
+
     return batches;
   }
 
@@ -8811,25 +9075,25 @@ class BatchUpdateOptimizer {
     const results = {
       successful: [],
       failed: [],
-      retried: []
+      retried: [],
     };
-    
+
     let remainingItems = [...batch];
     let attempt = 1;
-    
+
     while (remainingItems.length > 0 && attempt <= strategy.retryAttempts) {
       this.logger.info(`🔄 批次 ${batchId} 第 ${attempt} 次嘗試 (${remainingItems.length} 項)`);
-      
+
       const attemptResults = await this.processBatchItems(
-        remainingItems, 
-        operation, 
-        batchId, 
+        remainingItems,
+        operation,
+        batchId,
         attempt,
         progress
       );
-      
+
       results.successful.push(...attemptResults.successful);
-      
+
       if (attempt === 1) {
         results.failed.push(...attemptResults.failed);
       } else {
@@ -8837,35 +9101,36 @@ class BatchUpdateOptimizer {
         for (const item of attemptResults.successful) {
           results.retried.push({
             ...item,
-            retryAttempt: attempt
+            retryAttempt: attempt,
           });
         }
-        
+
         // 更新失敗項目
-        results.failed = results.failed.filter(failedItem => 
-          !attemptResults.successful.some(successItem => 
-            this.isSameItem(failedItem.item, successItem.item)
-          )
+        results.failed = results.failed.filter(
+          (failedItem) =>
+            !attemptResults.successful.some((successItem) =>
+              this.isSameItem(failedItem.item, successItem.item)
+            )
         );
         results.failed.push(...attemptResults.failed);
       }
-      
+
       // 準備下次重試的項目 (只重試失敗的項目)
-      remainingItems = attemptResults.failed.map(f => f.item);
-      
+      remainingItems = attemptResults.failed.map((f) => f.item);
+
       if (remainingItems.length === 0) {
         break; // 全部成功，不需要重試
       }
-      
+
       attempt++;
-      
+
       // 重試前延遲 (指數退避)
       if (attempt <= strategy.retryAttempts) {
         const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
     }
-    
+
     return results;
   }
 
@@ -8875,19 +9140,19 @@ class BatchUpdateOptimizer {
   async processBatchItems(items, operation, batchId, attempt, progress) {
     const results = {
       successful: [],
-      failed: []
+      failed: [],
     };
-    
+
     for (const item of items) {
       try {
         const result = await operation(item);
-        
+
         if (result && result.success) {
           results.successful.push({
             item: item,
             result: result,
             batchId: batchId,
-            attempt: attempt
+            attempt: attempt,
           });
           progress.addSuccess(item.id || item.courseName, '處理成功');
         } else {
@@ -8895,7 +9160,7 @@ class BatchUpdateOptimizer {
             item: item,
             error: result?.error || '處理失敗',
             batchId: batchId,
-            attempt: attempt
+            attempt: attempt,
           });
           progress.addError(item.id || item.courseName, result?.error || '處理失敗');
         }
@@ -8904,15 +9169,15 @@ class BatchUpdateOptimizer {
           item: item,
           error: error.message,
           batchId: batchId,
-          attempt: attempt
+          attempt: attempt,
         });
         progress.addError(item.id || item.courseName, error.message);
       }
-      
+
       // 項目間微調延遲
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    
+
     return results;
   }
 
@@ -8932,11 +9197,11 @@ class BatchUpdateOptimizer {
     if (item1.courseId && item2.courseId) {
       return item1.courseId === item2.courseId;
     }
-    
+
     if (item1.courseName && item1.subject && item2.courseName && item2.subject) {
       return item1.courseName === item2.courseName && item1.subject === item2.subject;
     }
-    
+
     return false;
   }
 }
@@ -8951,29 +9216,29 @@ class MappingMaintenanceScheduler {
     this.updateEngine = new AutoMappingUpdateEngine();
     this.qualityMonitor = new MappingQualityMonitor();
     this.versionControl = new MappingVersionControl();
-    
+
     // 維護任務類型
     this.maintenanceTasks = {
       INCREMENTAL_UPDATE: {
         interval: 60 * 60 * 1000, // 1小時
-        handler: this.performIncrementalUpdate.bind(this)
+        handler: this.performIncrementalUpdate.bind(this),
       },
       QUALITY_CHECK: {
         interval: 4 * 60 * 60 * 1000, // 4小時
-        handler: this.performQualityCheck.bind(this)
+        handler: this.performQualityCheck.bind(this),
       },
       FULL_SYNC: {
         interval: 24 * 60 * 60 * 1000, // 24小時
-        handler: this.performFullSync.bind(this)
+        handler: this.performFullSync.bind(this),
       },
       CLEANUP: {
         interval: 7 * 24 * 60 * 60 * 1000, // 7天
-        handler: this.performCleanup.bind(this)
+        handler: this.performCleanup.bind(this),
       },
       HEALTH_CHECK: {
         interval: 30 * 60 * 1000, // 30分鐘
-        handler: this.performHealthCheck.bind(this)
-      }
+        handler: this.performHealthCheck.bind(this),
+      },
     };
   }
 
@@ -8983,27 +9248,26 @@ class MappingMaintenanceScheduler {
   async startScheduler(options = {}) {
     try {
       this.logger.info('🚀 啟動映射表自動維護排程器...');
-      
+
       // 記錄啟動時間
       const startTime = new Date().toISOString();
       this.setProperty('MAINTENANCE_SCHEDULER_START_TIME', startTime);
-      
+
       // 初始健康檢查
       const initialHealth = await this.performHealthCheck();
       if (!initialHealth.success) {
         this.logger.warn(`初始健康檢查失敗: ${initialHealth.error}`);
       }
-      
+
       // 設定觸發器 (Google Apps Script 觸發器)
       this.setupTriggers(options);
-      
+
       this.logger.info('✅ 自動維護排程器啟動成功');
       return {
         success: true,
         startTime: startTime,
-        scheduledTasks: Object.keys(this.maintenanceTasks)
+        scheduledTasks: Object.keys(this.maintenanceTasks),
       };
-      
     } catch (error) {
       this.logger.error(`啟動維護排程器失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -9016,22 +9280,16 @@ class MappingMaintenanceScheduler {
   setupTriggers(options) {
     // 刪除現有觸發器
     this.clearExistingTriggers();
-    
+
     // 設定新觸發器
     if (!options.disableIncrementalUpdate) {
-      ScriptApp.newTrigger('scheduledIncrementalUpdate')
-        .timeBased()
-        .everyHours(1)
-        .create();
+      ScriptApp.newTrigger('scheduledIncrementalUpdate').timeBased().everyHours(1).create();
     }
-    
+
     if (!options.disableQualityCheck) {
-      ScriptApp.newTrigger('scheduledQualityCheck')
-        .timeBased()
-        .everyHours(4)
-        .create();
+      ScriptApp.newTrigger('scheduledQualityCheck').timeBased().everyHours(4).create();
     }
-    
+
     if (!options.disableFullSync) {
       ScriptApp.newTrigger('scheduledFullSync')
         .timeBased()
@@ -9039,14 +9297,11 @@ class MappingMaintenanceScheduler {
         .atHour(3) // 凌晨3點執行
         .create();
     }
-    
+
     if (!options.disableHealthCheck) {
-      ScriptApp.newTrigger('scheduledHealthCheck')
-        .timeBased()
-        .everyMinutes(30)
-        .create();
+      ScriptApp.newTrigger('scheduledHealthCheck').timeBased().everyMinutes(30).create();
     }
-    
+
     if (!options.disableCleanup) {
       ScriptApp.newTrigger('scheduledCleanup')
         .timeBased()
@@ -9062,17 +9317,16 @@ class MappingMaintenanceScheduler {
   async performIncrementalUpdate() {
     try {
       this.logger.info('🔄 執行排程增量更新...');
-      
+
       const result = await this.updateEngine.performIncrementalUpdate({
         priority: 'NORMAL',
-        respectRateLimit: true
+        respectRateLimit: true,
       });
-      
+
       // 記錄維護結果
       await this.recordMaintenanceResult('INCREMENTAL_UPDATE', result);
-      
+
       return result;
-      
     } catch (error) {
       this.logger.error(`增量更新維護失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -9085,33 +9339,32 @@ class MappingMaintenanceScheduler {
   async performQualityCheck() {
     try {
       this.logger.info('🔍 執行品質檢查維護...');
-      
+
       // 獲取當前映射數據
       const currentData = await this.updateEngine.getCurrentMappingState();
       if (!currentData.success) {
         throw new Error(`無法獲取當前數據: ${currentData.error}`);
       }
-      
+
       // 模擬更新結果進行品質檢查
       const mockUpdateResults = {
         added: [],
         updated: currentData.data || [],
         deleted: [],
-        errors: []
+        errors: [],
       };
-      
+
       const qualityReport = await this.qualityMonitor.validateUpdates(mockUpdateResults);
-      
+
       // 如果品質不達標，觸發警報
       if (qualityReport.success && qualityReport.qualityReport.overall.score < 0.8) {
         await this.triggerQualityAlert(qualityReport.qualityReport);
       }
-      
+
       // 記錄品質檢查結果
       await this.recordMaintenanceResult('QUALITY_CHECK', qualityReport);
-      
+
       return qualityReport;
-      
     } catch (error) {
       this.logger.error(`品質檢查維護失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -9124,25 +9377,24 @@ class MappingMaintenanceScheduler {
   async performFullSync() {
     try {
       this.logger.info('🔄 執行完整同步維護...');
-      
+
       // 創建備份
       const backup = await this.versionControl.createFullBackup('BEFORE_FULL_SYNC');
       if (!backup.success) {
         this.logger.warn(`創建備份失敗: ${backup.error}`);
       }
-      
+
       // 執行完整課程映射重建
       const syncResult = await createCompleteCourseMapping({
         clearExisting: true,
         backupExisting: true,
-        forceRefresh: true
+        forceRefresh: true,
       });
-      
+
       // 記錄同步結果
       await this.recordMaintenanceResult('FULL_SYNC', syncResult);
-      
+
       return syncResult;
-      
     } catch (error) {
       this.logger.error(`完整同步維護失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -9155,27 +9407,26 @@ class MappingMaintenanceScheduler {
   async performCleanup() {
     try {
       this.logger.info('🧹 執行清理維護...');
-      
+
       const results = {
         versionCleanup: null,
         logCleanup: null,
-        tempCleanup: null
+        tempCleanup: null,
       };
-      
+
       // 清理舊版本
       results.versionCleanup = await this.versionControl.cleanupOldVersions();
-      
+
       // 清理舊日誌 (如果有實現)
       results.logCleanup = await this.cleanupOldLogs();
-      
+
       // 清理臨時數據
       results.tempCleanup = await this.cleanupTempData();
-      
+
       // 記錄清理結果
       await this.recordMaintenanceResult('CLEANUP', { success: true, results: results });
-      
+
       return { success: true, results: results };
-      
     } catch (error) {
       this.logger.error(`清理維護失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -9190,32 +9441,31 @@ class MappingMaintenanceScheduler {
       const healthReport = {
         timestamp: new Date().toISOString(),
         overall: { status: 'UNKNOWN', score: 0 },
-        components: {}
+        components: {},
       };
-      
+
       // 檢查映射表狀態
       healthReport.components.mappingTable = await this.checkMappingTableHealth();
-      
+
       // 檢查 Classroom API 連接
       healthReport.components.classroomApi = await this.checkClassroomApiHealth();
-      
+
       // 檢查工作表完整性
       healthReport.components.worksheetIntegrity = await this.checkWorksheetIntegrity();
-      
+
       // 檢查觸發器狀態
       healthReport.components.triggers = await this.checkTriggersHealth();
-      
+
       // 計算總體健康分數
-      const componentScores = Object.values(healthReport.components)
-        .map(c => c.score || 0);
-      healthReport.overall.score = componentScores.reduce((sum, score) => sum + score, 0) / componentScores.length;
+      const componentScores = Object.values(healthReport.components).map((c) => c.score || 0);
+      healthReport.overall.score =
+        componentScores.reduce((sum, score) => sum + score, 0) / componentScores.length;
       healthReport.overall.status = this.determineHealthStatus(healthReport.overall.score);
-      
+
       // 記錄健康檢查結果
       await this.recordMaintenanceResult('HEALTH_CHECK', { success: true, report: healthReport });
-      
+
       return { success: true, healthReport: healthReport };
-      
     } catch (error) {
       this.logger.error(`健康檢查失敗: ${error.message}`);
       return { success: false, error: error.message };
@@ -9229,29 +9479,21 @@ class MappingMaintenanceScheduler {
     try {
       const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
       let maintenanceSheet = spreadsheet.getSheetByName('maintenance_log');
-      
+
       if (!maintenanceSheet) {
         maintenanceSheet = spreadsheet.insertSheet('maintenance_log');
-        maintenanceSheet.getRange(1, 1, 1, 6).setValues([[
-          'Timestamp', 'Task Type', 'Status', 'Duration', 'Details', 'Error'
-        ]]);
+        maintenanceSheet
+          .getRange(1, 1, 1, 6)
+          .setValues([['Timestamp', 'Task Type', 'Status', 'Duration', 'Details', 'Error']]);
       }
-      
+
       const timestamp = new Date().toISOString();
       const status = result.success ? 'SUCCESS' : 'FAILURE';
       const duration = result.executionTime || 0;
       const details = result.summary ? JSON.stringify(result.summary) : '';
       const error = result.error || '';
-      
-      maintenanceSheet.appendRow([
-        timestamp,
-        taskType,
-        status,
-        duration,
-        details,
-        error
-      ]);
-      
+
+      maintenanceSheet.appendRow([timestamp, taskType, status, duration, details, error]);
     } catch (error) {
       this.logger.error(`記錄維護結果失敗: ${error.message}`);
     }
@@ -9260,53 +9502,53 @@ class MappingMaintenanceScheduler {
   // 輔助方法實作
   clearExistingTriggers() {
     const triggers = ScriptApp.getProjectTriggers();
-    triggers.forEach(trigger => {
+    triggers.forEach((trigger) => {
       if (trigger.getHandlerFunction().startsWith('scheduled')) {
         ScriptApp.deleteTrigger(trigger);
       }
     });
   }
-  
+
   async triggerQualityAlert(qualityReport) {
     this.logger.warn(`🚨 映射品質警報: 總分 ${(qualityReport.overall.score * 100).toFixed(1)}%`);
     // 這裡可以實作發送通知邏輯
   }
-  
+
   async cleanupOldLogs() {
     return { success: true, message: '日誌清理完成' };
   }
-  
+
   async cleanupTempData() {
     return { success: true, message: '臨時數據清理完成' };
   }
-  
+
   async checkMappingTableHealth() {
     // 實作映射表健康檢查邏輯
     return { status: 'HEALTHY', score: 1.0 };
   }
-  
+
   async checkClassroomApiHealth() {
     // 實作 API 健康檢查邏輯
     return { status: 'HEALTHY', score: 1.0 };
   }
-  
+
   async checkWorksheetIntegrity() {
     // 實作工作表完整性檢查邏輯
     return { status: 'HEALTHY', score: 1.0 };
   }
-  
+
   async checkTriggersHealth() {
     // 實作觸發器健康檢查邏輯
     return { status: 'HEALTHY', score: 1.0 };
   }
-  
+
   determineHealthStatus(score) {
     if (score >= 0.9) return 'EXCELLENT';
     if (score >= 0.7) return 'GOOD';
     if (score >= 0.5) return 'FAIR';
     return 'POOR';
   }
-  
+
   setProperty(key, value) {
     PropertiesService.getScriptProperties().setProperty(key, value);
   }
@@ -9321,17 +9563,16 @@ class MappingMaintenanceScheduler {
  */
 function scheduledIncrementalUpdate() {
   console.log('🔄 觸發排程增量更新...');
-  
+
   try {
     const updateEngine = new AutoMappingUpdateEngine();
     const result = updateEngine.performIncrementalUpdate({
       priority: 'SCHEDULED',
-      respectRateLimit: true
+      respectRateLimit: true,
     });
-    
+
     console.log('✅ 排程增量更新完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 排程增量更新失敗:', error.message);
     throw error;
@@ -9343,14 +9584,13 @@ function scheduledIncrementalUpdate() {
  */
 function scheduledQualityCheck() {
   console.log('🔍 觸發排程品質檢查...');
-  
+
   try {
     const scheduler = new MappingMaintenanceScheduler();
     const result = scheduler.performQualityCheck();
-    
+
     console.log('✅ 排程品質檢查完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 排程品質檢查失敗:', error.message);
     throw error;
@@ -9362,14 +9602,13 @@ function scheduledQualityCheck() {
  */
 function scheduledFullSync() {
   console.log('🔄 觸發排程完整同步...');
-  
+
   try {
     const scheduler = new MappingMaintenanceScheduler();
     const result = scheduler.performFullSync();
-    
+
     console.log('✅ 排程完整同步完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 排程完整同步失敗:', error.message);
     throw error;
@@ -9381,14 +9620,13 @@ function scheduledFullSync() {
  */
 function scheduledHealthCheck() {
   console.log('❤️ 觸發排程健康檢查...');
-  
+
   try {
     const scheduler = new MappingMaintenanceScheduler();
     const result = scheduler.performHealthCheck();
-    
+
     console.log('✅ 排程健康檢查完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 排程健康檢查失敗:', error.message);
     throw error;
@@ -9400,14 +9638,13 @@ function scheduledHealthCheck() {
  */
 function scheduledCleanup() {
   console.log('🧹 觸發排程清理...');
-  
+
   try {
     const scheduler = new MappingMaintenanceScheduler();
     const result = scheduler.performCleanup();
-    
+
     console.log('✅ 排程清理完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 排程清理失敗:', error.message);
     throw error;
@@ -9420,20 +9657,19 @@ function scheduledCleanup() {
 
 /**
  * 🚀 啟動自動映射表更新系統
- * 
+ *
  * @param {Object} options - 配置選項
  * @returns {Object} 執行結果
  */
 function startAutoMappingUpdateSystem(options = {}) {
   console.log('🚀 啟動自動映射表更新系統...');
-  
+
   try {
     const scheduler = new MappingMaintenanceScheduler();
     const result = scheduler.startScheduler(options);
-    
+
     console.log('✅ 自動映射表更新系統啟動成功');
     return result;
-    
   } catch (error) {
     console.error('❌ 啟動自動映射表更新系統失敗:', error.message);
     return { success: false, error: error.message };
@@ -9442,23 +9678,22 @@ function startAutoMappingUpdateSystem(options = {}) {
 
 /**
  * 🔄 手動執行增量映射更新
- * 
+ *
  * @param {Object} options - 配置選項
  * @returns {Object} 執行結果
  */
 function runManualIncrementalUpdate(options = {}) {
   console.log('🔄 執行手動增量映射更新...');
-  
+
   try {
     const updateEngine = new AutoMappingUpdateEngine();
     const result = updateEngine.performIncrementalUpdate({
       ...options,
-      priority: 'HIGH' // 手動執行使用高優先級
+      priority: 'HIGH', // 手動執行使用高優先級
     });
-    
+
     console.log('✅ 手動增量映射更新完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 手動增量映射更新失敗:', error.message);
     return { success: false, error: error.message };
@@ -9467,20 +9702,19 @@ function runManualIncrementalUpdate(options = {}) {
 
 /**
  * 💾 手動創建映射表備份
- * 
+ *
  * @param {string} reason - 備份原因
  * @returns {Object} 執行結果
  */
 function createMappingTableBackup(reason = 'MANUAL_BACKUP') {
   console.log('💾 創建映射表備份...');
-  
+
   try {
     const versionControl = new MappingVersionControl();
     const result = versionControl.createFullBackup(reason);
-    
+
     console.log('✅ 映射表備份創建完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 創建映射表備份失敗:', error.message);
     return { success: false, error: error.message };
@@ -9489,19 +9723,18 @@ function createMappingTableBackup(reason = 'MANUAL_BACKUP') {
 
 /**
  * 🔍 執行映射品質檢查
- * 
+ *
  * @returns {Object} 執行結果
  */
 function runMappingQualityCheck() {
   console.log('🔍 執行映射品質檢查...');
-  
+
   try {
     const scheduler = new MappingMaintenanceScheduler();
     const result = scheduler.performQualityCheck();
-    
+
     console.log('✅ 映射品質檢查完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 映射品質檢查失敗:', error.message);
     return { success: false, error: error.message };
@@ -9510,19 +9743,18 @@ function runMappingQualityCheck() {
 
 /**
  * ❤️ 執行系統健康檢查
- * 
+ *
  * @returns {Object} 執行結果
  */
 function runSystemHealthCheck() {
   console.log('❤️ 執行系統健康檢查...');
-  
+
   try {
     const scheduler = new MappingMaintenanceScheduler();
     const result = scheduler.performHealthCheck();
-    
+
     console.log('✅ 系統健康檢查完成');
     return result;
-    
   } catch (error) {
     console.error('❌ 系統健康檢查失敗:', error.message);
     return { success: false, error: error.message };
@@ -9531,34 +9763,36 @@ function runSystemHealthCheck() {
 
 /**
  * 📊 獲取映射表統計資訊
- * 
+ *
  * @returns {Object} 統計結果
  */
 function getMappingTableStatistics() {
   console.log('📊 獲取映射表統計資訊...');
-  
+
   try {
     const updateEngine = new AutoMappingUpdateEngine();
     const currentMapping = updateEngine.getCurrentMappingState();
-    
+
     if (!currentMapping.success) {
       throw new Error(`無法獲取當前映射: ${currentMapping.error}`);
     }
-    
+
     const data = currentMapping.data || [];
     const statistics = {
       total: data.length,
-      active: data.filter(m => m.status === 'ACTIVE').length,
-      archived: data.filter(m => m.status === 'ARCHIVED').length,
-      deleted: data.filter(m => m.status === 'DELETED').length,
+      active: data.filter((m) => m.status === 'ACTIVE').length,
+      archived: data.filter((m) => m.status === 'ARCHIVED').length,
+      deleted: data.filter((m) => m.status === 'DELETED').length,
       byGrade: {},
       bySubject: {},
-      lastUpdated: data.reduce((latest, item) => {
-        const itemDate = new Date(item.lastUpdated || item.discoveredAt || item.addedAt || 0);
-        return itemDate > latest ? itemDate : latest;
-      }, new Date(0)).toISOString()
+      lastUpdated: data
+        .reduce((latest, item) => {
+          const itemDate = new Date(item.lastUpdated || item.discoveredAt || item.addedAt || 0);
+          return itemDate > latest ? itemDate : latest;
+        }, new Date(0))
+        .toISOString(),
     };
-    
+
     // 按年級統計
     for (const mapping of data) {
       if (mapping.courseName) {
@@ -9569,21 +9803,20 @@ function getMappingTableStatistics() {
         }
       }
     }
-    
+
     // 按科目統計
     for (const mapping of data) {
       if (mapping.subject) {
         statistics.bySubject[mapping.subject] = (statistics.bySubject[mapping.subject] || 0) + 1;
       }
     }
-    
+
     console.log('✅ 映射表統計資訊獲取完成');
     return {
       success: true,
       statistics: statistics,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
   } catch (error) {
     console.error('❌ 獲取映射表統計資訊失敗:', error.message);
     return { success: false, error: error.message };
@@ -9592,18 +9825,18 @@ function getMappingTableStatistics() {
 
 /**
  * 🎯 簡化學生新增功能 - 直接可用版本
- * 
+ *
  * 使用方式：
  * 1. 在 Google Sheets 中建立名為 'stu_course' 的工作表
  * 2. 填入三欄：學生Email | 課程名稱或ID | 狀態（留空）
  * 3. 執行此函數
- * 
+ *
  * @returns {Object} 執行結果
  */
 function addStudentsSimple() {
   console.log('🎯 === 簡化學生新增系統 === 🎯');
   console.log('📚 正在檢查資料表格式和內容...');
-  
+
   try {
     // 步驟 1: 檢查和準備資料表
     const setupResult = setupStudentDataSheets();
@@ -9612,18 +9845,17 @@ function addStudentsSimple() {
       showUserMessage('❌ 設定錯誤', setupResult.error + '\n\n請按照說明準備資料表。', 'error');
       return { success: false, error: setupResult.error };
     }
-    
+
     console.log('✅ 資料表格式檢查完成');
-    
+
     // 步驟 2: 執行學生新增
     console.log('🚀 開始執行學生新增...');
     const result = executeRealStudentBatch();
-    
+
     // 步驟 3: 顯示結果
     showStudentAdditionResults(result);
-    
+
     return result;
-    
   } catch (error) {
     const errorMsg = `系統執行錯誤：${error.message}`;
     console.log(`❌ ${errorMsg}`);
@@ -9638,51 +9870,54 @@ function addStudentsSimple() {
 function setupStudentDataSheets() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    
+
     // 檢查主要資料表：stu_course
     let stuSheet = ss.getSheetByName('stu_course');
     if (!stuSheet) {
       console.log('🔧 建立 stu_course 工作表...');
       stuSheet = ss.insertSheet('stu_course');
-      
+
       // 設定標題行
-      stuSheet.getRange(1, 1, 1, 3).setValues([
-        ['學生Email', '課程名稱或ID', '狀態']
-      ]);
-      stuSheet.getRange(1, 1, 1, 3).setBackground('#4285f4').setFontColor('white').setFontWeight('bold');
+      stuSheet.getRange(1, 1, 1, 3).setValues([['學生Email', '課程名稱或ID', '狀態']]);
+      stuSheet
+        .getRange(1, 1, 1, 3)
+        .setBackground('#4285f4')
+        .setFontColor('white')
+        .setFontWeight('bold');
       stuSheet.setFrozenRows(1);
-      
+
       // 設定範例資料
       stuSheet.getRange(2, 1, 2, 3).setValues([
         ['student1@school.edu', 'G6 Voyagers', ''],
-        ['student2@school.edu', 'G3 Achievers', '']
+        ['student2@school.edu', 'G3 Achievers', ''],
       ]);
-      
+
       console.log('✅ stu_course 工作表已建立，請填入學生資料');
-      return { 
-        success: false, 
-        error: '已為您建立 stu_course 工作表並設定範例資料。\n\n請填入實際的學生Email和課程名稱，然後再次執行此功能。\n\n格式：\n• 欄位A：學生Email\n• 欄位B：課程名稱（如 G6 Voyagers）或課程ID\n• 欄位C：狀態（請留空）'
+      return {
+        success: false,
+        error:
+          '已為您建立 stu_course 工作表並設定範例資料。\n\n請填入實際的學生Email和課程名稱，然後再次執行此功能。\n\n格式：\n• 欄位A：學生Email\n• 欄位B：課程名稱（如 G6 Voyagers）或課程ID\n• 欄位C：狀態（請留空）',
       };
     }
-    
+
     // 檢查資料內容
     const lastRow = stuSheet.getLastRow();
     if (lastRow < 2) {
-      return { 
-        success: false, 
-        error: 'stu_course 工作表中沒有學生資料。\n\n請在工作表中填入：\n• 欄位A：學生Email\n• 欄位B：課程名稱或ID\n• 欄位C：狀態（留空）'
+      return {
+        success: false,
+        error:
+          'stu_course 工作表中沒有學生資料。\n\n請在工作表中填入：\n• 欄位A：學生Email\n• 欄位B：課程名稱或ID\n• 欄位C：狀態（留空）',
       };
     }
-    
+
     // 檢查課程映射表
     const mappingResult = checkCourseMappingSheet();
     if (!mappingResult.success) {
       console.log('⚠️ 課程映射表問題，但將嘗試繼續執行...');
     }
-    
+
     console.log(`📊 發現 ${lastRow - 1} 筆學生資料，準備處理`);
     return { success: true };
-    
   } catch (error) {
     return { success: false, error: `資料表設定錯誤：${error.message}` };
   }
@@ -9695,42 +9930,45 @@ function checkCourseMappingSheet() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let mappingSheet = ss.getSheetByName('course_mapping');
-    
+
     if (!mappingSheet) {
       console.log('🔧 建立 course_mapping 工作表...');
       mappingSheet = ss.insertSheet('course_mapping');
-      
+
       // 設定標題行
-      mappingSheet.getRange(1, 1, 1, 4).setValues([
-        ['Course Name', 'Subject', 'Course ID', 'Status']
-      ]);
-      mappingSheet.getRange(1, 1, 1, 4).setBackground('#34a853').setFontColor('white').setFontWeight('bold');
+      mappingSheet
+        .getRange(1, 1, 1, 4)
+        .setValues([['Course Name', 'Subject', 'Course ID', 'Status']]);
+      mappingSheet
+        .getRange(1, 1, 1, 4)
+        .setBackground('#34a853')
+        .setFontColor('white')
+        .setFontWeight('bold');
       mappingSheet.setFrozenRows(1);
-      
+
       // 設定範例資料
       mappingSheet.getRange(2, 1, 3, 4).setValues([
         ['G6 Voyagers', 'LT', '請填入實際課程ID', 'ACTIVE'],
         ['G6 Voyagers', 'IT', '請填入實際課程ID', 'ACTIVE'],
-        ['G3 Achievers', 'LT', '請填入實際課程ID', 'ACTIVE']
+        ['G3 Achievers', 'LT', '請填入實際課程ID', 'ACTIVE'],
       ]);
-      
-      return { 
-        success: false, 
-        error: '已建立課程映射表，如果使用課程名稱而非ID，請先設定課程映射'
+
+      return {
+        success: false,
+        error: '已建立課程映射表，如果使用課程名稱而非ID，請先設定課程映射',
       };
     }
-    
+
     const lastRow = mappingSheet.getLastRow();
     if (lastRow < 2) {
-      return { 
-        success: false, 
-        error: 'course_mapping 工作表為空，如果使用課程名稱，請先填入課程映射資料'
+      return {
+        success: false,
+        error: 'course_mapping 工作表為空，如果使用課程名稱，請先填入課程映射資料',
       };
     }
-    
+
     console.log(`📋 課程映射表包含 ${lastRow - 1} 筆映射資料`);
     return { success: true };
-    
   } catch (error) {
     return { success: false, error: `課程映射表檢查失敗：${error.message}` };
   }
@@ -9742,23 +9980,22 @@ function checkCourseMappingSheet() {
 function showStudentAdditionResults(result) {
   try {
     let message = '🎉 學生新增執行完成！\n\n';
-    
+
     if (result.success) {
       message += `✅ 處理狀態：成功\n`;
       message += `📊 處理數量：${result.processedCount || 0} 項\n`;
       message += `📈 總任務數：${result.totalAssignments || 0} 項\n\n`;
-      
+
       if (result.summary) {
         message += `詳細結果：\n`;
         message += `• 成功：${result.summary.successful || 0} 項\n`;
         message += `• 已存在：${result.summary.existing || 0} 項\n`;
         message += `• 錯誤：${result.summary.errors || 0} 項\n`;
       }
-      
+
       if (result.processedCount > 0) {
         message += `\n📋 詳細報告已儲存至工作表`;
       }
-      
     } else {
       message += `❌ 執行失敗\n`;
       message += `錯誤原因：${result.error}\n\n`;
@@ -9767,10 +10004,9 @@ function showStudentAdditionResults(result) {
       message += `• 學生Email和課程資料是否完整\n`;
       message += `• Google Classroom 權限是否正常`;
     }
-    
+
     console.log('📊 結果摘要：', message.replace(/\n/g, ' | '));
     showUserMessage('📊 執行結果', message, result.success ? 'info' : 'warning');
-    
   } catch (error) {
     console.log(`❌ 顯示結果失敗：${error.message}`);
   }
@@ -9782,15 +10018,14 @@ function showStudentAdditionResults(result) {
 function showUserMessage(title, message, type = 'info') {
   try {
     const ui = SpreadsheetApp.getUi();
-    
+
     // 根據類型選擇按鈕組
     let buttonSet = ui.ButtonSet.OK;
     if (type === 'error' || type === 'warning') {
       buttonSet = ui.ButtonSet.OK;
     }
-    
+
     ui.alert(title, message, buttonSet);
-    
   } catch (error) {
     console.log(`💬 UI訊息：${title} - ${message}`);
   }
@@ -9802,26 +10037,26 @@ function showUserMessage(title, message, type = 'info') {
  */
 function generateCompleteStudentCourseData() {
   console.log('🎯 === 自動生成完整學生課程資料 === 🎯');
-  
+
   try {
     const result = setupCompleteStudentData();
-    
+
     if (result.success) {
-      showUserMessage('✅ 資料生成成功', 
+      showUserMessage(
+        '✅ 資料生成成功',
         `已成功生成 ${result.totalRecords} 筆學生-課程記錄\n\n` +
-        `📊 統計：\n` +
-        `• 學生數量：${result.studentCount}\n` +
-        `• 課程數量：${result.courseCount}\n` +
-        `• 總記錄數：${result.totalRecords}\n\n` +
-        `資料已儲存至 'stu_course' 工作表，可以直接執行學生新增功能。`, 
+          `📊 統計：\n` +
+          `• 學生數量：${result.studentCount}\n` +
+          `• 課程數量：${result.courseCount}\n` +
+          `• 總記錄數：${result.totalRecords}\n\n` +
+          `資料已儲存至 'stu_course' 工作表，可以直接執行學生新增功能。`,
         'info'
       );
     } else {
       showUserMessage('❌ 生成失敗', result.error, 'error');
     }
-    
+
     return result;
-    
   } catch (error) {
     const errorMsg = `生成學生課程資料失敗：${error.message}`;
     console.log(`❌ ${errorMsg}`);
@@ -9835,31 +10070,33 @@ function generateCompleteStudentCourseData() {
  */
 function setupCompleteStudentData() {
   console.log('🔧 開始設置學生-課程對應資料...');
-  
+
   try {
     // 步驟 1: 獲取完整課程映射資料
     const courseMapping = getCompleteCourseMapping();
     console.log(`📋 獲取到 ${Object.keys(courseMapping).length} 個班級的課程資料`);
-    
+
     // 步驟 2: 生成學生Email範例（每班5名學生）
     const studentData = generateStudentEmailsByClass();
     console.log(`👥 生成 ${studentData.length} 位學生資料`);
-    
+
     // 步驟 3: 創建學生-課程配對記錄
     const studentCourseRecords = createStudentCourseRecords(studentData, courseMapping);
     console.log(`📊 創建 ${studentCourseRecords.length} 筆學生-課程記錄`);
-    
+
     // 步驟 4: 更新工作表
     const updateResult = updateStuCourseSheet(studentCourseRecords);
-    
+
     return {
       success: updateResult.success,
       studentCount: studentData.length,
-      courseCount: Object.values(courseMapping).reduce((total, courses) => total + courses.length, 0),
+      courseCount: Object.values(courseMapping).reduce(
+        (total, courses) => total + courses.length,
+        0
+      ),
       totalRecords: studentCourseRecords.length,
-      error: updateResult.error
+      error: updateResult.error,
     };
-    
   } catch (error) {
     return { success: false, error: `資料設置失敗：${error.message}` };
   }
@@ -9875,70 +10112,70 @@ function getCompleteCourseMapping() {
     'G1 Achievers': [
       { subject: 'LT', courseId: '779922029471', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779921968089', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922003016', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922003016', teacher: 'Mr. Louw' },
     ],
     'G1 Discoverers': [
       { subject: 'LT', courseId: '779922024070', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922045964', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922047333', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922047333', teacher: 'Mr. Louw' },
     ],
     'G1 Voyagers': [
       { subject: 'LT', courseId: '779922000504', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779921963954', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922050446', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922050446', teacher: 'Mr. Louw' },
     ],
     'G1 Explorers': [
       { subject: 'LT', courseId: '779922034354', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779921930383', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922065235', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922065235', teacher: 'Mr. Louw' },
     ],
     // G2 班級
     'G2 Achievers': [
       { subject: 'LT', courseId: '779921948991', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922014568', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922012472', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922012472', teacher: 'Mr. Louw' },
     ],
     'G2 Voyagers': [
       { subject: 'LT', courseId: '779921921851', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922034749', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922005284', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922005284', teacher: 'Mr. Louw' },
     ],
     // G3 班級
     'G3 Achievers': [
       { subject: 'LT', courseId: '779922075128', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922073859', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922001163', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922001163', teacher: 'Mr. Louw' },
     ],
     'G3 Voyagers': [
       { subject: 'LT', courseId: '779921955583', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922018332', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922065856', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922065856', teacher: 'Mr. Louw' },
     ],
     'G3 Pathfinders': [
       { subject: 'LT', courseId: '779922010084', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922040641', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922072684', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922072684', teacher: 'Mr. Louw' },
     ],
     // G4 班級
     'G4 Voyagers': [
       { subject: 'LT', courseId: '779922056194', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922086834', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922089490', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922089490', teacher: 'Mr. Louw' },
     ],
     // G5 班級 (範例)
     'G5 Achievers': [
       { subject: 'LT', courseId: '779922100001', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922100002', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922100003', teacher: 'Mr. Louw' }
+      { subject: 'KCFS', courseId: '779922100003', teacher: 'Mr. Louw' },
     ],
     // G6 班級
     'G6 Voyagers': [
       { subject: 'LT', courseId: '779922200001', teacher: 'Ms. Kate' },
       { subject: 'IT', courseId: '779922200002', teacher: 'Mr. Perry' },
-      { subject: 'KCFS', courseId: '779922200003', teacher: 'Mr. Louw' }
-    ]
+      { subject: 'KCFS', courseId: '779922200003', teacher: 'Mr. Louw' },
+    ],
   };
-  
+
   return courseMapping;
 }
 
@@ -9946,22 +10183,33 @@ function getCompleteCourseMapping() {
  * 👥 生成學生Email資料（按班級分組）
  */
 function generateStudentEmailsByClass() {
-  const classes = ['G1 Achievers', 'G1 Voyagers', 'G2 Achievers', 'G2 Voyagers', 'G3 Achievers', 'G3 Voyagers', 'G3 Pathfinders', 'G4 Voyagers', 'G5 Achievers', 'G6 Voyagers'];
+  const classes = [
+    'G1 Achievers',
+    'G1 Voyagers',
+    'G2 Achievers',
+    'G2 Voyagers',
+    'G3 Achievers',
+    'G3 Voyagers',
+    'G3 Pathfinders',
+    'G4 Voyagers',
+    'G5 Achievers',
+    'G6 Voyagers',
+  ];
   const studentData = [];
-  
+
   // 為每個班級生成5名學生
-  classes.forEach(className => {
+  classes.forEach((className) => {
     const classCode = className.replace(' ', '').toLowerCase(); // g1achievers
-    
+
     for (let i = 1; i <= 5; i++) {
       studentData.push({
         email: `student${i}.${classCode}@kcislk.ntpc.edu.tw`,
         className: className,
-        studentName: `Student ${i} (${className})`
+        studentName: `Student ${i} (${className})`,
       });
     }
   });
-  
+
   console.log(`👥 生成 ${studentData.length} 位學生，分布在 ${classes.length} 個班級中`);
   return studentData;
 }
@@ -9971,27 +10219,27 @@ function generateStudentEmailsByClass() {
  */
 function createStudentCourseRecords(studentData, courseMapping) {
   const records = [];
-  
-  studentData.forEach(student => {
+
+  studentData.forEach((student) => {
     const courses = courseMapping[student.className];
-    
+
     if (courses) {
       // 為每位學生創建3門課程記錄
-      courses.forEach(course => {
+      courses.forEach((course) => {
         records.push({
           studentEmail: student.email,
           courseId: course.courseId,
           courseName: `${student.className}-${course.subject}`,
           subject: course.subject,
           teacher: course.teacher,
-          status: '' // 留空讓系統自動填入
+          status: '', // 留空讓系統自動填入
         });
       });
     } else {
       console.log(`⚠️ 找不到班級 ${student.className} 的課程資料`);
     }
   });
-  
+
   console.log(`📝 創建 ${records.length} 筆學生-課程記錄`);
   return records;
 }
@@ -10003,43 +10251,46 @@ function updateStuCourseSheet(records) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('stu_course');
-    
+
     // 如果工作表不存在，創建新的
     if (!sheet) {
       console.log('🔧 創建 stu_course 工作表...');
       sheet = ss.insertSheet('stu_course');
     }
-    
+
     // 清空現有資料
     sheet.clear();
-    
+
     // 設定標題行
     const headers = ['學生Email', '課程ID', '狀態', '課程名稱', '科目', '教師'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length).setBackground('#4285f4').setFontColor('white').setFontWeight('bold');
+    sheet
+      .getRange(1, 1, 1, headers.length)
+      .setBackground('#4285f4')
+      .setFontColor('white')
+      .setFontWeight('bold');
     sheet.setFrozenRows(1);
-    
+
     // 準備資料行
-    const dataRows = records.map(record => [
+    const dataRows = records.map((record) => [
       record.studentEmail,
       record.courseId,
       record.status,
       record.courseName,
       record.subject,
-      record.teacher
+      record.teacher,
     ]);
-    
+
     // 寫入資料
     if (dataRows.length > 0) {
       sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
       console.log(`✅ 成功寫入 ${dataRows.length} 筆學生-課程記錄`);
     }
-    
+
     // 自動調整欄寬
     sheet.autoResizeColumns(1, headers.length);
-    
+
     return { success: true };
-    
   } catch (error) {
     return { success: false, error: `工作表更新失敗：${error.message}` };
   }
@@ -10051,20 +10302,20 @@ function updateStuCourseSheet(records) {
  */
 function testTeacherMapping() {
   console.log('🧪 === 測試教師資料讀取功能 === 🧪');
-  
+
   const mappingResult = readCourseTeacherMapping();
-  
+
   if (!mappingResult.success) {
     console.log(`❌ 教師資料讀取失敗: ${mappingResult.error}`);
     showUserMessage('❌ 教師資料讀取失敗', mappingResult.error, 'error');
     return;
   }
-  
+
   const mapping = mappingResult.mapping;
   const teacherCount = mappingResult.count;
-  
+
   console.log(`✅ 成功讀取 ${teacherCount} 筆教師資料`);
-  
+
   // 顯示前5筆資料作為範例
   let sampleData = '📋 教師資料範例（前5筆）:\n';
   let count = 0;
@@ -10077,12 +10328,12 @@ function testTeacherMapping() {
     sampleData += `  └ Email: ${info.teacherEmail}\n`;
     count++;
   }
-  
+
   console.log(sampleData);
-  
-  showUserMessage('✅ 教師資料測試完成', 
-    `成功讀取 ${teacherCount} 筆教師資料\n\n` +
-    sampleData, 
+
+  showUserMessage(
+    '✅ 教師資料測試完成',
+    `成功讀取 ${teacherCount} 筆教師資料\n\n` + sampleData,
     'info'
   );
 }
@@ -10093,27 +10344,27 @@ function testTeacherMapping() {
  */
 function expandStudentCourseData() {
   console.log('🎯 === 擴展學生課程資料系統 === 🎯');
-  
+
   try {
     const result = expandRealStudentData();
-    
+
     if (result.success) {
-      showUserMessage('✅ 資料擴展成功', 
+      showUserMessage(
+        '✅ 資料擴展成功',
         `已成功擴展 ${result.expandedRecords} 筆學生-課程記錄\n\n` +
-        `📊 統計：\n` +
-        `• 原始學生記錄：${result.originalRecords}\n` +
-        `• 擴展後記錄：${result.expandedRecords}\n` +
-        `• 成功映射：${result.mappedClasses}\n` +
-        `• 失敗映射：${result.unmappedClasses}\n\n` +
-        `資料已更新至 'stu_course' 工作表，可以直接執行學生新增功能。`, 
+          `📊 統計：\n` +
+          `• 原始學生記錄：${result.originalRecords}\n` +
+          `• 擴展後記錄：${result.expandedRecords}\n` +
+          `• 成功映射：${result.mappedClasses}\n` +
+          `• 失敗映射：${result.unmappedClasses}\n\n` +
+          `資料已更新至 'stu_course' 工作表，可以直接執行學生新增功能。`,
         'info'
       );
     } else {
       showUserMessage('❌ 擴展失敗', result.error, 'error');
     }
-    
+
     return result;
-    
   } catch (error) {
     const errorMsg = `擴展學生課程資料失敗：${error.message}`;
     console.log(`❌ ${errorMsg}`);
@@ -10127,35 +10378,34 @@ function expandStudentCourseData() {
  */
 function expandRealStudentData() {
   console.log('🔧 開始擴展真實學生資料...');
-  
+
   try {
     // 步驟 1: 解析真實課程映射資料
     const courseMapping = parseRealCourseMapping();
     console.log(`📋 解析到 ${Object.keys(courseMapping).length} 個班級的課程資料`);
-    
+
     // 步驟 2: 讀取現有學生資料
     const currentStudentData = readCurrentStudentData();
     if (!currentStudentData.success) {
       return { success: false, error: currentStudentData.error };
     }
     console.log(`👥 讀取到 ${currentStudentData.records.length} 筆學生記錄`);
-    
+
     // 步驟 3: 擴展學生-課程記錄
     const expandedRecords = createExpandedStudentRecords(currentStudentData.records, courseMapping);
     console.log(`📊 擴展為 ${expandedRecords.mappedRecords.length} 筆學生-課程記錄`);
-    
+
     // 步驟 4: 更新工作表
     const updateResult = updateExpandedStuCourseSheet(expandedRecords.mappedRecords);
-    
+
     return {
       success: updateResult.success,
       originalRecords: currentStudentData.records.length,
       expandedRecords: expandedRecords.mappedRecords.length,
       mappedClasses: expandedRecords.mappedCount,
       unmappedClasses: expandedRecords.unmappedCount,
-      error: updateResult.error
+      error: updateResult.error,
     };
-    
   } catch (error) {
     return { success: false, error: `資料擴展失敗：${error.message}` };
   }
@@ -10167,18 +10417,18 @@ function expandRealStudentData() {
  */
 function parseRealCourseMapping() {
   console.log('📚 解析真實課程映射資料...');
-  
+
   // 首先嘗試從 course_teacher 工作表讀取真實教師資料
   const teacherMappingResult = readCourseTeacherMapping();
   let teacherMapping = {};
-  
+
   if (teacherMappingResult.success) {
     teacherMapping = teacherMappingResult.mapping;
     console.log(`✅ 成功載入 ${teacherMappingResult.count} 筆真實教師資料`);
   } else {
     console.log('⚠️ 無法讀取真實教師資料，將使用課程ID映射');
   }
-  
+
   // 從 populateSheetFromLog 函數中的日誌資料解析
   const logData = `[INFO]   ✅ 成功: LT-G1 Achievers (ID: 779922029471)
 [INFO]   ✅ 成功: IT-G1 Achievers (ID: 779921968089)
@@ -10432,39 +10682,39 @@ function parseRealCourseMapping() {
 [INFO]   ✅ 成功: LT-G6 Inventors (ID: 779922129101)
 [INFO]   ✅ 成功: IT-G6 Inventors (ID: 779922124838)
 [INFO]   ✅ 成功: KCFS-G6 Inventors (ID: 779922054673)`;
-  
+
   const courseMapping = {};
-  const lines = logData.split('\n').filter(line => line.includes('✅ 成功:'));
-  
+  const lines = logData.split('\n').filter((line) => line.includes('✅ 成功:'));
+
   for (const line of lines) {
     try {
       const courseNameMatch = line.match(/✅ 成功: (.+) \(ID:/);
       const courseIdMatch = line.match(/\(ID: (\d+)\)/);
-      
+
       if (courseNameMatch && courseIdMatch) {
         const fullCourseName = courseNameMatch[1]; // 例如: "LT-G1 Achievers"
         const courseId = courseIdMatch[1];
-        
+
         const parts = fullCourseName.split('-');
         if (parts.length === 2) {
           const subject = parts[0]; // "LT"
           const className = parts[1]; // "G1 Achievers"
-          
+
           if (!courseMapping[className]) {
             courseMapping[className] = [];
           }
-          
+
           // 獲取真實教師資料
           let teacherInfo = {
             teacherName: 'Unknown Teacher',
-            teacherEmail: 'unknown@school.edu'
+            teacherEmail: 'unknown@school.edu',
           };
-          
+
           if (teacherMapping[courseId]) {
             // 從真實資料中獲取教師資訊
             teacherInfo = {
               teacherName: teacherMapping[courseId].teacherName,
-              teacherEmail: teacherMapping[courseId].teacherEmail
+              teacherEmail: teacherMapping[courseId].teacherEmail,
             };
           } else {
             // 後備方案：嘗試從科目映射獲取
@@ -10475,14 +10725,14 @@ function parseRealCourseMapping() {
               console.log(`⚠️ 找不到課程 ${courseId} (${subject}-${className}) 的教師資料`);
             }
           }
-          
+
           courseMapping[className].push({
             subject: subject,
             courseId: courseId,
             teacherName: teacherInfo.teacherName,
             teacherEmail: teacherInfo.teacherEmail,
             // 保持向下相容
-            teacher: teacherInfo.teacherName
+            teacher: teacherInfo.teacherName,
           });
         }
       }
@@ -10490,7 +10740,7 @@ function parseRealCourseMapping() {
       console.log(`⚠️ 解析日誌行失敗: ${line}`);
     }
   }
-  
+
   console.log(`📚 成功解析 ${Object.keys(courseMapping).length} 個班級的課程資料`);
   return courseMapping;
 }
@@ -10501,26 +10751,25 @@ function parseRealCourseMapping() {
  */
 function getTeacherBySubject(subject) {
   console.log(`🔍 查詢科目 "${subject}" 的教師資訊...`);
-  
+
   try {
     const subjectMappingResult = buildSubjectTeacherMapping();
-    
+
     if (subjectMappingResult.success && subjectMappingResult.mapping[subject]) {
       const teacherInfo = subjectMappingResult.mapping[subject];
       console.log(`✅ 找到科目 "${subject}" 的教師: ${teacherInfo.teacherName}`);
       return teacherInfo.teacherName;
     }
-    
+
     // 使用後備映射
     if (subjectMappingResult.fallbackMapping && subjectMappingResult.fallbackMapping[subject]) {
       const fallbackInfo = subjectMappingResult.fallbackMapping[subject];
       console.log(`⚠️ 使用後備教師資料: ${fallbackInfo.teacherName}`);
       return fallbackInfo.teacherName;
     }
-    
+
     console.log(`❌ 找不到科目 "${subject}" 的教師，返回 Unknown`);
     return 'Unknown Teacher';
-    
   } catch (error) {
     console.log(`❌ 查詢教師資訊失敗: ${error.message}`);
     return 'Unknown Teacher';
@@ -10533,20 +10782,22 @@ function getTeacherBySubject(subject) {
  */
 function getTeacherInfoBySubject(subject) {
   console.log(`🔍 查詢科目 "${subject}" 的完整教師資訊...`);
-  
+
   try {
     const subjectMappingResult = buildSubjectTeacherMapping();
-    
+
     if (subjectMappingResult.success && subjectMappingResult.mapping[subject]) {
       const teacherInfo = subjectMappingResult.mapping[subject];
-      console.log(`✅ 找到科目 "${subject}" 的教師: ${teacherInfo.teacherName} (${teacherInfo.teacherEmail})`);
+      console.log(
+        `✅ 找到科目 "${subject}" 的教師: ${teacherInfo.teacherName} (${teacherInfo.teacherEmail})`
+      );
       return {
         success: true,
         teacherName: teacherInfo.teacherName,
-        teacherEmail: teacherInfo.teacherEmail
+        teacherEmail: teacherInfo.teacherEmail,
       };
     }
-    
+
     // 使用後備映射
     if (subjectMappingResult.fallbackMapping && subjectMappingResult.fallbackMapping[subject]) {
       const fallbackInfo = subjectMappingResult.fallbackMapping[subject];
@@ -10555,23 +10806,22 @@ function getTeacherInfoBySubject(subject) {
         success: false,
         teacherName: fallbackInfo.teacherName,
         teacherEmail: fallbackInfo.teacherEmail,
-        note: '使用後備資料'
+        note: '使用後備資料',
       };
     }
-    
+
     return {
       success: false,
       error: `找不到科目 "${subject}" 的教師資訊`,
       teacherName: 'Unknown Teacher',
-      teacherEmail: 'unknown@school.edu'
+      teacherEmail: 'unknown@school.edu',
     };
-    
   } catch (error) {
     return {
       success: false,
       error: `查詢教師資訊失敗：${error.message}`,
       teacherName: 'Unknown Teacher',
-      teacherEmail: 'unknown@school.edu'
+      teacherEmail: 'unknown@school.edu',
     };
   }
 }
@@ -10584,69 +10834,71 @@ function getTeacherInfoBySubject(subject) {
  */
 function readCourseTeacherMapping() {
   console.log('📚 開始讀取真實課程-教師映射資料...');
-  
+
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('course_teacher');
-    
+
     if (!sheet) {
       console.log('❌ 找不到 course_teacher 工作表');
       return { success: false, error: '找不到 course_teacher 工作表，無法讀取真實教師資料' };
     }
-    
+
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
       console.log('❌ course_teacher 工作表中沒有資料');
       return { success: false, error: 'course_teacher 工作表中沒有教師資料' };
     }
-    
+
     // 讀取所有資料（跳過標題行）
     const range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     const data = range.getValues();
-    
+
     const courseTeacherMapping = {};
     let successCount = 0;
-    
+
     data.forEach((row, index) => {
       try {
         // 根據實際 course_teacher 工作表結構：E欄=教師姓名, F欄=教師Email, G欄=課程ID
-        const courseName = row[0];      // A欄：課程名稱
-        const subject = row[2];         // C欄：科目 
-        const teacherName = row[4];     // E欄：教師姓名
-        const teacherEmail = row[5];    // F欄：教師Email
-        const courseId = row[6];        // G欄：課程ID
-        
+        const courseName = row[0]; // A欄：課程名稱
+        const subject = row[2]; // C欄：科目
+        const teacherName = row[4]; // E欄：教師姓名
+        const teacherEmail = row[5]; // F欄：教師Email
+        const courseId = row[6]; // G欄：課程ID
+
         // 詳細除錯日誌
-        console.log(`🔍 第 ${index + 2} 行資料：課程名稱="${courseName}", 科目="${subject}", 教師="${teacherName}", Email="${teacherEmail}", 課程ID="${courseId}"`);
-        
+        console.log(
+          `🔍 第 ${index + 2} 行資料：課程名稱="${courseName}", 科目="${subject}", 教師="${teacherName}", Email="${teacherEmail}", 課程ID="${courseId}"`
+        );
+
         if (!courseId || !teacherName || !teacherEmail) {
-          console.log(`⚠️ 第 ${index + 2} 行資料不完整，跳過 (課程ID: ${courseId}, 教師: ${teacherName}, Email: ${teacherEmail})`);
+          console.log(
+            `⚠️ 第 ${index + 2} 行資料不完整，跳過 (課程ID: ${courseId}, 教師: ${teacherName}, Email: ${teacherEmail})`
+          );
           return;
         }
-        
+
         courseTeacherMapping[courseId.toString()] = {
           courseName: courseName || '',
           courseId: courseId.toString(),
           subject: subject || '',
           teacherName: teacherName.toString().trim(),
-          teacherEmail: teacherEmail.toString().trim()
+          teacherEmail: teacherEmail.toString().trim(),
         };
-        
+
         successCount++;
-        
       } catch (error) {
         console.log(`❌ 解析第 ${index + 2} 行資料失敗: ${error.message}`);
       }
     });
-    
+
     console.log(`✅ 成功讀取 ${successCount} 筆課程-教師映射資料`);
-    
+
     return {
       success: true,
       mapping: courseTeacherMapping,
-      count: successCount
+      count: successCount,
     };
-    
   } catch (error) {
     console.log(`❌ 讀取課程-教師映射失敗: ${error.message}`);
     return { success: false, error: `讀取課程-教師映射失敗：${error.message}` };
@@ -10661,39 +10913,38 @@ function getTeacherInfoByCourseId(courseId) {
   if (!courseId) {
     return { success: false, error: '缺少課程 ID' };
   }
-  
+
   try {
     const mappingResult = readCourseTeacherMapping();
     if (!mappingResult.success) {
       return mappingResult;
     }
-    
+
     const teacherInfo = mappingResult.mapping[courseId.toString()];
     if (!teacherInfo) {
       console.log(`⚠️ 找不到課程 ID ${courseId} 的教師資訊`);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: `找不到課程 ID ${courseId} 的教師資訊`,
         fallback: {
           teacherName: 'Unknown Teacher',
-          teacherEmail: 'unknown@school.edu'
-        }
+          teacherEmail: 'unknown@school.edu',
+        },
       };
     }
-    
+
     return {
       success: true,
-      teacherInfo: teacherInfo
+      teacherInfo: teacherInfo,
     };
-    
   } catch (error) {
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: `查詢教師資訊失敗：${error.message}`,
       fallback: {
         teacherName: 'Unknown Teacher',
-        teacherEmail: 'unknown@school.edu'
-      }
+        teacherEmail: 'unknown@school.edu',
+      },
     };
   }
 }
@@ -10704,7 +10955,7 @@ function getTeacherInfoByCourseId(courseId) {
  */
 function buildSubjectTeacherMapping() {
   console.log('📊 建立科目-教師映射...');
-  
+
   const mappingResult = readCourseTeacherMapping();
   if (!mappingResult.success) {
     console.log('❌ 無法讀取教師資料，使用預設映射');
@@ -10712,33 +10963,33 @@ function buildSubjectTeacherMapping() {
       success: false,
       error: mappingResult.error,
       fallbackMapping: {
-        'LT': { teacherName: 'Language Teacher', teacherEmail: 'lt@school.edu' },
-        'IT': { teacherName: 'IT Teacher', teacherEmail: 'it@school.edu' },
-        'KCFS': { teacherName: 'KCFS Teacher', teacherEmail: 'kcfs@school.edu' }
-      }
+        LT: { teacherName: 'Language Teacher', teacherEmail: 'lt@school.edu' },
+        IT: { teacherName: 'IT Teacher', teacherEmail: 'it@school.edu' },
+        KCFS: { teacherName: 'KCFS Teacher', teacherEmail: 'kcfs@school.edu' },
+      },
     };
   }
-  
+
   const subjectMapping = {};
   const courseMapping = mappingResult.mapping;
-  
+
   // 分析每個科目的教師
-  Object.values(courseMapping).forEach(course => {
+  Object.values(courseMapping).forEach((course) => {
     const subject = course.subject;
     if (subject && !subjectMapping[subject]) {
       subjectMapping[subject] = {
         teacherName: course.teacherName,
-        teacherEmail: course.teacherEmail
+        teacherEmail: course.teacherEmail,
       };
     }
   });
-  
+
   console.log(`✅ 建立了 ${Object.keys(subjectMapping).length} 個科目的教師映射`);
-  
+
   return {
     success: true,
     mapping: subjectMapping,
-    totalCourses: Object.keys(courseMapping).length
+    totalCourses: Object.keys(courseMapping).length,
   };
 }
 
@@ -10749,47 +11000,46 @@ function readCurrentStudentData() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('stu_course');
-    
+
     if (!sheet) {
       return { success: false, error: '找不到 stu_course 工作表' };
     }
-    
+
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
       return { success: false, error: 'stu_course 工作表中沒有學生資料' };
     }
-    
+
     // 讀取資料（跳過標題行）
     const range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
     const data = range.getValues();
-    
+
     const records = [];
     data.forEach((row, index) => {
       const studentEmail = row[0];
       const classNameOrId = row[1]; // 可能是班級名稱或課程ID
       const status = row[2];
-      
+
       if (!studentEmail || !classNameOrId) {
         console.log(`⚠️ 第 ${index + 2} 行資料不完整，跳過`);
         return;
       }
-      
+
       // 跳過已處理的項目
       if (status && status.toString().trim()) {
         console.log(`ℹ️ 學生 ${studentEmail} 已處理，跳過`);
         return;
       }
-      
+
       records.push({
         studentEmail: studentEmail.toString().trim(),
         className: classNameOrId.toString().trim(),
-        originalRow: index + 2
+        originalRow: index + 2,
       });
     });
-    
+
     console.log(`📖 讀取到 ${records.length} 筆未處理的學生記錄`);
     return { success: true, records };
-    
   } catch (error) {
     return { success: false, error: `讀取學生資料失敗：${error.message}` };
   }
@@ -10802,14 +11052,14 @@ function createExpandedStudentRecords(studentRecords, courseMapping) {
   const mappedRecords = [];
   let mappedCount = 0;
   let unmappedCount = 0;
-  
-  studentRecords.forEach(student => {
+
+  studentRecords.forEach((student) => {
     const className = student.className;
     const courses = courseMapping[className];
-    
+
     if (courses && courses.length > 0) {
       // 為這個學生創建3門課程記錄
-      courses.forEach(course => {
+      courses.forEach((course) => {
         mappedRecords.push({
           studentEmail: student.studentEmail,
           courseId: course.courseId,
@@ -10820,14 +11070,14 @@ function createExpandedStudentRecords(studentRecords, courseMapping) {
           status: '',
           originalClassName: className,
           // 保持向下相容性
-          teacher: course.teacherName || course.teacher || 'Unknown Teacher'
+          teacher: course.teacherName || course.teacher || 'Unknown Teacher',
         });
       });
       mappedCount++;
     } else {
       console.log(`❌ 找不到班級 "${className}" 的課程映射`);
       unmappedCount++;
-      
+
       // 即使找不到映射，也保留原始記錄
       mappedRecords.push({
         studentEmail: student.studentEmail,
@@ -10840,18 +11090,18 @@ function createExpandedStudentRecords(studentRecords, courseMapping) {
         originalClassName: className,
         mappingError: `找不到班級 "${className}" 的課程映射`,
         // 保持向下相容性
-        teacher: 'Unknown Teacher'
+        teacher: 'Unknown Teacher',
       });
     }
   });
-  
+
   console.log(`🔄 映射結果：成功 ${mappedCount} 個班級，失敗 ${unmappedCount} 個班級`);
   console.log(`📊 總共創建 ${mappedRecords.length} 筆學生-課程記錄`);
-  
+
   return {
     mappedRecords,
     mappedCount,
-    unmappedCount
+    unmappedCount,
   };
 }
 
@@ -10862,23 +11112,36 @@ function updateExpandedStuCourseSheet(records) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName('stu_course');
-    
+
     if (!sheet) {
       console.log('🔧 創建 stu_course 工作表...');
       sheet = ss.insertSheet('stu_course');
     }
-    
+
     // 清空現有資料
     sheet.clear();
-    
+
     // 設定標題行（包含教師 Email）
-    const headers = ['學生Email', '課程ID', '狀態', '課程名稱', '科目', '教師姓名', '教師Email', '備註'];
+    const headers = [
+      '學生Email',
+      '課程ID',
+      '狀態',
+      '課程名稱',
+      '科目',
+      '教師姓名',
+      '教師Email',
+      '備註',
+    ];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length).setBackground('#4285f4').setFontColor('white').setFontWeight('bold');
+    sheet
+      .getRange(1, 1, 1, headers.length)
+      .setBackground('#4285f4')
+      .setFontColor('white')
+      .setFontWeight('bold');
     sheet.setFrozenRows(1);
-    
+
     // 準備資料行（包含教師 Email）
-    const dataRows = records.map(record => [
+    const dataRows = records.map((record) => [
       record.studentEmail,
       record.courseId,
       record.status,
@@ -10886,32 +11149,31 @@ function updateExpandedStuCourseSheet(records) {
       record.subject,
       record.teacherName || record.teacher || 'Unknown Teacher',
       record.teacherEmail || 'unknown@school.edu',
-      record.mappingError || ''
+      record.mappingError || '',
     ]);
-    
+
     // 寫入資料
     if (dataRows.length > 0) {
       sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
       console.log(`✅ 成功寫入 ${dataRows.length} 筆擴展的學生-課程記錄`);
-      
+
       // 標記有錯誤的行
       dataRows.forEach((row, index) => {
-        if (row[6]) { // 如果有備註（錯誤訊息）
+        if (row[6]) {
+          // 如果有備註（錯誤訊息）
           sheet.getRange(index + 2, 1, 1, headers.length).setBackground('#ffebee');
         }
       });
     }
-    
+
     // 自動調整欄寬
     sheet.autoResizeColumns(1, headers.length);
-    
+
     return { success: true };
-    
   } catch (error) {
     return { success: false, error: `工作表更新失敗：${error.message}` };
   }
 }
-
 
 /**
  * 🚀 進階批次新增學生 UI - 支援大量資料處理
@@ -10919,12 +11181,12 @@ function updateExpandedStuCourseSheet(records) {
  */
 async function addStudentsAdvancedUI() {
   const ui = SpreadsheetApp.getUi();
-  
+
   try {
     // 步驟1: 獲取工作表名稱
     const sheetNameResult = ui.prompt(
-      "🚀 進階批次新增學生 - 步驟 1/3",
-      "請輸入包含學生資料的工作表名稱（預設：新增學生）\\n格式需包含：學生Email | 課程ID | 狀態\\n\\n⚡ 支援大量資料處理，自動分批執行",
+      '🚀 進階批次新增學生 - 步驟 1/3',
+      '請輸入包含學生資料的工作表名稱（預設：新增學生）\\n格式需包含：學生Email | 課程ID | 狀態\\n\\n⚡ 支援大量資料處理，自動分批執行',
       ui.ButtonSet.OK_CANCEL
     );
 
@@ -10932,12 +11194,12 @@ async function addStudentsAdvancedUI() {
       return;
     }
 
-    const sheetName = sheetNameResult.getResponseText() || "新增學生";
+    const sheetName = sheetNameResult.getResponseText() || '新增學生';
 
     // 步驟2: 獲取任務ID（用於恢復）
     const jobIdResult = ui.prompt(
-      "🚀 進階批次新增學生 - 步驟 2/3",
-      "請輸入任務ID（選填）：\\n• 留空：建立新任務\\n• 輸入ID：恢復現有任務\\n\\n💡 任務ID可用於恢復中斷的批次處理",
+      '🚀 進階批次新增學生 - 步驟 2/3',
+      '請輸入任務ID（選填）：\\n• 留空：建立新任務\\n• 輸入ID：恢復現有任務\\n\\n💡 任務ID可用於恢復中斷的批次處理',
       ui.ButtonSet.OK_CANCEL
     );
 
@@ -10952,11 +11214,11 @@ async function addStudentsAdvancedUI() {
       const status = classroomService.checkBatchStatus(jobId);
       if (status.found) {
         const resumeConfirm = ui.alert(
-          "📂 發現現有任務",
-          `任務 ${jobId} 狀態：\\n• 進度：${status.progress}%\\n• 已處理：${status.processed}/${status.total}\\n• 最後更新：${status.lastUpdate}\\n${status.hasError ? `• 錯誤：${status.error}` : ""}\\n\\n是否繼續此任務？`,
+          '📂 發現現有任務',
+          `任務 ${jobId} 狀態：\\n• 進度：${status.progress}%\\n• 已處理：${status.processed}/${status.total}\\n• 最後更新：${status.lastUpdate}\\n${status.hasError ? `• 錯誤：${status.error}` : ''}\\n\\n是否繼續此任務？`,
           ui.ButtonSet.YES_NO
         );
-        
+
         if (resumeConfirm !== ui.Button.YES) {
           return;
         }
@@ -10965,26 +11227,25 @@ async function addStudentsAdvancedUI() {
 
     // 步驟3: 確認執行
     const confirmResult = ui.alert(
-      "🚀 進階批次新增學生 - 步驟 3/3",
-      `即將執行進階批次新增學生功能：\\n\\n📊 工作表：${sheetName}\\n🆔 任務ID：${jobId || "將自動生成"}\\n\\n✨ 新功能特色：\\n• 🔄 斷點續傳：中途中斷可恢復\\n• ⏰ 時間管理：自動分批避免超時\\n• 📈 進度追蹤：即時狀態更新\\n• 🤖 自動觸發：無人值守執行\\n\\n確定開始？`,
+      '🚀 進階批次新增學生 - 步驟 3/3',
+      `即將執行進階批次新增學生功能：\\n\\n📊 工作表：${sheetName}\\n🆔 任務ID：${jobId || '將自動生成'}\\n\\n✨ 新功能特色：\\n• 🔄 斷點續傳：中途中斷可恢復\\n• ⏰ 時間管理：自動分批避免超時\\n• 📈 進度追蹤：即時狀態更新\\n• 🤖 自動觸發：無人值守執行\\n\\n確定開始？`,
       ui.ButtonSet.OK_CANCEL
     );
 
     if (confirmResult !== ui.Button.OK) {
-      ui.alert("操作已取消", "進階批次新增學生已取消。", ui.ButtonSet.OK);
+      ui.alert('操作已取消', '進階批次新增學生已取消。', ui.ButtonSet.OK);
       return;
     }
 
     // 執行進階批次新增
-    console.log("🚀 開始執行進階批次新增學生");
+    console.log('🚀 開始執行進階批次新增學生');
     const result = await executeAdvancedBatchStudentAddition(sheetName, { jobId });
-    
+
     // 處理結果
     handleAdvancedBatchResult(result, ui);
-    
   } catch (error) {
     console.log(`[ERROR] 進階批次新增學生失敗: ${error.message}`);
-    ui.alert("❌ 系統錯誤", `進階批次處理失敗：${error.message}`, ui.ButtonSet.OK);
+    ui.alert('❌ 系統錯誤', `進階批次處理失敗：${error.message}`, ui.ButtonSet.OK);
   }
 }
 
@@ -10993,7 +11254,7 @@ async function addStudentsAdvancedUI() {
  */
 async function executeAdvancedBatchStudentAddition(sheetName, options = {}) {
   console.log(`🚀 開始進階批次學生新增: ${sheetName}`);
-  
+
   try {
     // 步驟1: 讀取學生-課程配對資料
     const studentCourseData = await readStudentCourseDataFromSheet(sheetName);
@@ -11005,21 +11266,20 @@ async function executeAdvancedBatchStudentAddition(sheetName, options = {}) {
 
     // 步驟2: 使用進階批次處理
     const result = await classroomService.addMembersBatchAdvanced(
-      studentCourseData.assignments.map(assignment => ({
+      studentCourseData.assignments.map((assignment) => ({
         courseId: assignment.courseId,
-        userEmail: assignment.studentEmail
+        userEmail: assignment.studentEmail,
       })),
-      "STUDENT",
+      'STUDENT',
       options
     );
-    
+
     // 步驟3: 更新工作表狀態（如果有結果）
     if (result.results && result.results.length > 0) {
       await updateStudentCourseStatusBatch(result.results, sheetName);
     }
-    
+
     return result;
-    
   } catch (error) {
     console.log(`[ERROR] 進階批次處理執行失敗: ${error.message}`);
     return { success: false, error: `進階批次處理失敗: ${error.message}` };
@@ -11031,7 +11291,8 @@ async function executeAdvancedBatchStudentAddition(sheetName, options = {}) {
  */
 function handleAdvancedBatchResult(result, ui) {
   if (result.success) {
-    const message = `🎉 進階批次新增完成！
+    const message =
+      `🎉 進階批次新增完成！
 
 ` +
       `📊 處理統計：
@@ -11046,11 +11307,11 @@ function handleAdvancedBatchResult(result, ui) {
 
 ` +
       `✨ 所有項目已成功處理！`;
-      
-    ui.alert("✅ 處理完成", message, ui.ButtonSet.OK);
-    
+
+    ui.alert('✅ 處理完成', message, ui.ButtonSet.OK);
   } else if (result.partial) {
-    const message = `⏸️ 部分處理完成
+    const message =
+      `⏸️ 部分處理完成
 
 ` +
       `📊 目前進度：
@@ -11065,21 +11326,25 @@ function handleAdvancedBatchResult(result, ui) {
       `🤖 系統將自動繼續處理剩餘項目
 ` +
       `💡 您可以隨時使用任務ID恢復或查看狀態`;
-      
-    ui.alert("⏸️ 部分完成", message, ui.ButtonSet.OK);
-    
+
+    ui.alert('⏸️ 部分完成', message, ui.ButtonSet.OK);
   } else {
-    const errorMessage = result.error || "未知錯誤";
-    const message = `❌ 處理失敗
+    const errorMessage = result.error || '未知錯誤';
+    const message =
+      `❌ 處理失敗
 
 錯誤：${errorMessage}
 
 ` +
-      `${result.jobId ? `任務ID：${result.jobId}` : ""}` +
-      `${result.processedCount ? `
-已處理：${result.processedCount}` : ""}`;
-      
-    ui.alert("❌ 處理失敗", message, ui.ButtonSet.OK);
+      `${result.jobId ? `任務ID：${result.jobId}` : ''}` +
+      `${
+        result.processedCount
+          ? `
+已處理：${result.processedCount}`
+          : ''
+      }`;
+
+    ui.alert('❌ 處理失敗', message, ui.ButtonSet.OK);
   }
 }
 
@@ -11088,69 +11353,64 @@ function handleAdvancedBatchResult(result, ui) {
  * 由時間觸發器自動調用
  */
 async function continueAdvancedBatchProcessing() {
-  console.log("🔄 觸發器觸發：繼續進階批次處理");
-  
+  console.log('🔄 觸發器觸發：繼續進階批次處理');
+
   try {
     // 查找所有進行中的批次任務
     const properties = PropertiesService.getScriptProperties().getProperties();
     const batchStates = Object.keys(properties)
-      .filter(key => key.startsWith("batch_state_"))
-      .map(key => {
+      .filter((key) => key.startsWith('batch_state_'))
+      .map((key) => {
         try {
           return { key, state: JSON.parse(properties[key]) };
         } catch {
           return null;
         }
       })
-      .filter(item => item !== null);
-    
+      .filter((item) => item !== null);
+
     if (batchStates.length === 0) {
-      console.log("📭 沒有找到進行中的批次任務");
+      console.log('📭 沒有找到進行中的批次任務');
       return;
     }
-    
+
     // 處理第一個找到的批次任務
     const { key, state } = batchStates[0];
-    const jobId = key.replace("batch_state_", "");
-    
+    const jobId = key.replace('batch_state_', '');
+
     console.log(`🔄 恢復批次任務: ${jobId}`);
     console.log(`📊 當前進度: ${state.lastProcessedIndex}/${state.totalItems}`);
-    
+
     // 重構資料格式
-    const members = state.results.map(result => ({
+    const members = state.results.map((result) => ({
       courseId: result.courseId,
-      userEmail: result.userEmail
+      userEmail: result.userEmail,
     }));
-    
+
     // 繼續處理
-    const result = await batchManager.processMembersInBatches(
-      members,
-      state.role,
-      { jobId }
-    );
-    
-    console.log("🔄 觸發器處理完成:", result.success ? "成功" : "失敗");
-    
+    const result = await batchManager.processMembersInBatches(members, state.role, { jobId });
+
+    console.log('🔄 觸發器處理完成:', result.success ? '成功' : '失敗');
+
     // 清除觸發器（如果完成）
     if (result.success && !result.partial) {
       const triggers = ScriptApp.getProjectTriggers();
       for (const trigger of triggers) {
-        if (trigger.getHandlerFunction() === "continueAdvancedBatchProcessing") {
+        if (trigger.getHandlerFunction() === 'continueAdvancedBatchProcessing') {
           ScriptApp.deleteTrigger(trigger);
-          console.log("🗑️ 清除觸發器");
+          console.log('🗑️ 清除觸發器');
         }
       }
     }
-    
   } catch (error) {
     console.log(`[ERROR] 觸發器處理失敗: ${error.message}`);
-    
+
     // 錯誤處理：延遲重試
-    const trigger = ScriptApp.newTrigger("continueAdvancedBatchProcessing")
+    const trigger = ScriptApp.newTrigger('continueAdvancedBatchProcessing')
       .timeBased()
       .after(5 * 60 * 1000) // 5分鐘後重試
       .create();
-    
+
     console.log(`⏰ 設定重試觸發器: ${trigger.getUniqueId()}`);
   }
 }
@@ -11162,48 +11422,48 @@ async function updateStudentCourseStatusBatch(results, sheetName) {
   try {
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = spreadsheet.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       console.log(`[WARN] 找不到工作表: ${sheetName}`);
       return;
     }
-    
+
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
-    
+
     // 找到相關欄位索引
-    const emailIndex = headers.findIndex(h => h.includes("Email") || h.includes("email"));
-    const courseIndex = headers.findIndex(h => h.includes("課程ID") || h.includes("Course"));
-    const statusIndex = headers.findIndex(h => h.includes("狀態") || h.includes("Status"));
-    
+    const emailIndex = headers.findIndex((h) => h.includes('Email') || h.includes('email'));
+    const courseIndex = headers.findIndex((h) => h.includes('課程ID') || h.includes('Course'));
+    const statusIndex = headers.findIndex((h) => h.includes('狀態') || h.includes('Status'));
+
     if (emailIndex === -1 || courseIndex === -1 || statusIndex === -1) {
-      console.log("[WARN] 找不到必要的欄位");
+      console.log('[WARN] 找不到必要的欄位');
       return;
     }
-    
+
     // 批次更新狀態
     const updates = [];
-    results.forEach(result => {
+    results.forEach((result) => {
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
-        if (row[emailIndex] === result.userEmail && 
-            row[courseIndex] === result.courseId) {
-          const status = result.success 
-            ? (result.status === "ALREADY_EXISTS" ? "existed" : "success")
-            : "failed";
+        if (row[emailIndex] === result.userEmail && row[courseIndex] === result.courseId) {
+          const status = result.success
+            ? result.status === 'ALREADY_EXISTS'
+              ? 'existed'
+              : 'success'
+            : 'failed';
           updates.push({ row: i + 1, col: statusIndex + 1, value: status });
           break;
         }
       }
     });
-    
+
     // 執行批次更新
-    updates.forEach(update => {
+    updates.forEach((update) => {
       sheet.getRange(update.row, update.col).setValue(update.value);
     });
-    
+
     console.log(`📝 批次更新 ${updates.length} 個狀態`);
-    
   } catch (error) {
     console.log(`[WARN] 批次狀態更新失敗: ${error.message}`);
   }
@@ -11214,11 +11474,11 @@ async function updateStudentCourseStatusBatch(results, sheetName) {
  */
 function checkBatchStatusUI() {
   const ui = SpreadsheetApp.getUi();
-  
+
   try {
     const jobIdResult = ui.prompt(
-      "📊 查詢批次處理狀態",
-      "請輸入要查詢的任務ID：",
+      '📊 查詢批次處理狀態',
+      '請輸入要查詢的任務ID：',
       ui.ButtonSet.OK_CANCEL
     );
 
@@ -11228,14 +11488,15 @@ function checkBatchStatusUI() {
 
     const jobId = jobIdResult.getResponseText().trim();
     if (!jobId) {
-      ui.alert("❌ 錯誤", "請輸入有效的任務ID", ui.ButtonSet.OK);
+      ui.alert('❌ 錯誤', '請輸入有效的任務ID', ui.ButtonSet.OK);
       return;
     }
 
     const status = classroomService.checkBatchStatus(jobId);
-    
+
     if (status.found) {
-      const message = `📊 任務狀態報告
+      const message =
+        `📊 任務狀態報告
 
 ` +
         `🆔 任務ID：${jobId}
@@ -11246,15 +11507,14 @@ function checkBatchStatusUI() {
 ` +
         `⏰ 最後更新：${status.lastUpdate}
 ` +
-        `${status.hasError ? `❌ 錯誤：${status.error}` : "✅ 狀態正常"}`;
-        
-      ui.alert("📊 狀態查詢結果", message, ui.ButtonSet.OK);
+        `${status.hasError ? `❌ 錯誤：${status.error}` : '✅ 狀態正常'}`;
+
+      ui.alert('📊 狀態查詢結果', message, ui.ButtonSet.OK);
     } else {
-      ui.alert("❌ 查詢結果", "找不到指定的任務ID或任務已完成", ui.ButtonSet.OK);
+      ui.alert('❌ 查詢結果', '找不到指定的任務ID或任務已完成', ui.ButtonSet.OK);
     }
-    
   } catch (error) {
-    ui.alert("❌ 系統錯誤", `狀態查詢失敗：${error.message}`, ui.ButtonSet.OK);
+    ui.alert('❌ 系統錯誤', `狀態查詢失敗：${error.message}`, ui.ButtonSet.OK);
   }
 }
 
@@ -11263,11 +11523,11 @@ function checkBatchStatusUI() {
  */
 function cancelBatchProcessingUI() {
   const ui = SpreadsheetApp.getUi();
-  
+
   try {
     const jobIdResult = ui.prompt(
-      "🗑️ 取消批次處理",
-      "請輸入要取消的任務ID：",
+      '🗑️ 取消批次處理',
+      '請輸入要取消的任務ID：',
       ui.ButtonSet.OK_CANCEL
     );
 
@@ -11277,12 +11537,12 @@ function cancelBatchProcessingUI() {
 
     const jobId = jobIdResult.getResponseText().trim();
     if (!jobId) {
-      ui.alert("❌ 錯誤", "請輸入有效的任務ID", ui.ButtonSet.OK);
+      ui.alert('❌ 錯誤', '請輸入有效的任務ID', ui.ButtonSet.OK);
       return;
     }
 
     const confirmResult = ui.alert(
-      "⚠️ 確認取消",
+      '⚠️ 確認取消',
       `確定要取消任務 ${jobId} 嗎？
 
 此操作將：
@@ -11297,15 +11557,14 @@ function cancelBatchProcessingUI() {
     }
 
     const result = classroomService.cancelBatchProcessing(jobId);
-    
+
     if (result.success) {
-      ui.alert("✅ 取消成功", result.message, ui.ButtonSet.OK);
+      ui.alert('✅ 取消成功', result.message, ui.ButtonSet.OK);
     } else {
-      ui.alert("❌ 取消失敗", result.error, ui.ButtonSet.OK);
+      ui.alert('❌ 取消失敗', result.error, ui.ButtonSet.OK);
     }
-    
   } catch (error) {
-    ui.alert("❌ 系統錯誤", `取消操作失敗：${error.message}`, ui.ButtonSet.OK);
+    ui.alert('❌ 系統錯誤', `取消操作失敗：${error.message}`, ui.ButtonSet.OK);
   }
 }
 
@@ -11314,57 +11573,65 @@ function cancelBatchProcessingUI() {
  * 用於驗證改善後的功能是否正常運作
  */
 function testAdvancedBatchFeatures() {
-  console.log("🧪 開始測試進階批次功能...");
-  
+  console.log('🧪 開始測試進階批次功能...');
+
   try {
     // 測試 BatchManager 實例化
-    console.log("✅ BatchManager 類別:", typeof batchManager === "object");
-    
+    console.log('✅ BatchManager 類別:', typeof batchManager === 'object');
+
     // 測試批次管理器配置
-    console.log("✅ 執行時間限制:", batchManager.EXECUTION_LIMIT);
-    console.log("✅ 預設批次大小:", batchManager.DEFAULT_BATCH_SIZE);
-    console.log("✅ 安全緩衝時間:", batchManager.SAFETY_BUFFER);
-    
+    console.log('✅ 執行時間限制:', batchManager.EXECUTION_LIMIT);
+    console.log('✅ 預設批次大小:', batchManager.DEFAULT_BATCH_SIZE);
+    console.log('✅ 安全緩衝時間:', batchManager.SAFETY_BUFFER);
+
     // 測試 ID 生成
     const jobId = batchManager.generateJobId();
-    console.log("✅ 任務ID生成:", jobId);
-    
+    console.log('✅ 任務ID生成:', jobId);
+
     // 測試狀態管理
     const testState = {
       lastProcessedIndex: 100,
       totalItems: 500,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
-    
+
     batchManager.saveBatchState(jobId, testState);
     const loadedState = batchManager.loadBatchState(jobId);
-    console.log("✅ 狀態保存/讀取:", loadedState ? "正常" : "失敗");
-    
+    console.log('✅ 狀態保存/讀取:', loadedState ? '正常' : '失敗');
+
     // 清除測試狀態
     batchManager.clearBatchState(jobId);
-    
+
     // 測試 ClassroomService 新增方法
-    console.log("✅ addMembersBatchAdvanced 方法:", typeof classroomService.addMembersBatchAdvanced === "function");
-    console.log("✅ checkBatchStatus 方法:", typeof classroomService.checkBatchStatus === "function");
-    console.log("✅ cancelBatchProcessing 方法:", typeof classroomService.cancelBatchProcessing === "function");
-    
+    console.log(
+      '✅ addMembersBatchAdvanced 方法:',
+      typeof classroomService.addMembersBatchAdvanced === 'function'
+    );
+    console.log(
+      '✅ checkBatchStatus 方法:',
+      typeof classroomService.checkBatchStatus === 'function'
+    );
+    console.log(
+      '✅ cancelBatchProcessing 方法:',
+      typeof classroomService.cancelBatchProcessing === 'function'
+    );
+
     // 測試批次大小計算
-    console.log("✅ 批次大小計算 (100項目):", batchManager.calculateOptimalBatchSize(100));
-    console.log("✅ 批次大小計算 (1000項目):", batchManager.calculateOptimalBatchSize(1000));
-    console.log("✅ 批次大小計算 (5000項目):", batchManager.calculateOptimalBatchSize(5000));
-    
-    console.log("🎉 進階批次功能測試完成！所有功能正常");
-    
+    console.log('✅ 批次大小計算 (100項目):', batchManager.calculateOptimalBatchSize(100));
+    console.log('✅ 批次大小計算 (1000項目):', batchManager.calculateOptimalBatchSize(1000));
+    console.log('✅ 批次大小計算 (5000項目):', batchManager.calculateOptimalBatchSize(5000));
+
+    console.log('🎉 進階批次功能測試完成！所有功能正常');
+
     return {
       success: true,
-      message: "所有進階批次功能測試通過"
+      message: '所有進階批次功能測試通過',
     };
-    
   } catch (error) {
     console.log(`❌ 進階批次功能測試失敗: ${error.message}`);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -11373,38 +11640,47 @@ function testAdvancedBatchFeatures() {
  * 📋 系統功能驗證報告
  */
 function generateSystemVerificationReport() {
-  console.log("📋 生成系統功能驗證報告...");
-  
+  console.log('📋 生成系統功能驗證報告...');
+
   const report = {
     timestamp: new Date().toLocaleString(),
     originalFeatures: {
-      classroomService: typeof classroomService === "object",
-      addMembersBatch: typeof classroomService.addMembersBatch === "function",
-      rateLimiter: typeof rateLimiter === "object",
-      errorHandler: typeof ErrorHandler === "function",
-      progressTracker: typeof ProgressTracker === "function"
+      classroomService: typeof classroomService === 'object',
+      addMembersBatch: typeof classroomService.addMembersBatch === 'function',
+      rateLimiter: typeof rateLimiter === 'object',
+      errorHandler: typeof ErrorHandler === 'function',
+      progressTracker: typeof ProgressTracker === 'function',
     },
     advancedFeatures: {
-      batchManager: typeof batchManager === "object",
-      addMembersBatchAdvanced: typeof classroomService.addMembersBatchAdvanced === "function",
-      batchStateManagement: typeof batchManager.saveBatchState === "function",
-      triggerSupport: typeof batchManager.scheduleNextBatch === "function",
-      statusChecking: typeof classroomService.checkBatchStatus === "function",
-      processCancellation: typeof classroomService.cancelBatchProcessing === "function"
+      batchManager: typeof batchManager === 'object',
+      addMembersBatchAdvanced: typeof classroomService.addMembersBatchAdvanced === 'function',
+      batchStateManagement: typeof batchManager.saveBatchState === 'function',
+      triggerSupport: typeof batchManager.scheduleNextBatch === 'function',
+      statusChecking: typeof classroomService.checkBatchStatus === 'function',
+      processCancellation: typeof classroomService.cancelBatchProcessing === 'function',
     },
     uiFeatures: {
-      addStudentsAdvancedUI: typeof addStudentsAdvancedUI === "function",
-      checkBatchStatusUI: typeof checkBatchStatusUI === "function",
-      cancelBatchProcessingUI: typeof cancelBatchProcessingUI === "function",
-      continueAdvancedBatchProcessing: typeof continueAdvancedBatchProcessing === "function"
-    }
+      addStudentsAdvancedUI: typeof addStudentsAdvancedUI === 'function',
+      checkBatchStatusUI: typeof checkBatchStatusUI === 'function',
+      cancelBatchProcessingUI: typeof cancelBatchProcessingUI === 'function',
+      continueAdvancedBatchProcessing: typeof continueAdvancedBatchProcessing === 'function',
+    },
   };
-  
-  console.log("📊 驗證報告:");
-  console.log("  原有功能:", Object.values(report.originalFeatures).every(v => v) ? "✅ 全部正常" : "❌ 有問題");
-  console.log("  進階功能:", Object.values(report.advancedFeatures).every(v => v) ? "✅ 全部正常" : "❌ 有問題");  
-  console.log("  UI 功能:", Object.values(report.uiFeatures).every(v => v) ? "✅ 全部正常" : "❌ 有問題");
-  
+
+  console.log('📊 驗證報告:');
+  console.log(
+    '  原有功能:',
+    Object.values(report.originalFeatures).every((v) => v) ? '✅ 全部正常' : '❌ 有問題'
+  );
+  console.log(
+    '  進階功能:',
+    Object.values(report.advancedFeatures).every((v) => v) ? '✅ 全部正常' : '❌ 有問題'
+  );
+  console.log(
+    '  UI 功能:',
+    Object.values(report.uiFeatures).every((v) => v) ? '✅ 全部正常' : '❌ 有問題'
+  );
+
   return report;
 }
 
@@ -11415,12 +11691,12 @@ function generateSystemVerificationReport() {
 
 /**
  * 🚀 直接執行學生批次新增 (Apps Script 編輯器專用)
- * 
+ *
  * 使用方式：
  * 1. 在 Apps Script 編輯器中選擇此函數
  * 2. 點擊執行按鈕
  * 3. 在執行記錄中查看詳細進度
- * 
+ *
  * 功能特色：
  * - 實時 console.log 進度顯示
  * - 可配置執行參數
@@ -11428,421 +11704,430 @@ function generateSystemVerificationReport() {
  * - 支援斷點續傳
  */
 async function executeStudentBatchDirect() {
-  console.log("🚀 ============================================");
-  console.log("🚀 開始直接執行學生批次新增");
-  console.log("🚀 ============================================");
-  
+  console.log('🚀 ============================================');
+  console.log('🚀 開始直接執行學生批次新增');
+  console.log('🚀 ============================================');
+
   // ⚙️ 可配置參數區域 - 可在此修改執行設定
   const CONFIG = {
-    sheetName: '新增學生',           // 工作表名稱
-    batchSize: 275,                 // 批次大小（推薦 275 for 4500+ 筆資料）
-    testMode: false,                // 測試模式（true=只處理前 10 筆）
-    startRow: 2,                    // 起始行數（通常從第 2 行開始）
-    maxRows: null,                  // 最大處理行數（null=全部處理）
-    resumeJobId: null,              // 恢復任務ID（null=建立新任務）
-    enableDetailedLog: true,        // 啟用詳細日誌
-    showProgressEvery: 10           // 每處理 N 筆顯示進度
+    sheetName: 'stu_course', // 工作表名稱
+    batchSize: 275, // 批次大小（推薦 275 for 4500+ 筆資料）
+    testMode: false, // 測試模式（true=只處理前 10 筆）
+    startRow: 2, // 起始行數（通常從第 2 行開始）
+    maxRows: null, // 最大處理行數（null=全部處理）
+    resumeJobId: null, // 恢復任務ID（null=建立新任務）
+    enableDetailedLog: true, // 啟用詳細日誌
+    showProgressEvery: 10, // 每處理 N 筆顯示進度
   };
-  
-  console.log("⚙️ 執行設定:");
-  console.log("  📊 工作表名稱:", CONFIG.sheetName);
-  console.log("  📦 批次大小:", CONFIG.batchSize);
-  console.log("  🧪 測試模式:", CONFIG.testMode ? "啟用" : "關閉");
-  console.log("  📍 起始行數:", CONFIG.startRow);
-  console.log("  📏 最大處理行數:", CONFIG.maxRows || "全部");
-  console.log("  🔄 恢復任務ID:", CONFIG.resumeJobId || "建立新任務");
-  
+
+  console.log('⚙️ 執行設定:');
+  console.log('  📊 工作表名稱:', CONFIG.sheetName);
+  console.log('  📦 批次大小:', CONFIG.batchSize);
+  console.log('  🧪 測試模式:', CONFIG.testMode ? '啟用' : '關閉');
+  console.log('  📍 起始行數:', CONFIG.startRow);
+  console.log('  📏 最大處理行數:', CONFIG.maxRows || '全部');
+  console.log('  🔄 恢復任務ID:', CONFIG.resumeJobId || '建立新任務');
+
   try {
     // 步驟1: 系統健康檢查
-    console.log("");
-    console.log("🔍 ============== 步驟 1: 系統健康檢查 ==============");
-    
+    console.log('');
+    console.log('🔍 ============== 步驟 1: 系統健康檢查 ==============');
+
     // 檢查工作表是否存在
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = spreadsheet.getSheetByName(CONFIG.sheetName);
-    
+
     if (!sheet) {
       throw new Error(`找不到工作表: ${CONFIG.sheetName}`);
     }
-    
-    console.log("✅ 工作表檢查通過:", CONFIG.sheetName);
-    
+
+    console.log('✅ 工作表檢查通過:', CONFIG.sheetName);
+
     // 檢查資料行數
     const lastRow = sheet.getLastRow();
     const dataRows = lastRow - CONFIG.startRow + 1;
-    
-    console.log("📊 資料統計:");
-    console.log("  總行數:", lastRow);
-    console.log("  資料行數:", Math.max(0, dataRows));
-    console.log("  預計處理:", CONFIG.testMode ? Math.min(10, dataRows) : dataRows);
-    
+
+    console.log('📊 資料統計:');
+    console.log('  總行數:', lastRow);
+    console.log('  資料行數:', Math.max(0, dataRows));
+    console.log('  預計處理:', CONFIG.testMode ? Math.min(10, dataRows) : dataRows);
+
     if (dataRows <= 0) {
-      throw new Error("沒有找到需要處理的資料");
+      throw new Error('沒有找到需要處理的資料');
     }
-    
+
     // 檢查 ClassroomService 是否可用
     if (!classroomService) {
-      throw new Error("ClassroomService 未初始化");
+      throw new Error('ClassroomService 未初始化');
     }
-    
-    console.log("✅ ClassroomService 檢查通過");
-    
+
+    console.log('✅ ClassroomService 檢查通過');
+
     // 步驟2: 讀取和驗證資料
-    console.log("");
-    console.log("📖 ============== 步驟 2: 讀取和驗證資料 ==============");
-    
+    console.log('');
+    console.log('📖 ============== 步驟 2: 讀取和驗證資料 ==============');
+
     const studentCourseData = await readStudentCourseDataFromSheet(CONFIG.sheetName);
-    
+
     if (!studentCourseData.success) {
       throw new Error(`讀取資料失敗: ${studentCourseData.error}`);
     }
-    
+
     let assignments = studentCourseData.assignments;
     const originalCount = assignments.length;
-    
-    console.log("📊 原始資料:");
-    console.log("  讀取成功:", originalCount, "項");
-    
+
+    console.log('📊 原始資料:');
+    console.log('  讀取成功:', originalCount, '項');
+
     // 測試模式：只處理前 N 筆
     if (CONFIG.testMode && assignments.length > 10) {
       assignments = assignments.slice(0, 10);
-      console.log("🧪 測試模式：限制處理", assignments.length, "項");
+      console.log('🧪 測試模式：限制處理', assignments.length, '項');
     }
-    
+
     // 最大行數限制
     if (CONFIG.maxRows && assignments.length > CONFIG.maxRows) {
       assignments = assignments.slice(0, CONFIG.maxRows);
-      console.log("📏 行數限制：限制處理", assignments.length, "項");
+      console.log('📏 行數限制：限制處理', assignments.length, '項');
     }
-    
-    console.log("✅ 最終處理:", assignments.length, "項新增任務");
-    
+
+    console.log('✅ 最終處理:', assignments.length, '項新增任務');
+
     // 顯示前幾筆資料樣本
     if (CONFIG.enableDetailedLog && assignments.length > 0) {
-      console.log("");
-      console.log("📋 資料樣本 (前 3 筆):");
+      console.log('');
+      console.log('📋 資料樣本 (前 3 筆):');
       assignments.slice(0, 3).forEach((item, index) => {
         console.log(`  ${index + 1}. ${item.studentEmail} → 課程 ${item.courseId}`);
       });
     }
-    
+
     // 步驟3: 執行批次處理
-    console.log("");
-    console.log("🚀 ============== 步驟 3: 執行批次處理 ==============");
-    console.log("⏰ 預估時間:", Math.ceil(assignments.length * 1.2 / 60), "分鐘");
-    console.log("📦 預計批次數:", Math.ceil(assignments.length / CONFIG.batchSize));
-    
+    console.log('');
+    console.log('🚀 ============== 步驟 3: 執行批次處理 ==============');
+    console.log('⏰ 預估時間:', Math.ceil((assignments.length * 1.2) / 60), '分鐘');
+    console.log('📦 預計批次數:', Math.ceil(assignments.length / CONFIG.batchSize));
+
     // 準備批次處理參數
     const batchOptions = {
       jobId: CONFIG.resumeJobId,
       batchSize: CONFIG.batchSize,
       enableDetailedLog: CONFIG.enableDetailedLog,
-      testMode: CONFIG.testMode
+      testMode: CONFIG.testMode,
     };
-    
+
     // 轉換為 ClassroomService 預期格式
-    const members = assignments.map(assignment => ({
+    const members = assignments.map((assignment) => ({
       courseId: assignment.courseId,
       userEmail: assignment.studentEmail,
-      originalData: assignment // 保留原始資料以便後續更新
+      originalData: assignment, // 保留原始資料以便後續更新
     }));
-    
-    console.log("🔄 開始進階批次處理...");
-    
-    const result = await classroomService.addMembersBatchAdvanced(
-      members,
-      "STUDENT", 
-      batchOptions
-    );
-    
+
+    console.log('🔄 開始進階批次處理...');
+
+    const result = await classroomService.addMembersBatchAdvanced(members, 'STUDENT', batchOptions);
+
     // 步驟4: 結果分析和報告
-    console.log("");
-    console.log("📊 ============== 步驟 4: 執行結果分析 ==============");
-    
+    console.log('');
+    console.log('📊 ============== 步驟 4: 執行結果分析 ==============');
+
     if (result.success || result.partial) {
-      console.log("✅ 執行狀態:", result.partial ? "部分完成" : "完全成功");
-      console.log("📈 處理統計:");
-      console.log("  總任務數:", result.totalItems || assignments.length);
-      console.log("  已處理:", result.processedCount || 0);
-      console.log("  成功數:", result.successCount || 0);
-      console.log("  失敗數:", result.errorCount || 0);
-      console.log("  完成率:", Math.round(((result.successCount || 0) / (result.totalItems || assignments.length)) * 100), "%");
-      
+      console.log('✅ 執行狀態:', result.partial ? '部分完成' : '完全成功');
+      console.log('📈 處理統計:');
+      console.log('  總任務數:', result.totalItems || assignments.length);
+      console.log('  已處理:', result.processedCount || 0);
+      console.log('  成功數:', result.successCount || 0);
+      console.log('  失敗數:', result.errorCount || 0);
+      console.log(
+        '  完成率:',
+        Math.round(((result.successCount || 0) / (result.totalItems || assignments.length)) * 100),
+        '%'
+      );
+
       if (result.executionTime) {
-        console.log("  執行時間:", Math.round(result.executionTime / 1000), "秒");
-        console.log("  處理速度:", Math.round((result.processedCount || 0) / (result.executionTime / 1000 / 60)), "項/分鐘");
+        console.log('  執行時間:', Math.round(result.executionTime / 1000), '秒');
+        console.log(
+          '  處理速度:',
+          Math.round((result.processedCount || 0) / (result.executionTime / 1000 / 60)),
+          '項/分鐘'
+        );
       }
-      
+
       // 顯示錯誤詳情
       if (result.errors && result.errors.length > 0) {
-        console.log("");
-        console.log("❌ 錯誤詳情 (前 10 項):");
+        console.log('');
+        console.log('❌ 錯誤詳情 (前 10 項):');
         result.errors.slice(0, 10).forEach((error, index) => {
-          console.log(`  ${index + 1}. ${error.userEmail} → 課程 ${error.courseId}: ${error.error}`);
+          console.log(
+            `  ${index + 1}. ${error.userEmail} → 課程 ${error.courseId}: ${error.error}`
+          );
         });
-        
+
         if (result.errors.length > 10) {
           console.log(`  ... 以及其他 ${result.errors.length - 10} 個錯誤`);
         }
       }
-      
+
       // 如果是部分完成，顯示恢復資訊
       if (result.partial && result.jobId) {
-        console.log("");
-        console.log("⏸️ 部分完成通知:");
-        console.log("  任務 ID:", result.jobId);
-        console.log("  恢復指令: 修改 CONFIG.resumeJobId =", `"${result.jobId}"`);
+        console.log('');
+        console.log('⏸️ 部分完成通知:');
+        console.log('  任務 ID:', result.jobId);
+        console.log('  恢復指令: 修改 CONFIG.resumeJobId =', `"${result.jobId}"`);
         console.log("  或執行: resumeBatchDirect('" + result.jobId + "')");
       }
-      
     } else {
-      console.log("❌ 執行失敗:", result.error);
-      console.log("💡 建議檢查:");
-      console.log("  - Google Classroom API 權限");
-      console.log("  - 網路連線狀態");
-      console.log("  - 學生 Email 和課程 ID 格式");
-      console.log("  - API 配額使用情況");
+      console.log('❌ 執行失敗:', result.error);
+      console.log('💡 建議檢查:');
+      console.log('  - Google Classroom API 權限');
+      console.log('  - 網路連線狀態');
+      console.log('  - 學生 Email 和課程 ID 格式');
+      console.log('  - API 配額使用情況');
     }
-    
+
     // 步驟5: 更新工作表（如果有結果）
     if (result.results && result.results.length > 0) {
-      console.log("");
-      console.log("📝 ============== 步驟 5: 更新工作表狀態 ==============");
+      console.log('');
+      console.log('📝 ============== 步驟 5: 更新工作表狀態 ==============');
       try {
         await updateStudentCourseStatusBatch(result.results, CONFIG.sheetName);
-        console.log("✅ 工作表狀態更新完成");
+        console.log('✅ 工作表狀態更新完成');
       } catch (updateError) {
-        console.log("⚠️ 工作表更新失敗:", updateError.message);
+        console.log('⚠️ 工作表更新失敗:', updateError.message);
       }
     }
-    
-    console.log("");
-    console.log("🎉 ============== 執行完成 ==============");
-    console.log("🎯 總結:", result.partial ? "部分完成，可繼續執行" : "全部完成");
-    
+
+    console.log('');
+    console.log('🎉 ============== 執行完成 ==============');
+    console.log('🎯 總結:', result.partial ? '部分完成，可繼續執行' : '全部完成');
+
     return result;
-    
   } catch (error) {
-    console.log("");
-    console.log("❌ ============== 執行失敗 ==============");
-    console.log("錯誤訊息:", error.message);
-    console.log("錯誤類型:", error.name);
-    
+    console.log('');
+    console.log('❌ ============== 執行失敗 ==============');
+    console.log('錯誤訊息:', error.message);
+    console.log('錯誤類型:', error.name);
+
     if (error.stack) {
-      console.log("錯誤堆疊:", error.stack);
+      console.log('錯誤堆疊:', error.stack);
     }
-    
-    console.log("");
-    console.log("💡 故障排除建議:");
-    console.log("1. 檢查工作表名稱和資料格式");
-    console.log("2. 確認 Google Classroom API 權限");
-    console.log("3. 檢查學生 Email 和課程 ID 有效性");
-    console.log("4. 查看完整錯誤訊息進行診斷");
-    
+
+    console.log('');
+    console.log('💡 故障排除建議:');
+    console.log('1. 檢查工作表名稱和資料格式');
+    console.log('2. 確認 Google Classroom API 權限');
+    console.log('3. 檢查學生 Email 和課程 ID 有效性');
+    console.log('4. 查看完整錯誤訊息進行診斷');
+
     throw error;
   }
 }
 
 /**
  * 🧪 測試單個學生新增 (除錯專用)
- * 
+ *
  * 使用方式：
  * 1. 修改下方的測試參數
  * 2. 在 Apps Script 編輯器中執行此函數
  * 3. 查看詳細的執行過程和錯誤資訊
  */
 async function testSingleStudent() {
-  console.log("🧪 ============================================");
-  console.log("🧪 開始單個學生新增測試");
-  console.log("🧪 ============================================");
-  
+  console.log('🧪 ============================================');
+  console.log('🧪 開始單個學生新增測試');
+  console.log('🧪 ============================================');
+
   // ⚙️ 測試參數 - 修改這裡的值進行測試
   const TEST_CONFIG = {
-    studentEmail: "LE14234@stu.kcislk.ntpc.edu.tw",  // 要測試的學生 Email
-    courseId: "779922029471",                         // 要新增到的課程 ID
-    enableDetailedDiagnosis: true                     // 啟用詳細診斷
+    studentEmail: 'LE14234@stu.kcislk.ntpc.edu.tw', // 要測試的學生 Email
+    courseId: '779922029471', // 要新增到的課程 ID
+    enableDetailedDiagnosis: true, // 啟用詳細診斷
   };
-  
-  console.log("🎯 測試目標:");
-  console.log("  學生Email:", TEST_CONFIG.studentEmail);
-  console.log("  課程ID:", TEST_CONFIG.courseId);
-  console.log("  詳細診斷:", TEST_CONFIG.enableDetailedDiagnosis ? "啟用" : "關閉");
-  
+
+  console.log('🎯 測試目標:');
+  console.log('  學生Email:', TEST_CONFIG.studentEmail);
+  console.log('  課程ID:', TEST_CONFIG.courseId);
+  console.log('  詳細診斷:', TEST_CONFIG.enableDetailedDiagnosis ? '啟用' : '關閉');
+
   try {
     // 步驟1: 參數驗證
-    console.log("");
-    console.log("🔍 ============== 步驟 1: 參數驗證 ==============");
-    
+    console.log('');
+    console.log('🔍 ============== 步驟 1: 參數驗證 ==============');
+
     const emailValidation = ValidationUtils.validateEmail(TEST_CONFIG.studentEmail);
-    console.log("📧 Email 驗證:", emailValidation.valid ? "✅ 通過" : "❌ 失敗");
+    console.log('📧 Email 驗證:', emailValidation.valid ? '✅ 通過' : '❌ 失敗');
     if (!emailValidation.valid) {
-      console.log("  錯誤:", emailValidation.error);
+      console.log('  錯誤:', emailValidation.error);
     }
-    
+
     const courseValidation = ValidationUtils.validateCourseId(TEST_CONFIG.courseId);
-    console.log("🏫 課程ID驗證:", courseValidation.valid ? "✅ 通過" : "❌ 失敗");
+    console.log('🏫 課程ID驗證:', courseValidation.valid ? '✅ 通過' : '❌ 失敗');
     if (!courseValidation.valid) {
-      console.log("  錯誤:", courseValidation.error);
+      console.log('  錯誤:', courseValidation.error);
     }
-    
+
     // 步驟2: 預檢權限和設定
     if (TEST_CONFIG.enableDetailedDiagnosis) {
-      console.log("");
-      console.log("🔍 ============== 步驟 2: 詳細預檢 ==============");
-      
+      console.log('');
+      console.log('🔍 ============== 步驟 2: 詳細預檢 ==============');
+
       try {
         // 檢查課程是否存在和可存取
-        console.log("📚 檢查課程存取權限...");
+        console.log('📚 檢查課程存取權限...');
         const course = Classroom.Courses.get(TEST_CONFIG.courseId);
-        console.log("✅ 課程資訊:");
-        console.log("  課程名稱:", course.name);
-        console.log("  課程狀態:", course.courseState);
-        console.log("  建立時間:", course.creationTime);
-        console.log("  擁有者ID:", course.ownerId);
-        
+        console.log('✅ 課程資訊:');
+        console.log('  課程名稱:', course.name);
+        console.log('  課程狀態:', course.courseState);
+        console.log('  建立時間:', course.creationTime);
+        console.log('  擁有者ID:', course.ownerId);
+
         // 檢查當前用戶權限
-        console.log("");
-        console.log("👤 檢查當前用戶權限...");
+        console.log('');
+        console.log('👤 檢查當前用戶權限...');
         const currentUser = Session.getActiveUser().getEmail();
-        console.log("當前用戶:", currentUser);
-        
+        console.log('當前用戶:', currentUser);
+
         // 嘗試列出現有成員（測試權限）
         try {
           const teachers = Classroom.Courses.Teachers.list(TEST_CONFIG.courseId);
-          console.log("✅ 教師清單存取: 成功 (", teachers.teachers ? teachers.teachers.length : 0, "位教師)");
+          console.log(
+            '✅ 教師清單存取: 成功 (',
+            teachers.teachers ? teachers.teachers.length : 0,
+            '位教師)'
+          );
         } catch (teacherError) {
-          console.log("⚠️ 教師清單存取: 失敗 -", teacherError.message);
+          console.log('⚠️ 教師清單存取: 失敗 -', teacherError.message);
         }
-        
+
         try {
           const students = Classroom.Courses.Students.list(TEST_CONFIG.courseId);
-          console.log("✅ 學生清單存取: 成功 (", students.students ? students.students.length : 0, "位學生)");
+          console.log(
+            '✅ 學生清單存取: 成功 (',
+            students.students ? students.students.length : 0,
+            '位學生)'
+          );
         } catch (studentError) {
-          console.log("⚠️ 學生清單存取: 失敗 -", studentError.message);
+          console.log('⚠️ 學生清單存取: 失敗 -', studentError.message);
         }
-        
       } catch (courseError) {
-        console.log("❌ 課程檢查失敗:", courseError.message);
-        console.log("💡 可能原因:");
-        console.log("  - 課程 ID 不正確");
-        console.log("  - 沒有課程存取權限");
-        console.log("  - 課程已被刪除或封存");
+        console.log('❌ 課程檢查失敗:', courseError.message);
+        console.log('💡 可能原因:');
+        console.log('  - 課程 ID 不正確');
+        console.log('  - 沒有課程存取權限');
+        console.log('  - 課程已被刪除或封存');
       }
-      
+
       // 域名檢查
-      console.log("");
-      console.log("🌐 域名相容性檢查...");
+      console.log('');
+      console.log('🌐 域名相容性檢查...');
       try {
         const domainValidation = ErrorHandler.validateUserDomain(TEST_CONFIG.studentEmail);
-        console.log("域名驗證結果:", domainValidation.valid ? "✅ 匹配" : "⚠️ 不匹配");
+        console.log('域名驗證結果:', domainValidation.valid ? '✅ 匹配' : '⚠️ 不匹配');
         if (!domainValidation.valid) {
-          console.log("  學生域名:", domainValidation.userDomain);
-          console.log("  允許域名:", domainValidation.allowedDomains);
-          console.log("  不匹配原因:", domainValidation.reason);
+          console.log('  學生域名:', domainValidation.userDomain);
+          console.log('  允許域名:', domainValidation.allowedDomains);
+          console.log('  不匹配原因:', domainValidation.reason);
         }
       } catch (domainError) {
-        console.log("⚠️ 域名檢查失敗:", domainError.message);
+        console.log('⚠️ 域名檢查失敗:', domainError.message);
       }
     }
-    
+
     // 步驟3: 執行新增測試
-    console.log("");
-    console.log("🚀 ============== 步驟 3: 執行新增測試 ==============");
-    console.log("開始新增學生到課程...");
-    
+    console.log('');
+    console.log('🚀 ============== 步驟 3: 執行新增測試 ==============');
+    console.log('開始新增學生到課程...');
+
     const startTime = Date.now();
-    
+
     try {
       const result = await classroomService.addMemberToCourse(
         TEST_CONFIG.courseId,
         TEST_CONFIG.studentEmail,
         'STUDENT'
       );
-      
+
       const executionTime = Date.now() - startTime;
-      
-      console.log("");
-      console.log("✅ ============== 新增成功 ==============");
-      console.log("📊 執行結果:");
-      console.log("  狀態: ✅ 成功");
-      console.log("  學生Email:", TEST_CONFIG.studentEmail);
-      console.log("  課程ID:", TEST_CONFIG.courseId);
-      console.log("  執行時間:", executionTime, "毫秒");
-      console.log("  API 回應:", JSON.stringify(result, null, 2));
-      
+
+      console.log('');
+      console.log('✅ ============== 新增成功 ==============');
+      console.log('📊 執行結果:');
+      console.log('  狀態: ✅ 成功');
+      console.log('  學生Email:', TEST_CONFIG.studentEmail);
+      console.log('  課程ID:', TEST_CONFIG.courseId);
+      console.log('  執行時間:', executionTime, '毫秒');
+      console.log('  API 回應:', JSON.stringify(result, null, 2));
     } catch (addError) {
       const executionTime = Date.now() - startTime;
-      
-      console.log("");
-      console.log("❌ ============== 新增失敗 ==============");
-      console.log("📊 執行結果:");
-      console.log("  狀態: ❌ 失敗");
-      console.log("  學生Email:", TEST_CONFIG.studentEmail);
-      console.log("  課程ID:", TEST_CONFIG.courseId);
-      console.log("  執行時間:", executionTime, "毫秒");
-      console.log("  錯誤訊息:", addError.message);
-      
+
+      console.log('');
+      console.log('❌ ============== 新增失敗 ==============');
+      console.log('📊 執行結果:');
+      console.log('  狀態: ❌ 失敗');
+      console.log('  學生Email:', TEST_CONFIG.studentEmail);
+      console.log('  課程ID:', TEST_CONFIG.courseId);
+      console.log('  執行時間:', executionTime, '毫秒');
+      console.log('  錯誤訊息:', addError.message);
+
       // 詳細錯誤分析
-      console.log("");
-      console.log("🔍 詳細錯誤分析:");
+      console.log('');
+      console.log('🔍 詳細錯誤分析:');
       const errorAnalysis = ErrorHandler.parseApiError(addError);
-      console.log("  錯誤類型:", errorAnalysis.type || "UNKNOWN");
-      console.log("  用戶訊息:", errorAnalysis.userMessage);
-      console.log("  技術訊息:", errorAnalysis.technicalMessage);
-      console.log("  應重試:", errorAnalysis.shouldRetry ? "是" : "否");
-      
+      console.log('  錯誤類型:', errorAnalysis.type || 'UNKNOWN');
+      console.log('  用戶訊息:', errorAnalysis.userMessage);
+      console.log('  技術訊息:', errorAnalysis.technicalMessage);
+      console.log('  應重試:', errorAnalysis.shouldRetry ? '是' : '否');
+
       if (errorAnalysis.diagnosticInfo) {
-        console.log("");
-        console.log("💡 診斷建議:");
-        console.log("  可能原因:");
+        console.log('');
+        console.log('💡 診斷建議:');
+        console.log('  可能原因:');
         errorAnalysis.diagnosticInfo.possibleCauses.forEach((cause, index) => {
           console.log(`    ${index + 1}. ${cause}`);
         });
-        console.log("  建議解決方案:");
+        console.log('  建議解決方案:');
         errorAnalysis.diagnosticInfo.solutions.forEach((solution, index) => {
           console.log(`    ${index + 1}. ${solution}`);
         });
       }
-      
+
       // 如果是特定類型的錯誤，提供額外建議
       if (addError.message.includes('CannotDirectAddUser')) {
-        console.log("");
+        console.log('');
         console.log("⚠️ 'CannotDirectAddUser' 錯誤 - 特殊處理建議:");
-        console.log("1. 確認學生 Email 域名與學校管理域匹配");
-        console.log("2. 檢查學生帳戶是否已在 Google Workspace 中啟用");
-        console.log("3. 確認執行帳戶具備域管理員權限");
-        console.log("4. 嘗試讓學生自行加入課程（發送邀請碼）");
+        console.log('1. 確認學生 Email 域名與學校管理域匹配');
+        console.log('2. 檢查學生帳戶是否已在 Google Workspace 中啟用');
+        console.log('3. 確認執行帳戶具備域管理員權限');
+        console.log('4. 嘗試讓學生自行加入課程（發送邀請碼）');
       }
-      
+
       if (addError.message.includes('403') || addError.message.includes('permission')) {
-        console.log("");
-        console.log("⚠️ 權限錯誤 - 特殊處理建議:");
-        console.log("1. 確認當前執行帳戶是課程擁有者或協同教師");
-        console.log("2. 檢查是否具備域管理員權限");
-        console.log("3. 重新授權 Google Classroom API 權限");
-        console.log("4. 聯絡 IT 管理員確認權限設定");
+        console.log('');
+        console.log('⚠️ 權限錯誤 - 特殊處理建議:');
+        console.log('1. 確認當前執行帳戶是課程擁有者或協同教師');
+        console.log('2. 檢查是否具備域管理員權限');
+        console.log('3. 重新授權 Google Classroom API 權限');
+        console.log('4. 聯絡 IT 管理員確認權限設定');
       }
-      
+
       throw addError;
     }
-    
   } catch (error) {
-    console.log("");
-    console.log("❌ ============== 測試失敗 ==============");
-    console.log("最終錯誤:", error.message);
-    
-    console.log("");
-    console.log("🛠️ 故障排除步驟:");
-    console.log("1. 檢查測試參數是否正確");
-    console.log("2. 確認 API 權限和配額");
-    console.log("3. 驗證網路連線");
-    console.log("4. 查看完整錯誤訊息");
-    console.log("5. 嘗試使用不同的測試資料");
-    
+    console.log('');
+    console.log('❌ ============== 測試失敗 ==============');
+    console.log('最終錯誤:', error.message);
+
+    console.log('');
+    console.log('🛠️ 故障排除步驟:');
+    console.log('1. 檢查測試參數是否正確');
+    console.log('2. 確認 API 權限和配額');
+    console.log('3. 驗證網路連線');
+    console.log('4. 查看完整錯誤訊息');
+    console.log('5. 嘗試使用不同的測試資料');
+
     return {
       success: false,
       error: error.message,
-      testConfig: TEST_CONFIG
+      testConfig: TEST_CONFIG,
     };
   }
 }
@@ -11851,25 +12136,25 @@ async function testSingleStudent() {
  * 📊 檢查批次處理狀態 (直接執行版)
  */
 function checkBatchStatusDirect(jobId = null) {
-  console.log("📊 ============================================");
-  console.log("📊 檢查批次處理狀態");
-  console.log("📊 ============================================");
-  
+  console.log('📊 ============================================');
+  console.log('📊 檢查批次處理狀態');
+  console.log('📊 ============================================');
+
   try {
     if (!jobId) {
       console.log("💡 使用方式: checkBatchStatusDirect('your-job-id')");
-      console.log("或修改下方的 DEFAULT_JOB_ID");
-      
+      console.log('或修改下方的 DEFAULT_JOB_ID');
+
       // 如果沒有提供 jobId，嘗試使用預設值或列出所有任務
       const DEFAULT_JOB_ID = null; // 在這裡設定預設的 job ID
-      
+
       if (DEFAULT_JOB_ID) {
         jobId = DEFAULT_JOB_ID;
-        console.log("使用預設任務ID:", jobId);
+        console.log('使用預設任務ID:', jobId);
       } else {
-        console.log("");
-        console.log("📋 查詢所有批次任務狀態...");
-        
+        console.log('');
+        console.log('📋 查詢所有批次任務狀態...');
+
         // 嘗試列出所有可能的任務
         const allStatuses = [];
         for (let i = 1; i <= 10; i++) {
@@ -11883,9 +12168,9 @@ function checkBatchStatusDirect(jobId = null) {
             // 忽略不存在的任務
           }
         }
-        
+
         if (allStatuses.length > 0) {
-          console.log("📊 找到的批次任務:");
+          console.log('📊 找到的批次任務:');
           allStatuses.forEach((status, index) => {
             console.log(`${index + 1}. 任務ID: ${status.jobId}`);
             console.log(`   狀態: ${status.status}`);
@@ -11893,80 +12178,78 @@ function checkBatchStatusDirect(jobId = null) {
             console.log(`   已處理: ${status.processed}/${status.total}`);
           });
         } else {
-          console.log("📭 沒有找到任何批次任務");
+          console.log('📭 沒有找到任何批次任務');
         }
-        
-        return { success: false, error: "需要提供任務ID" };
+
+        return { success: false, error: '需要提供任務ID' };
       }
     }
-    
-    console.log("🔍 查詢任務ID:", jobId);
-    
+
+    console.log('🔍 查詢任務ID:', jobId);
+
     const status = classroomService.checkBatchStatus(jobId);
-    
-    console.log("");
+
+    console.log('');
     if (status.found) {
-      console.log("✅ ============== 找到批次任務 ==============");
-      console.log("📊 任務資訊:");
-      console.log("  任務ID:", jobId);
-      console.log("  任務狀態:", status.status || "未知");
-      console.log("  執行進度:", status.progress || 0, "%");
-      console.log("  已處理項目:", status.processed || 0);
-      console.log("  總項目數:", status.total || 0);
-      console.log("  最後更新:", status.lastUpdate || "未知");
-      console.log("  開始時間:", status.startTime || "未知");
-      
+      console.log('✅ ============== 找到批次任務 ==============');
+      console.log('📊 任務資訊:');
+      console.log('  任務ID:', jobId);
+      console.log('  任務狀態:', status.status || '未知');
+      console.log('  執行進度:', status.progress || 0, '%');
+      console.log('  已處理項目:', status.processed || 0);
+      console.log('  總項目數:', status.total || 0);
+      console.log('  最後更新:', status.lastUpdate || '未知');
+      console.log('  開始時間:', status.startTime || '未知');
+
       if (status.hasError) {
-        console.log("  ❌ 錯誤狀態: 有錯誤");
-        console.log("  錯誤訊息:", status.error || "未知錯誤");
+        console.log('  ❌ 錯誤狀態: 有錯誤');
+        console.log('  錯誤訊息:', status.error || '未知錯誤');
       } else {
-        console.log("  ✅ 錯誤狀態: 無錯誤");
+        console.log('  ✅ 錯誤狀態: 無錯誤');
       }
-      
+
       // 顯示詳細統計
       if (status.statistics) {
-        console.log("");
-        console.log("📈 詳細統計:");
-        console.log("  成功數:", status.statistics.successCount || 0);
-        console.log("  失敗數:", status.statistics.failureCount || 0);
-        console.log("  跳過數:", status.statistics.skippedCount || 0);
+        console.log('');
+        console.log('📈 詳細統計:');
+        console.log('  成功數:', status.statistics.successCount || 0);
+        console.log('  失敗數:', status.statistics.failureCount || 0);
+        console.log('  跳過數:', status.statistics.skippedCount || 0);
       }
-      
+
       // 如果任務未完成，提供恢復建議
       if (status.progress < 100 && status.status !== 'COMPLETED') {
-        console.log("");
-        console.log("🔄 任務未完成 - 恢復選項:");
+        console.log('');
+        console.log('🔄 任務未完成 - 恢復選項:');
         console.log("  1. 執行: resumeBatchDirect('" + jobId + "')");
-        console.log("  2. 或修改 executeStudentBatchDirect() 中的 CONFIG.resumeJobId");
+        console.log('  2. 或修改 executeStudentBatchDirect() 中的 CONFIG.resumeJobId');
       }
-      
+
       return {
         success: true,
-        status: status
+        status: status,
       };
-      
     } else {
-      console.log("❌ ============== 任務不存在 ==============");
-      console.log("💡 可能原因:");
-      console.log("  - 任務ID不正確");
-      console.log("  - 任務已過期被清理");
-      console.log("  - 從未建立過此任務");
-      
+      console.log('❌ ============== 任務不存在 ==============');
+      console.log('💡 可能原因:');
+      console.log('  - 任務ID不正確');
+      console.log('  - 任務已過期被清理');
+      console.log('  - 從未建立過此任務');
+
       return {
         success: false,
-        error: "任務不存在",
-        jobId: jobId
+        error: '任務不存在',
+        jobId: jobId,
       };
     }
-    
   } catch (error) {
-    console.log("❌ ============== 狀態檢查失敗 ==============");
-    console.log("錯誤訊息:", error.message);
-    
+    console.log('❌ ============== 狀態檢查失敗 ==============');
+    console.log('錯誤訊息:', error.message);
+
     return {
       success: false,
       error: error.message,
-      jobId: jobId
+      jobId: jobId,
     };
   }
 }
@@ -11975,93 +12258,91 @@ function checkBatchStatusDirect(jobId = null) {
  * 🔄 恢復批次處理 (直接執行版)
  */
 async function resumeBatchDirect(jobId = null) {
-  console.log("🔄 ============================================");
-  console.log("🔄 恢復批次處理");
-  console.log("🔄 ============================================");
-  
+  console.log('🔄 ============================================');
+  console.log('🔄 恢復批次處理');
+  console.log('🔄 ============================================');
+
   try {
     if (!jobId) {
-      console.log("❌ 需要提供任務ID");
+      console.log('❌ 需要提供任務ID');
       console.log("💡 使用方式: resumeBatchDirect('your-job-id')");
-      console.log("或修改函數中的預設值");
-      
+      console.log('或修改函數中的預設值');
+
       // 可在此設定預設的 job ID
       const DEFAULT_JOB_ID = null;
       if (DEFAULT_JOB_ID) {
         jobId = DEFAULT_JOB_ID;
-        console.log("使用預設任務ID:", jobId);
+        console.log('使用預設任務ID:', jobId);
       } else {
-        return { success: false, error: "需要提供任務ID" };
+        return { success: false, error: '需要提供任務ID' };
       }
     }
-    
-    console.log("🎯 目標任務ID:", jobId);
-    
+
+    console.log('🎯 目標任務ID:', jobId);
+
     // 首先檢查任務狀態
-    console.log("");
-    console.log("🔍 ============== 檢查任務狀態 ==============");
+    console.log('');
+    console.log('🔍 ============== 檢查任務狀態 ==============');
     const statusCheck = classroomService.checkBatchStatus(jobId);
-    
+
     if (!statusCheck.found) {
-      console.log("❌ 任務不存在:", jobId);
-      return { success: false, error: "任務不存在" };
+      console.log('❌ 任務不存在:', jobId);
+      return { success: false, error: '任務不存在' };
     }
-    
-    console.log("✅ 找到任務");
-    console.log("  當前進度:", statusCheck.progress, "%");
-    console.log("  已處理:", statusCheck.processed, "/", statusCheck.total);
-    console.log("  任務狀態:", statusCheck.status);
-    
+
+    console.log('✅ 找到任務');
+    console.log('  當前進度:', statusCheck.progress, '%');
+    console.log('  已處理:', statusCheck.processed, '/', statusCheck.total);
+    console.log('  任務狀態:', statusCheck.status);
+
     if (statusCheck.progress >= 100) {
-      console.log("✅ 任務已完成，無需恢復");
-      return { success: true, message: "任務已完成" };
+      console.log('✅ 任務已完成，無需恢復');
+      return { success: true, message: '任務已完成' };
     }
-    
+
     // 執行恢復
-    console.log("");
-    console.log("🔄 ============== 開始恢復處理 ==============");
-    console.log("從斷點繼續執行...");
-    
+    console.log('');
+    console.log('🔄 ============== 開始恢復處理 ==============');
+    console.log('從斷點繼續執行...');
+
     const result = await classroomService.continueAdvancedBatchProcessing(jobId);
-    
-    console.log("");
+
+    console.log('');
     if (result.success || result.partial) {
-      console.log("✅ ============== 恢復成功 ==============");
-      console.log("📊 恢復結果:");
-      console.log("  狀態:", result.partial ? "部分完成" : "完全完成");
-      console.log("  總處理:", result.processedCount || 0);
-      console.log("  本次處理:", result.processedCount - statusCheck.processed || 0);
-      console.log("  成功數:", result.successCount || 0);
-      console.log("  失敗數:", result.errorCount || 0);
-      
+      console.log('✅ ============== 恢復成功 ==============');
+      console.log('📊 恢復結果:');
+      console.log('  狀態:', result.partial ? '部分完成' : '完全完成');
+      console.log('  總處理:', result.processedCount || 0);
+      console.log('  本次處理:', result.processedCount - statusCheck.processed || 0);
+      console.log('  成功數:', result.successCount || 0);
+      console.log('  失敗數:', result.errorCount || 0);
+
       if (result.partial) {
-        console.log("");
-        console.log("⏸️ 部分完成 - 可繼續恢復:");
+        console.log('');
+        console.log('⏸️ 部分完成 - 可繼續恢復:');
         console.log("  執行: resumeBatchDirect('" + jobId + "')");
       } else {
-        console.log("");
-        console.log("🎉 任務完全完成！");
+        console.log('');
+        console.log('🎉 任務完全完成！');
       }
-      
     } else {
-      console.log("❌ ============== 恢復失敗 ==============");
-      console.log("錯誤:", result.error);
+      console.log('❌ ============== 恢復失敗 ==============');
+      console.log('錯誤:', result.error);
     }
-    
+
     return result;
-    
   } catch (error) {
-    console.log("❌ ============== 恢復處理失敗 ==============");
-    console.log("錯誤訊息:", error.message);
-    
+    console.log('❌ ============== 恢復處理失敗 ==============');
+    console.log('錯誤訊息:', error.message);
+
     if (error.stack) {
-      console.log("錯誤堆疊:", error.stack);
+      console.log('錯誤堆疊:', error.stack);
     }
-    
+
     return {
       success: false,
       error: error.message,
-      jobId: jobId
+      jobId: jobId,
     };
   }
 }

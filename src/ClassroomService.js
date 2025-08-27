@@ -236,8 +236,10 @@ class ClassroomService {
    * 特點: 斷點續傳、時間管理、自動重試、觸發器支援
    */
   async addMembersBatchAdvanced(members, role = 'STUDENT', options = {}) {
-    console.log(`🚀 啟動進階批次新增: ${members.length} 項 ${role === 'TEACHER' ? '老師' : '學生'}`);
-    
+    console.log(
+      `🚀 啟動進階批次新增: ${members.length} 項 ${role === 'TEACHER' ? '老師' : '學生'}`
+    );
+
     if (!ErrorHandler.validateRequired({ members, role }, ['members', 'role'])) {
       return { success: false, error: '參數驗證失敗' };
     }
@@ -251,15 +253,17 @@ class ClassroomService {
     // 使用批次管理器處理大量資料
     try {
       const result = await batchManager.processMembersInBatches(members, role, options);
-      
+
       // 如果是部分完成，提供使用者友善的訊息
       if (result.partial) {
-        console.log(`⏸️ 部分完成: ${result.processedCount}/${result.totalItems} (${((result.processedCount / result.totalItems) * 100).toFixed(1)}%)`);
-        
+        console.log(
+          `⏸️ 部分完成: ${result.processedCount}/${result.totalItems} (${((result.processedCount / result.totalItems) * 100).toFixed(1)}%)`
+        );
+
         // 可選：發送通知或記錄到工作表
         this.recordPartialCompletion(result);
       }
-      
+
       return result;
     } catch (error) {
       console.log(`❌ 進階批次處理失敗: ${error.message}`);
@@ -272,17 +276,17 @@ class ClassroomService {
    */
   recordPartialCompletion(result) {
     try {
-      const message = `批次處理 ${result.jobId} 部分完成：\n` +
+      const message =
+        `批次處理 ${result.jobId} 部分完成：\n` +
         `• 已處理：${result.processedCount}/${result.totalItems}\n` +
         `• 進度：${((result.processedCount / result.totalItems) * 100).toFixed(1)}%\n` +
         `• 狀態：${result.message}\n` +
         `• 時間：${new Date().toLocaleString()}`;
-        
+
       console.log(`📝 ${message}`);
-      
+
       // 可選：保存到工作表或發送通知
       // 這裡可以添加將進度寫入特定工作表的邏輯
-      
     } catch (error) {
       console.log(`[WARN] 無法記錄部分完成狀態: ${error.message}`);
     }
@@ -302,7 +306,7 @@ class ClassroomService {
           progress: ((state.lastProcessedIndex / state.totalItems) * 100).toFixed(1),
           lastUpdate: new Date(state.timestamp).toLocaleString(),
           hasError: !!state.error,
-          error: state.error
+          error: state.error,
         };
       }
       return { found: false };
@@ -318,7 +322,7 @@ class ClassroomService {
     try {
       // 清除狀態
       batchManager.clearBatchState(jobId);
-      
+
       // 嘗試刪除相關觸發器
       const triggers = ScriptApp.getProjectTriggers();
       for (const trigger of triggers) {
@@ -326,7 +330,7 @@ class ClassroomService {
           ScriptApp.deleteTrigger(trigger);
         }
       }
-      
+
       return { success: true, message: `批次處理 ${jobId} 已取消` };
     } catch (error) {
       return { success: false, error: error.message };
@@ -506,9 +510,9 @@ class BatchManager {
   constructor() {
     this.EXECUTION_LIMIT = 5.5 * 60 * 1000; // 5.5分鐘限制，留0.5分鐘緩衝
     this.DEFAULT_BATCH_SIZE = 50; // 預設批次大小
-    this.MIN_BATCH_SIZE = 10;     // 最小批次大小
-    this.MAX_BATCH_SIZE = 100;    // 最大批次大小
-    this.SAFETY_BUFFER = 30000;   // 30秒安全緩衝
+    this.MIN_BATCH_SIZE = 10; // 最小批次大小
+    this.MAX_BATCH_SIZE = 100; // 最大批次大小
+    this.SAFETY_BUFFER = 30000; // 30秒安全緩衝
   }
 
   /**
@@ -517,14 +521,14 @@ class BatchManager {
   async processMembersInBatches(members, role = 'STUDENT', options = {}) {
     const jobId = options.jobId || this.generateJobId();
     const startTime = Date.now();
-    
+
     console.log(`🚀 開始批次處理任務 [${jobId}]: ${members.length} 項目`);
-    
+
     // 恢復之前的進度（如果存在）
     const savedState = this.loadBatchState(jobId);
     const startIndex = savedState ? savedState.lastProcessedIndex : 0;
     const previousResults = savedState ? savedState.results : [];
-    
+
     if (startIndex > 0) {
       console.log(`📂 恢復之前進度: 從第 ${startIndex + 1} 項開始`);
     }
@@ -533,11 +537,14 @@ class BatchManager {
     const remainingItems = members.slice(startIndex);
     const results = [...previousResults];
     let processedCount = startIndex;
-    
+
     // 動態調整批次大小
     let batchSize = this.calculateOptimalBatchSize(remainingItems.length);
-    const progress = new ProgressTracker(totalItems, `批次${role === 'TEACHER' ? '老師' : '學生'}處理`);
-    
+    const progress = new ProgressTracker(
+      totalItems,
+      `批次${role === 'TEACHER' ? '老師' : '學生'}處理`
+    );
+
     try {
       // 分批處理剩餘項目
       for (let i = 0; i < remainingItems.length; i += batchSize) {
@@ -550,12 +557,12 @@ class BatchManager {
             results: results,
             totalItems: totalItems,
             role: role,
-            timestamp: Date.now()
+            timestamp: Date.now(),
           });
-          
+
           // 設定觸發器繼續執行
           this.scheduleNextBatch(jobId, members, role, options);
-          
+
           return {
             success: false,
             partial: true,
@@ -563,54 +570,53 @@ class BatchManager {
             totalItems: totalItems,
             message: '部分處理完成，已安排下一批次執行',
             jobId: jobId,
-            results: results
+            results: results,
           };
         }
 
         const batch = remainingItems.slice(i, i + batchSize);
         console.log(`📦 處理批次 ${Math.floor(i / batchSize) + 1}: ${batch.length} 項目`);
-        
+
         // 處理當前批次
         const batchResult = await this.processSingleBatch(batch, role, progress);
         results.push(...batchResult.results);
         processedCount += batch.length;
-        
+
         // 即時保存進度
         this.saveBatchState(jobId, {
           lastProcessedIndex: processedCount,
           results: results,
           totalItems: totalItems,
           role: role,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         });
-        
+
         // 動態調整批次大小（根據處理時間）
         batchSize = this.adjustBatchSize(batchSize, batchResult.processingTime);
-        
+
         // 批次間短暫休息
         if (i + batchSize < remainingItems.length) {
           await Utilities.sleep(1000);
         }
       }
-      
+
       // 完成處理
       this.clearBatchState(jobId);
       const summary = progress.complete();
-      
+
       console.log(`✅ 批次處理完成 [${jobId}]: ${processedCount}/${totalItems}`);
-      
+
       return {
         success: true,
         processedCount: processedCount,
         totalItems: totalItems,
         results: results,
         summary: summary,
-        jobId: jobId
+        jobId: jobId,
       };
-      
     } catch (error) {
       console.log(`❌ 批次處理錯誤 [${jobId}]: ${error.message}`);
-      
+
       // 保存錯誤狀態
       this.saveBatchState(jobId, {
         lastProcessedIndex: processedCount,
@@ -618,16 +624,16 @@ class BatchManager {
         totalItems: totalItems,
         role: role,
         timestamp: Date.now(),
-        error: error.message
+        error: error.message,
       });
-      
+
       return {
         success: false,
         error: error.message,
         processedCount: processedCount,
         totalItems: totalItems,
         results: results,
-        jobId: jobId
+        jobId: jobId,
       };
     }
   }
@@ -638,10 +644,10 @@ class BatchManager {
   async processSingleBatch(batch, role, progress) {
     const startTime = Date.now();
     const results = [];
-    
+
     for (const member of batch) {
       const { courseId, userEmail } = member;
-      
+
       if (!courseId || !userEmail) {
         progress.addError(`${userEmail || 'unknown'}`, new Error('缺少課程 ID 或使用者 Email'));
         results.push({
@@ -649,16 +655,17 @@ class BatchManager {
           userEmail,
           role,
           success: false,
-          error: '缺少必要參數'
+          error: '缺少必要參數',
         });
         continue;
       }
 
       try {
         // 使用智能重複檢查
-        const result = role === 'TEACHER' 
-          ? await classroomService.addTeacherIfNotExists(courseId, userEmail)
-          : await classroomService.addStudentIfNotExists(courseId, userEmail);
+        const result =
+          role === 'TEACHER'
+            ? await classroomService.addTeacherIfNotExists(courseId, userEmail)
+            : await classroomService.addStudentIfNotExists(courseId, userEmail);
 
         if (result.success) {
           progress.addSuccess(`${userEmail} → 課程 ${courseId}`);
@@ -667,7 +674,7 @@ class BatchManager {
             userEmail,
             role,
             success: true,
-            status: result.status || 'ADDED'
+            status: result.status || 'ADDED',
           });
         } else {
           progress.addError(`${userEmail} → 課程 ${courseId}`, result.error);
@@ -676,7 +683,7 @@ class BatchManager {
             userEmail,
             role,
             success: false,
-            error: result.error
+            error: result.error,
           });
         }
       } catch (error) {
@@ -686,14 +693,14 @@ class BatchManager {
           userEmail,
           role,
           success: false,
-          error: error.message
+          error: error.message,
         });
       }
     }
-    
+
     return {
       results: results,
-      processingTime: Date.now() - startTime
+      processingTime: Date.now() - startTime,
     };
   }
 
@@ -712,17 +719,17 @@ class BatchManager {
    */
   adjustBatchSize(currentSize, processingTime) {
     const timePerItem = processingTime / currentSize;
-    
+
     // 如果處理太快，增加批次大小
     if (timePerItem < 1000 && currentSize < this.MAX_BATCH_SIZE) {
       return Math.min(currentSize + 10, this.MAX_BATCH_SIZE);
     }
-    
+
     // 如果處理太慢，減少批次大小
     if (timePerItem > 3000 && currentSize > this.MIN_BATCH_SIZE) {
       return Math.max(currentSize - 10, this.MIN_BATCH_SIZE);
     }
-    
+
     return currentSize;
   }
 
@@ -783,10 +790,10 @@ class BatchManager {
         .timeBased()
         .after(2 * 60 * 1000) // 2分鐘後
         .create();
-      
+
       // 保存觸發器資訊
       this.saveTriggerInfo(jobId, trigger.getUniqueId(), { members, role, options });
-      
+
       console.log(`⏰ 已安排下一批次執行: 觸發器ID ${trigger.getUniqueId()}`);
     } catch (error) {
       console.log(`[ERROR] 無法安排下一批次: ${error.message}`);
@@ -799,11 +806,14 @@ class BatchManager {
   saveTriggerInfo(jobId, triggerId, data) {
     try {
       const triggerKey = `trigger_${jobId}`;
-      PropertiesService.getScriptProperties().setProperty(triggerKey, JSON.stringify({
-        triggerId: triggerId,
-        data: data,
-        timestamp: Date.now()
-      }));
+      PropertiesService.getScriptProperties().setProperty(
+        triggerKey,
+        JSON.stringify({
+          triggerId: triggerId,
+          data: data,
+          timestamp: Date.now(),
+        })
+      );
     } catch (error) {
       console.log(`[WARN] 無法保存觸發器資訊: ${error.message}`);
     }

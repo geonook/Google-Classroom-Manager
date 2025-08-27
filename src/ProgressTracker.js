@@ -37,12 +37,12 @@ class ProgressTracker {
       details,
       timestamp: new Date().toISOString(),
     });
-    
+
     // Apps Script 編輯器即時反饋
     if (this.successes.length % 50 === 0 || this.successes.length <= 10) {
       console.log(`✅ [${this.successes.length}] 成功: ${item} ${details ? `| ${details}` : ''}`);
     }
-    
+
     this.update();
   }
 
@@ -57,7 +57,7 @@ class ProgressTracker {
       details,
       timestamp: new Date().toISOString(),
     });
-    
+
     // Apps Script 編輯器詳細錯誤日誌
     console.log(`❌ [錯誤 ${this.errors.length}] ${this.operation} 失敗: ${item}`);
     console.log(`   🔍 錯誤詳情: ${errorMessage}`);
@@ -65,7 +65,7 @@ class ProgressTracker {
       console.log(`   📝 額外資訊: ${details}`);
     }
     console.log(`   ⏰ 發生時間: ${new Date().toLocaleString()}`);
-    
+
     // 如果是特定的 API 錯誤，提供更多診斷資訊
     if (errorMessage.includes('CannotDirectAddUser')) {
       console.log(`   💡 診斷: 可能是學生域名不匹配或帳戶權限問題`);
@@ -74,7 +74,7 @@ class ProgressTracker {
     } else if (errorMessage.includes('quota') || errorMessage.includes('rate')) {
       console.log(`   💡 診斷: API 配額超限，系統將自動重試`);
     }
-    
+
     this.update();
   }
 
@@ -97,16 +97,16 @@ class ProgressTracker {
 
     // 🚀 Apps Script 編輯器專用 - 詳細分行輸出
     if (this.current === 1 || percentage % 10 === 0 || this.current === this.total) {
-      console.log(""); // 空行分隔
+      console.log(''); // 空行分隔
       console.log(`📊 ============== 進度報告 ${percentage}% ==============`);
       console.log(`🎯 操作: ${this.operation}`);
       console.log(`${progressBar} ${percentage}%`);
       console.log(`📈 進度: ${this.current}/${this.total} 項`);
-      
+
       if (this.current > 0 && this.current < this.total) {
         console.log(`⏱️  預估剩餘時間: ${timeInfo}`);
       }
-      
+
       if (successCount > 0 || errorCount > 0) {
         console.log(`✅ 成功: ${successCount} 項`);
         if (errorCount > 0) {
@@ -119,7 +119,7 @@ class ProgressTracker {
         const itemsPerSecond = Math.round((this.current / (elapsed / 1000)) * 10) / 10;
         const itemsPerMinute = Math.round(itemsPerSecond * 60);
         console.log(`🚄 處理速度: ${itemsPerSecond}/秒 (${itemsPerMinute}/分鐘)`);
-        
+
         // 詳細時間統計
         const avgTimePerItem = Math.round(elapsed / this.current);
         console.log(`⏲️  平均每項耗時: ${avgTimePerItem}毫秒`);
@@ -128,14 +128,16 @@ class ProgressTracker {
       if (message) {
         console.log(`💡 訊息: ${message}`);
       }
-      
+
       console.log(`⏰ 已執行時間: ${this.formatTime(elapsed)}`);
-      
+
       // 如果有最近的錯誤，顯示最新的3個
       if (errorCount > 0) {
         console.log(`📋 最新錯誤 (最近 ${Math.min(3, errorCount)} 項):`);
         this.errors.slice(-3).forEach((error, index) => {
-          console.log(`  ${index + 1}. ${error.item}: ${error.error.substring(0, 100)}${error.error.length > 100 ? '...' : ''}`);
+          console.log(
+            `  ${index + 1}. ${error.item}: ${error.error.substring(0, 100)}${error.error.length > 100 ? '...' : ''}`
+          );
         });
       }
 
@@ -143,22 +145,26 @@ class ProgressTracker {
       if (successCount > 0 && percentage % 25 === 0) {
         console.log(`📋 最新成功 (最近 ${Math.min(3, successCount)} 項):`);
         this.successes.slice(-3).forEach((success, index) => {
-          console.log(`  ${index + 1}. ${success.item} ${success.details ? `(${success.details})` : ''}`);
+          console.log(
+            `  ${index + 1}. ${success.item} ${success.details ? `(${success.details})` : ''}`
+          );
         });
       }
 
       console.log(`================================================`);
     } else {
       // 簡化版本 - 每次更新
-      console.log(`[${percentage.toString().padStart(3)}%] ${this.operation} | ${this.current}/${this.total} | ✅${successCount} | ❌${errorCount}`);
+      console.log(
+        `[${percentage.toString().padStart(3)}%] ${this.operation} | ${this.current}/${this.total} | ✅${successCount} | ❌${errorCount}`
+      );
     }
 
     // 原有的 Google Sheets Toast 功能 (如果在 Sheets 環境中)
-    const shouldShowToast = 
-      percentage === 0 ||           // 開始
-      percentage >= 100 ||          // 完成
-      percentage % 20 === 0 ||      // 每20%更新
-      errorCount > 0 ||            // 有錯誤時
+    const shouldShowToast =
+      percentage === 0 || // 開始
+      percentage >= 100 || // 完成
+      percentage % 20 === 0 || // 每20%更新
+      errorCount > 0 || // 有錯誤時
       this.current % Math.max(1, Math.floor(this.total / 10)) === 0; // 每10%進度
 
     if (shouldShowToast) {
@@ -171,14 +177,16 @@ class ProgressTracker {
         if (errorCount > 0) {
           toastMessage += ` ❌${errorCount}`;
         }
-        
+
         SpreadsheetApp.getActiveSpreadsheet().toast(
-          toastMessage, 
-          percentage >= 100 ? '✅ 完成' : '⏳ 執行中', 
+          toastMessage,
+          percentage >= 100 ? '✅ 完成' : '⏳ 執行中',
           percentage >= 100 ? 5 : 3
         );
       } catch (toastError) {
-        console.log(`[WARN] Toast 顯示失敗: ${toastError.message} (可能在 Apps Script 編輯器中執行)`);
+        console.log(
+          `[WARN] Toast 顯示失敗: ${toastError.message} (可能在 Apps Script 編輯器中執行)`
+        );
       }
     }
   }
@@ -224,7 +232,7 @@ class ProgressTracker {
     console.log(`  ✅ 成功: ${successCount} (${completionRate}%)`);
     console.log(`  ❌ 失敗: ${errorCount}`);
     console.log(`  ⏱️ 耗時: ${this.formatTime(duration)}`);
-    
+
     if (this.total > 0) {
       const avgTime = Math.round(duration / this.total);
       console.log(`  🚄 平均: ${avgTime}ms/任務`);
@@ -239,11 +247,7 @@ class ProgressTracker {
         finalMessage += ` ⚠️ ${successCount} 成功, ${errorCount} 失敗`;
       }
 
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        finalMessage,
-        '🎉 執行完成',
-        8
-      );
+      SpreadsheetApp.getActiveSpreadsheet().toast(finalMessage, '🎉 執行完成', 8);
     } catch (toastError) {
       console.log(`[WARN] 完成 Toast 顯示失敗: ${toastError.message}`);
     }
@@ -318,7 +322,9 @@ class ProgressTracker {
         SpreadsheetApp.getUi().ButtonSet.OK
       );
     } catch (uiError) {
-      console.log(`[WARN] 無法顯示中斷訊息UI（可能在Apps Script編輯器中執行）: ${summary.userMessage}`);
+      console.log(
+        `[WARN] 無法顯示中斷訊息UI（可能在Apps Script編輯器中執行）: ${summary.userMessage}`
+      );
     }
 
     return summary;
