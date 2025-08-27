@@ -12305,7 +12305,8 @@ async function resumeBatchDirect(jobId = null) {
     console.log('🔄 ============== 開始恢復處理 ==============');
     console.log('從斷點繼續執行...');
 
-    const result = await classroomService.continueAdvancedBatchProcessing(jobId);
+    // 直接調用全域函式來恢復批次處理
+    const result = await continueAdvancedBatchProcessing();
 
     console.log('');
     if (result.success || result.partial) {
