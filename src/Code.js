@@ -11431,30 +11431,60 @@ async function updateStudentCourseStatusBatch(results, sheetName) {
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
 
-    // 找到相關欄位索引
-    const emailIndex = headers.findIndex((h) => h.includes('Email') || h.includes('email'));
-    const courseIndex = headers.findIndex((h) => h.includes('課程ID') || h.includes('Course'));
-    const statusIndex = headers.findIndex((h) => h.includes('狀態') || h.includes('Status'));
+    // 針對 stu_course 工作表的固定格式：A欄=Email, B欄=課程ID, C欄=狀態
+    let emailIndex = 0;    // A 欄
+    let courseIndex = 1;   // B 欄  
+    let statusIndex = 2;   // C 欄
 
-    if (emailIndex === -1 || courseIndex === -1 || statusIndex === -1) {
-      console.log('[WARN] 找不到必要的欄位');
-      return;
+    // 嘗試從標題行自動識別欄位（備用方案）
+    if (headers && headers.length > 0) {
+      const autoEmailIndex = headers.findIndex((h) => h && (h.toString().includes('Email') || h.toString().includes('email') || h.toString().includes('學生')));
+      const autoCourseIndex = headers.findIndex((h) => h && (h.toString().includes('課程') || h.toString().includes('Course') || h.toString().includes('ID')));
+      const autoStatusIndex = headers.findIndex((h) => h && (h.toString().includes('狀態') || h.toString().includes('Status') || h.toString().includes('status')));
+
+      if (autoEmailIndex !== -1) emailIndex = autoEmailIndex;
+      if (autoCourseIndex !== -1) courseIndex = autoCourseIndex;
+      if (autoStatusIndex !== -1) statusIndex = autoStatusIndex;
+    }
+
+    console.log(`[DEBUG] 欄位索引 - Email: ${emailIndex}, 課程: ${courseIndex}, 狀態: ${statusIndex}`);
+
+    // 確保欄位索引有效
+    if (emailIndex < 0 || courseIndex < 0 || statusIndex < 0) {
+      console.log('[WARN] 欄位索引無效，使用預設格式 A=Email, B=課程, C=狀態');
+      emailIndex = 0;
+      courseIndex = 1; 
+      statusIndex = 2;
     }
 
     // 批次更新狀態
     const updates = [];
-    results.forEach((result) => {
+    console.log(`[DEBUG] 開始處理 ${results.length} 筆結果資料`);
+
+    results.forEach((result, resultIndex) => {
+      console.log(`[DEBUG] 結果 ${resultIndex + 1}: ${result.userEmail} → 課程 ${result.courseId} (${result.success ? '成功' : '失敗'})`);
+      
+      let foundMatch = false;
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
-        if (row[emailIndex] === result.userEmail && row[courseIndex] === result.courseId) {
+        const rowEmail = row[emailIndex] ? row[emailIndex].toString().trim() : '';
+        const rowCourse = row[courseIndex] ? row[courseIndex].toString().trim() : '';
+        
+        if (rowEmail === result.userEmail && rowCourse === result.courseId) {
           const status = result.success
             ? result.status === 'ALREADY_EXISTS'
               ? 'existed'
               : 'success'
             : 'failed';
           updates.push({ row: i + 1, col: statusIndex + 1, value: status });
+          console.log(`[DEBUG] ✅ 找到匹配 - 行 ${i + 1}: ${rowEmail} → ${rowCourse}, 狀態: ${status}`);
+          foundMatch = true;
           break;
         }
+      }
+      
+      if (!foundMatch) {
+        console.log(`[WARN] ❌ 找不到匹配記錄: ${result.userEmail} → ${result.courseId}`);
       }
     });
 
