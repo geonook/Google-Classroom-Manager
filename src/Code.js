@@ -10924,10 +10924,7 @@ async function addStudentsAdvancedUI() {
     // 步驟1: 獲取工作表名稱
     const sheetNameResult = ui.prompt(
       "🚀 進階批次新增學生 - 步驟 1/3",
-      "請輸入包含學生資料的工作表名稱（預設：新增學生）
-格式需包含：學生Email | 課程ID | 狀態
-
-⚡ 支援大量資料處理，自動分批執行",
+      "請輸入包含學生資料的工作表名稱（預設：新增學生）\\n格式需包含：學生Email | 課程ID | 狀態\\n\\n⚡ 支援大量資料處理，自動分批執行",
       ui.ButtonSet.OK_CANCEL
     );
 
@@ -10940,11 +10937,7 @@ async function addStudentsAdvancedUI() {
     // 步驟2: 獲取任務ID（用於恢復）
     const jobIdResult = ui.prompt(
       "🚀 進階批次新增學生 - 步驟 2/3",
-      "請輸入任務ID（選填）：
-• 留空：建立新任務
-• 輸入ID：恢復現有任務
-
-💡 任務ID可用於恢復中斷的批次處理",
+      "請輸入任務ID（選填）：\\n• 留空：建立新任務\\n• 輸入ID：恢復現有任務\\n\\n💡 任務ID可用於恢復中斷的批次處理",
       ui.ButtonSet.OK_CANCEL
     );
 
@@ -10960,13 +10953,7 @@ async function addStudentsAdvancedUI() {
       if (status.found) {
         const resumeConfirm = ui.alert(
           "📂 發現現有任務",
-          `任務 ${jobId} 狀態：
-• 進度：${status.progress}%
-• 已處理：${status.processed}/${status.total}
-• 最後更新：${status.lastUpdate}
-${status.hasError ? `• 錯誤：${status.error}` : ""}
-
-是否繼續此任務？`,
+          `任務 ${jobId} 狀態：\\n• 進度：${status.progress}%\\n• 已處理：${status.processed}/${status.total}\\n• 最後更新：${status.lastUpdate}\\n${status.hasError ? `• 錯誤：${status.error}` : ""}\\n\\n是否繼續此任務？`,
           ui.ButtonSet.YES_NO
         );
         
@@ -10979,18 +10966,7 @@ ${status.hasError ? `• 錯誤：${status.error}` : ""}
     // 步驟3: 確認執行
     const confirmResult = ui.alert(
       "🚀 進階批次新增學生 - 步驟 3/3",
-      `即將執行進階批次新增學生功能：
-
-📊 工作表：${sheetName}
-🆔 任務ID：${jobId || "將自動生成"}
-
-✨ 新功能特色：
-• 🔄 斷點續傳：中途中斷可恢復
-• ⏰ 時間管理：自動分批避免超時
-• 📈 進度追蹤：即時狀態更新
-• 🤖 自動觸發：無人值守執行
-
-確定開始？`,
+      `即將執行進階批次新增學生功能：\\n\\n📊 工作表：${sheetName}\\n🆔 任務ID：${jobId || "將自動生成"}\\n\\n✨ 新功能特色：\\n• 🔄 斷點續傳：中途中斷可恢復\\n• ⏰ 時間管理：自動分批避免超時\\n• 📈 進度追蹤：即時狀態更新\\n• 🤖 自動觸發：無人值守執行\\n\\n確定開始？`,
       ui.ButtonSet.OK_CANCEL
     );
 
