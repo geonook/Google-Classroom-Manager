@@ -12349,33 +12349,48 @@ async function resumeBatchDirect(jobId = null) {
 }
 
 /**
- * 🔄 快速恢復當前中斷的批次處理
+ * 🔄 手動批次處理 - 學生新增任務繼續執行
  * 
- * 此函式專門用於恢復最近中斷的學生批次新增任務
- * 內建正確的任務 ID，可直接在 Apps Script 編輯器中執行
+ * ⚠️ 重要說明：因缺少 ScriptApp 權限，系統無法自動安排下一批次
+ * 需要採用手動重複執行模式完成所有學生資料處理
  * 
- * 使用方式：
+ * 📊 當前執行狀況：
+ * - 總學生數: 4521 筆
+ * - 已處理: ~200 筆 (4.4%)
+ * - 剩餘處理: ~4321 筆學生資料
+ * - 每次執行處理: 約 275 筆 (一個批次)
+ * - 需要手動執行: 約 16 次
+ * 
+ * 🚀 使用方式 - 手動重複執行模式：
  * 1. 在 Google Apps Script 編輯器中選擇此函式
- * 2. 點擊執行按鈕 ▶️
- * 3. 監控執行日誌查看進度
+ * 2. 點擊執行按鈕 ▶️ (每次處理一個批次)
+ * 3. 等待執行完成 (約 6 分鐘)
+ * 4. 重複步驟 2-3，直到所有學生處理完成
+ * 5. 監控執行日誌查看每次進度
  * 
- * 任務資訊：
- * - 任務 ID: batch_1756283799443_xl71qczge
- * - 當前進度: 100/4521 (2.2%)
- * - 剩餘: 4421 筆學生資料
- * - 預估完成時間: ~88 分鐘
+ * 💡 執行提示：
+ * - 每次執行會自動從上次停止點繼續
+ * - 系統會跳過已處理的學生記錄
+ * - 建議間隔 1-2 分鐘再執行下一次（避免 API 限制）
+ * - 預計總完成時間: ~96 分鐘 (16次 × 6分鐘)
+ * 
+ * 🎯 執行進度追蹤：
+ * 每次執行後查看日誌中的「已處理: X/4521」來追蹤總進度
  */
 async function resumeCurrentBatch() {
   console.log('🔄 ============================================');
-  console.log('🔄 快速恢復中斷的批次處理');
+  console.log('🔄 手動批次處理 - 繼續學生新增任務');
   console.log('🔄 ============================================');
   console.log('');
-  console.log('📊 任務資訊:');
-  console.log('  任務 ID: batch_1756283799443_xl71qczge');
-  console.log('  當前進度: 100/4521 (2.2%)');
-  console.log('  剩餘處理: 4421 筆學生資料');
-  console.log('  預估時間: ~88 分鐘');
+  console.log('📊 執行狀況:');
+  console.log('  📈 總學生數: 4521 筆');
+  console.log('  ✅ 已處理: ~200 筆 (4.4%)');
+  console.log('  🎯 剩餘處理: ~4321 筆');
+  console.log('  📦 本次處理: 約 275 筆 (一個批次)');
+  console.log('  🔄 需重複執行: 約 16 次');
+  console.log('  ⏱️  單次執行時間: ~6 分鐘');
   console.log('');
+  console.log('💡 執行模式: 手動重複執行 (因缺少 ScriptApp 權限)');
   
   // 直接調用恢復函式，內建正確的任務 ID
   const CURRENT_JOB_ID = 'batch_1756283799443_xl71qczge';
@@ -12402,4 +12417,75 @@ async function resumeCurrentBatch() {
       alternativeSolution: 'executeStudentBatchDirect()',
     };
   }
+}
+
+/**
+ * 📋 顯示手動執行指引和當前進度狀況
+ * 
+ * 此函式提供詳細的執行指引，幫助用戶了解如何手動完成
+ * 剩餘的學生批次新增任務
+ * 
+ * 功能：
+ * - 顯示當前執行進度
+ * - 提供詳細的手動執行步驟
+ * - 估算剩餘完成時間
+ * - 提供故障排除建議
+ */
+function showManualExecutionGuide() {
+  console.log('📋 ============================================');
+  console.log('📋 手動批次處理執行指引');
+  console.log('📋 ============================================');
+  console.log('');
+  
+  // 當前狀況分析
+  console.log('📊 當前執行狀況:');
+  console.log('  🎯 總任務: 4521 筆學生新增');
+  console.log('  ✅ 已完成: ~200 筆 (4.4%)');
+  console.log('  🔄 剩餘: ~4321 筆');
+  console.log('  📦 每次處理: ~275 筆 (一個批次)');
+  console.log('  🔢 需要執行: 約 16 次');
+  console.log('  ⏱️  單次時間: ~6 分鐘');
+  console.log('  🏁 預計完成: ~96 分鐘');
+  console.log('');
+  
+  // 執行步驟
+  console.log('🚀 手動執行步驟:');
+  console.log('  1️⃣  選擇函式: resumeCurrentBatch');
+  console.log('  2️⃣  點擊執行按鈕 ▶️');
+  console.log('  3️⃣  等待完成 (約6分鐘)');
+  console.log('  4️⃣  檢查執行日誌確認成功');
+  console.log('  5️⃣  等待 1-2 分鐘 (避免API限制)');
+  console.log('  6️⃣  重複步驟 1-5，直到全部完成');
+  console.log('');
+  
+  // 進度追蹤
+  console.log('📈 進度追蹤方式:');
+  console.log('  • 查看執行日誌中的 "已處理: X/4521"');
+  console.log('  • 查看 "當前進度: X%" 百分比');
+  console.log('  • 留意 "批次處理完成" 訊息');
+  console.log('');
+  
+  // 重要提醒
+  console.log('⚠️ 重要提醒:');
+  console.log('  • 每次執行會自動從停止點繼續');
+  console.log('  • 系統會跳過已處理的學生記錄');
+  console.log('  • 建議間隔執行避免 API 配額問題');
+  console.log('  • 如遇錯誤可重複執行相同步驟');
+  console.log('');
+  
+  // 完成條件
+  console.log('🎉 完成條件:');
+  console.log('  ✅ 執行日誌顯示 "已處理: 4521/4521 (100%)"');
+  console.log('  ✅ 不再有新的批次任務創建');
+  console.log('  ✅ 所有學生成功加入指定課程');
+  console.log('');
+  
+  console.log('💡 現在可以開始執行 resumeCurrentBatch() 函式！');
+  
+  return {
+    status: 'guide_displayed',
+    nextAction: 'Execute resumeCurrentBatch() function',
+    estimatedCompletionTime: '96 minutes',
+    remainingExecutions: 16,
+  };
 }
