@@ -1,0 +1,326 @@
+{
+  "name": "Error Handler - Intelligent Error Processing and Recovery System",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "error-handler",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "error-webhook",
+      "name": "Receive Error Report",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "error-handler-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Intelligent error analysis and classification\nconst inputData = $input.all();\n\nif (!inputData || inputData.length === 0) {\n  throw new Error('No error report received');\n}\n\nlet errorData;\ntry {\n  const bodyData = inputData[0].json.body;\n  if (typeof bodyData === 'string') {\n    errorData = JSON.parse(bodyData);\n  } else {\n    errorData = bodyData;\n  }\n} catch (error) {\n  throw new Error('Invalid error report format');\n}\n\nif (!errorData || !errorData.error) {\n  throw new Error('Error report format incorrect');\n}\n\n// Error classification pattern matching\nconst errorPatterns = {\n  'PERMISSION_DENIED': {\n    patterns: [/permission.*denied/i, /unauthorized/i, /403/i, /access.*denied/i],\n    category: 'Permission Issue',\n    severity: 'high',\n    retryable: false,\n    autoFix: false,\n    solutions: [\n      'Check Google Classroom API permissions',\n      'Re-authorize Google OAuth2 credentials',\n      'Confirm service account permissions',\n      'Contact admin to check domain settings'\n    ]\n  },\n  'RATE_LIMIT_EXCEEDED': {\n    patterns: [/quota.*exceeded/i, /rate.*limit/i, /429/i, /too.*many.*requests/i],\n    category: 'API Quota Limit',\n    severity: 'medium',\n    retryable: true,\n    autoFix: true,\n    retryDelay: 60000, // 60 seconds retry\n    solutions: [\n      'Wait for API quota reset (usually resets every minute)',\n      'Implement intelligent rate limiting',\n      'Consider applying for higher API quota',\n      'Optimize batch size to reduce API call frequency'\n    ]\n  },\n  'INVALID_EMAIL': {\n    patterns: [/email.*invalid/i, /invalid.*email/i, /malformed.*email/i],\n    category: 'Data Format Error',\n    severity: 'medium',\n    retryable: false,\n    autoFix: true,\n    solutions: [\n      'Validate and correct email format',\n      'Check if email meets school domain requirements',\n      'Remove invalid email records',\n      'Implement stricter data validation'\n    ]\n  },\n  'COURSE_NOT_FOUND': {\n    patterns: [/course.*not.*found/i, /404.*course/i, /invalid.*course/i],\n    category: 'Course Resource Issue',\n    severity: 'medium',\n    retryable: false,\n    autoFix: false,\n    solutions: [\n      'Verify course ID is correct',\n      'Check if course still exists',\n      'Update course ID mapping data',\n      'Contact academic office to confirm course status'\n    ]\n  },\n  'STUDENT_ALREADY_EXISTS': {\n    patterns: [/student.*already.*exists/i, /already.*member/i, /duplicate.*student/i],\n    category: 'Duplicate Data',\n    severity: 'low',\n    retryable: false,\n    autoFix: true,\n    solutions: [\n      'Skip existing student records',\n      'Update student data status to existing',\n      'Implement duplicate checking mechanism',\n      'This is usually not an error and can be ignored'\n    ]\n  },\n  'NETWORK_ERROR': {\n    patterns: [/network.*error/i, /connection.*timeout/i, /dns.*error/i, /socket.*timeout/i],\n    category: 'Network Connection Issue',\n    severity: 'high',\n    retryable: true,\n    autoFix: true,\n    retryDelay: 30000, // 30 seconds retry\n    maxRetries: 3,\n    solutions: [\n      'Check network connection status',\n      'Wait for network recovery then auto-retry',\n      'Check firewall and proxy settings',\n      'Contact network administrator'\n    ]\n  },\n  'UNKNOWN_ERROR': {\n    patterns: [/.*/], // Match all other errors\n    category: 'Unknown Error',\n    severity: 'medium',\n    retryable: true,\n    autoFix: false,\n    maxRetries: 1,\n    solutions: [\n      'Log detailed error information',\n      'Try re-executing operation',\n      'Contact technical support for analysis',\n      'Provide complete error logs'\n    ]\n  }\n};\n\n// Analyze error and classify\nfunction analyzeError(errorMessage, errorCode) {\n  for (const [errorType, config] of Object.entries(errorPatterns)) {\n    if (config.patterns.some(pattern => pattern.test(errorMessage + ' ' + errorCode))) {\n      return { errorType, ...config };\n    }\n  }\n  return { errorType: 'UNKNOWN_ERROR', ...errorPatterns.UNKNOWN_ERROR };\n}\n\nconst errorMessage = errorData.error || '';\nconst errorCode = errorData.code || errorData.status || '';\nconst analysisResult = analyzeError(errorMessage, errorCode);\n\n// Build error handling object\nconst errorReport = {\n  errorId: 'error_' + Date.now(),\n  timestamp: new Date().toISOString(),\n  \n  // Original error information\n  originalError: {\n    message: errorMessage,\n    code: errorCode,\n    batchId: errorData.batchId,\n    context: errorData.context || {},\n    stackTrace: errorData.stackTrace\n  },\n  \n  // Error analysis results\n  analysis: {\n    errorType: analysisResult.errorType,\n    category: analysisResult.category,\n    severity: analysisResult.severity,\n    retryable: analysisResult.retryable,\n    autoFixable: analysisResult.autoFix,\n    estimatedImpact: calculateImpact(analysisResult.severity, errorData.context)\n  },\n  \n  // Recovery strategy\n  recoveryStrategy: {\n    canAutoRecover: analysisResult.autoFix,\n    retryDelay: analysisResult.retryDelay || 30000,\n    maxRetries: analysisResult.maxRetries || 3,\n    currentRetryCount: errorData.retryCount || 0,\n    solutions: analysisResult.solutions\n  },\n  \n  // Notification settings\n  notificationConfig: {\n    shouldNotify: analysisResult.severity === 'high' || (analysisResult.severity === 'medium' && !analysisResult.autoFix),\n    urgentNotification: analysisResult.severity === 'high' && !analysisResult.retryable,\n    recipients: getNotificationRecipients(analysisResult.severity, analysisResult.category)\n  }\n};\n\n// Helper function: Calculate error impact level\nfunction calculateImpact(severity, context) {\n  const baseImpact = {\n    'low': 1,\n    'medium': 5,\n    'high': 10\n  }[severity] || 3;\n  \n  // Adjust impact based on context\n  let adjustedImpact = baseImpact;\n  \n  if (context && context.batchSize) {\n    // Larger batch processing errors have greater impact\n    if (context.batchSize > 1000) {\n      adjustedImpact *= 2;\n    } else if (context.batchSize > 100) {\n      adjustedImpact *= 1.5;\n    }\n  }\n  \n  return Math.min(adjustedImpact, 10); // Maximum impact level is 10\n}\n\n// Helper function: Get notification recipients\nfunction getNotificationRecipients(severity, category) {\n  const recipients = ['admin'];\n  \n  if (severity === 'high') {\n    recipients.push('tech_support');\n  }\n  \n  if (category === 'Permission Issue' || category === 'Google Service Issue') {\n    recipients.push('tech_support');\n  }\n  \n  return recipients;\n}\n\nconsole.log('Error analysis complete: ' + analysisResult.category + ' - ' + analysisResult.severity + ' level');\n\nreturn [errorReport];"
+      },
+      "id": "analyze-error",
+      "name": "Intelligent Error Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.analysis.autoFixable}}",
+            "operation": "equal",
+            "rightValue": true
+          }
+        }
+      },
+      "id": "check-auto-fix",
+      "name": "Can Auto Fix?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.analysis.retryable}}",
+            "operation": "equal",
+            "rightValue": true
+          }
+        }
+      },
+      "id": "check-retryable",
+      "name": "Can Retry?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Execute auto-fix logic\nconst errorReport = $input.first().json;\nconst errorType = errorReport.analysis.errorType;\n\nlet fixResult = {\n  errorId: errorReport.errorId,\n  fixAttempted: true,\n  fixSuccessful: false,\n  fixActions: [],\n  nextSteps: []\n};\n\nswitch (errorType) {\n  case 'RATE_LIMIT_EXCEEDED':\n    fixResult.fixActions.push('Implement exponential backoff delay strategy');\n    fixResult.fixActions.push('Adjust batch size to reduce API call frequency');\n    fixResult.nextSteps.push('Wait for API quota reset');\n    fixResult.nextSteps.push('Use smaller batch size for reprocessing');\n    fixResult.fixSuccessful = true;\n    fixResult.autoRetry = true;\n    fixResult.retryDelay = errorReport.recoveryStrategy.retryDelay;\n    break;\n    \n  case 'INVALID_EMAIL':\n    fixResult.fixActions.push('Mark invalid email records');\n    fixResult.fixActions.push('Remove invalid records from processing list');\n    fixResult.nextSteps.push('Continue processing other valid records');\n    fixResult.nextSteps.push('Generate invalid data report');\n    fixResult.fixSuccessful = true;\n    fixResult.continueProcessing = true;\n    break;\n    \n  case 'STUDENT_ALREADY_EXISTS':\n    fixResult.fixActions.push('Mark as existing status');\n    fixResult.fixActions.push('Skip duplicate records');\n    fixResult.nextSteps.push('Continue processing next record');\n    fixResult.fixSuccessful = true;\n    fixResult.continueProcessing = true;\n    fixResult.treatAsSuccess = true; // Treat this as success\n    break;\n    \n  case 'NETWORK_ERROR':\n    fixResult.fixActions.push('Prepare network reconnection mechanism');\n    fixResult.fixActions.push('Set retry strategy');\n    fixResult.nextSteps.push('Wait for network recovery');\n    fixResult.nextSteps.push('Auto-retry operation');\n    fixResult.fixSuccessful = true;\n    fixResult.autoRetry = true;\n    fixResult.retryDelay = errorReport.recoveryStrategy.retryDelay;\n    break;\n    \n  default:\n    fixResult.fixActions.push('Log unknown error details');\n    fixResult.fixActions.push('Save error scene information');\n    fixResult.nextSteps.push('Forward to technical support for analysis');\n    fixResult.nextSteps.push('Pause automatic processing pending manual intervention');\n    fixResult.fixSuccessful = false;\n    fixResult.requiresManualIntervention = true;\n}\n\n// Update retry count\nfixResult.retryCount = (errorReport.recoveryStrategy.currentRetryCount || 0) + 1;\nfixResult.maxRetriesReached = fixResult.retryCount >= errorReport.recoveryStrategy.maxRetries;\n\n// Generate fix report\nfixResult.fixReport = {\n  summary: fixResult.fixSuccessful ? \n    'Error automatically fixed: ' + errorReport.analysis.category : \n    'Cannot automatically fix: ' + errorReport.analysis.category,\n  details: fixResult.fixActions,\n  nextSteps: fixResult.nextSteps,\n  timestamp: new Date().toISOString()\n};\n\nconsole.log('Auto-fix attempt: ' + (fixResult.fixSuccessful ? 'Success' : 'Failed'));\n\nreturn [{ ...errorReport, fixResult }];"
+      },
+      "id": "auto-fix",
+      "name": "Auto Fix Processing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare intelligent retry strategy\nconst errorReport = $input.first().json;\nconst errorType = errorReport.analysis.errorType;\nconst currentRetryCount = errorReport.recoveryStrategy.currentRetryCount;\n\n// Check if should retry\nif (currentRetryCount >= errorReport.recoveryStrategy.maxRetries) {\n  console.log('Max retry count reached: ' + currentRetryCount + '/' + errorReport.recoveryStrategy.maxRetries);\n  return [{\n    ...errorReport,\n    retryDecision: {\n      shouldRetry: false,\n      reason: 'Max retry count reached',\n      finalAction: 'escalate_to_manual'\n    }\n  }];\n}\n\n// Dynamic retry strategy adjustment\nconst retryStrategies = {\n  'RATE_LIMIT_EXCEEDED': {\n    baseDelay: 60000, // 1 minute\n    backoffMultiplier: 2,\n    jitter: 0.1, // 10% random delay\n    adjustBatchSize: true\n  },\n  'NETWORK_ERROR': {\n    baseDelay: 30000, // 30 seconds\n    backoffMultiplier: 1.5,\n    jitter: 0.2,\n    adjustBatchSize: false\n  },\n  'UNKNOWN_ERROR': {\n    baseDelay: 60000, // 1 minute\n    backoffMultiplier: 1.8,\n    jitter: 0.25,\n    adjustBatchSize: true\n  }\n};\n\nconst strategy = retryStrategies[errorType] || retryStrategies['UNKNOWN_ERROR'];\n\n// Calculate exponential backoff delay\nconst exponentialDelay = strategy.baseDelay * Math.pow(strategy.backoffMultiplier, currentRetryCount);\n\n// Add random jitter to avoid thundering herd\nconst jitterRange = exponentialDelay * strategy.jitter;\nconst jitter = (Math.random() - 0.5) * 2 * jitterRange;\nconst finalDelay = Math.max(exponentialDelay + jitter, strategy.baseDelay);\n\n// Prepare retry configuration\nconst retryConfig = {\n  shouldRetry: true,\n  retryDelay: Math.round(finalDelay),\n  retryCount: currentRetryCount + 1,\n  maxRetries: errorReport.recoveryStrategy.maxRetries,\n  strategy: {\n    type: 'exponential_backoff_with_jitter',\n    baseDelay: strategy.baseDelay,\n    calculatedDelay: Math.round(finalDelay),\n    backoffMultiplier: strategy.backoffMultiplier,\n    jitterApplied: Math.round(jitter)\n  },\n  \n  // Adjust processing parameters\n  adjustments: {\n    reduceBatchSize: strategy.adjustBatchSize && currentRetryCount > 0,\n    newBatchSize: strategy.adjustBatchSize ? \n      Math.max(Math.floor(((errorReport.originalError.context && errorReport.originalError.context.batchSize) || 50) * 0.7), 10) : null,\n    enableConservativeMode: currentRetryCount >= 2\n  }\n};\n\n// Generate retry plan\nconst retryPlan = {\n  summary: 'Prepare retry ' + retryConfig.retryCount + ' (max ' + retryConfig.maxRetries + ' times)',\n  delayMinutes: Math.round(retryConfig.retryDelay / 60000 * 10) / 10,\n  scheduledTime: new Date(Date.now() + retryConfig.retryDelay).toLocaleString(),\n  adjustments: retryConfig.adjustments,\n  riskAssessment: assessRetryRisk(currentRetryCount, errorType)\n};\n\nfunction assessRetryRisk(retryCount, errorType) {\n  const riskFactors = {\n    'RATE_LIMIT_EXCEEDED': retryCount < 2 ? 'low' : 'medium',\n    'NETWORK_ERROR': retryCount < 3 ? 'low' : 'high',\n    'UNKNOWN_ERROR': 'medium'\n  };\n  \n  return riskFactors[errorType] || 'medium';\n}\n\nconsole.log('Prepare retry: delay ' + retryPlan.delayMinutes + ' minutes');\n\nreturn [{\n  ...errorReport,\n  retryDecision: {\n    ...retryConfig,\n    plan: retryPlan\n  }\n}];"
+      },
+      "id": "prepare-retry",
+      "name": "Prepare Intelligent Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.notificationConfig ? $json.notificationConfig.shouldNotify : true}}",
+            "operation": "equal",
+            "rightValue": true
+          }
+        }
+      },
+      "id": "check-notification-needed",
+      "name": "Need Notification?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare error notification content\nconst errorReport = $input.first().json;\nconst isUrgent = (errorReport.notificationConfig && errorReport.notificationConfig.urgentNotification) || false;\n\n// Generate notification content\nconst notificationData = {\n  type: 'system_error',\n  data: {\n    error: errorReport.analysis.category + ': ' + errorReport.originalError.message,\n    batchId: errorReport.originalError.batchId,\n    errorId: errorReport.errorId,\n    severity: errorReport.analysis.severity,\n    category: errorReport.analysis.category,\n    timestamp: errorReport.timestamp,\n    \n    // Error details\n    details: {\n      errorType: errorReport.analysis.errorType,\n      retryable: errorReport.analysis.retryable,\n      autoFixable: errorReport.analysis.autoFixable,\n      estimatedImpact: errorReport.analysis.estimatedImpact,\n      \n      // Fix status\n      fixAttempted: (errorReport.fixResult && errorReport.fixResult.fixAttempted) || false,\n      fixSuccessful: (errorReport.fixResult && errorReport.fixResult.fixSuccessful) || false,\n      fixActions: (errorReport.fixResult && errorReport.fixResult.fixActions) || [],\n      \n      // Retry status\n      retryPlanned: (errorReport.retryDecision && errorReport.retryDecision.shouldRetry) || false,\n      retryCount: (errorReport.fixResult && errorReport.fixResult.retryCount) || (errorReport.retryDecision && errorReport.retryDecision.retryCount) || 0,\n      maxRetries: errorReport.recoveryStrategy.maxRetries\n    },\n    \n    // Recommended solutions\n    recommendedActions: errorReport.recoveryStrategy.solutions,\n    \n    // System status\n    systemStatus: {\n      autoRecoveryAttempted: (errorReport.fixResult && errorReport.fixResult.autoRetry) || (errorReport.retryDecision && errorReport.retryDecision.shouldRetry) || false,\n      manualInterventionRequired: (errorReport.fixResult && errorReport.fixResult.requiresManualIntervention) || false,\n      processingContinued: (errorReport.fixResult && errorReport.fixResult.continueProcessing) || false\n    }\n  }\n};\n\n// Adjust notification settings based on severity and urgency\nif (isUrgent) {\n  notificationData.priority = 'urgent';\n  notificationData.channels = ['email', 'sms', 'teams'];\n} else if (errorReport.analysis.severity === 'high') {\n  notificationData.priority = 'high';\n  notificationData.channels = ['email', 'teams'];\n} else {\n  notificationData.priority = 'normal';\n  notificationData.channels = ['email'];\n}\n\nnotificationData.recipients = errorReport.notificationConfig.recipients;\n\nconsole.log('Preparing to send ' + errorReport.analysis.severity + ' level error notification');\n\nreturn [notificationData];"
+      },
+      "id": "prepare-notification",
+      "name": "Prepare Error Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "notification-system",
+        "options": {
+          "loadFromCurrentWorkflow": false,
+          "waitForExecution": false
+        }
+      },
+      "id": "send-error-notification",
+      "name": "Send Error Notification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate final processing report\nconst allInputs = $input.all();\nconst errorReport = allInputs.find(item => item.json.errorId) || allInputs[0];\n\nconst finalReport = {\n  errorHandlingId: 'handling_' + Date.now(),\n  originalErrorId: errorReport.json.errorId,\n  completedAt: new Date().toISOString(),\n  \n  // Processing summary\n  summary: {\n    errorType: errorReport.json.analysis.errorType,\n    category: errorReport.json.analysis.category,\n    severity: errorReport.json.analysis.severity,\n    handlingDuration: Math.round((Date.now() - new Date(errorReport.json.timestamp)) / 1000), // seconds\n    outcome: determineOutcome(errorReport.json)\n  },\n  \n  // Actions performed\n  actionsPerformed: {\n    analysisCompleted: true,\n    autoFixAttempted: (errorReport.json.fixResult && errorReport.json.fixResult.fixAttempted) || false,\n    autoFixSuccessful: (errorReport.json.fixResult && errorReport.json.fixResult.fixSuccessful) || false,\n    retryAttempted: (errorReport.json.retryDecision && errorReport.json.retryDecision.shouldRetry) || false,\n    notificationSent: (errorReport.json.notificationConfig && errorReport.json.notificationConfig.shouldNotify) || false\n  },\n  \n  // Result statistics\n  statistics: {\n    totalRetries: (errorReport.json.fixResult && errorReport.json.fixResult.retryCount) || (errorReport.json.retryDecision && errorReport.json.retryDecision.retryCount) || 0,\n    maxRetriesReached: (errorReport.json.fixResult && errorReport.json.fixResult.maxRetriesReached) || false,\n    estimatedImpact: errorReport.json.analysis.estimatedImpact,\n    resolutionConfidence: calculateResolutionConfidence(errorReport.json)\n  },\n  \n  // Follow-up recommendations\n  recommendations: generateRecommendations(errorReport.json),\n  \n  // Original error information (for audit)\n  originalError: errorReport.json.originalError\n};\n\n// Helper function: Determine processing outcome\nfunction determineOutcome(errorReport) {\n  if (errorReport.fixResult && errorReport.fixResult.fixSuccessful) {\n    return 'auto_fixed';\n  } else if (errorReport.retryDecision && errorReport.retryDecision.shouldRetry) {\n    return 'retry_scheduled';\n  } else if (errorReport.fixResult && errorReport.fixResult.requiresManualIntervention) {\n    return 'requires_manual_intervention';\n  } else {\n    return 'handled_with_notifications';\n  }\n}\n\n// Helper function: Calculate resolution confidence\nfunction calculateResolutionConfidence(errorReport) {\n  let confidence = 0;\n  \n  if (errorReport.analysis.autoFixable) confidence += 40;\n  if (errorReport.analysis.retryable) confidence += 30;\n  if (errorReport.fixResult && errorReport.fixResult.fixSuccessful) confidence += 50;\n  if (errorReport.analysis.severity === 'low') confidence += 20;\n  \n  return Math.min(confidence, 100);\n}\n\n// Helper function: Generate recommendations\nfunction generateRecommendations(errorReport) {\n  const recommendations = [];\n  \n  if (errorReport.analysis.estimatedImpact > 5) {\n    recommendations.push('Recommend reviewing system stability, consider adding monitoring mechanisms');\n  }\n  \n  if (errorReport.recoveryStrategy.currentRetryCount > 2) {\n    recommendations.push('Frequent retries may indicate systemic issues, recommend thorough investigation');\n  }\n  \n  if (errorReport.analysis.errorType === 'UNKNOWN_ERROR') {\n    recommendations.push('Unknown errors need manual analysis, recommend updating error classification patterns');\n  }\n  \n  if (errorReport.analysis.severity === 'high' && !errorReport.analysis.autoFixable) {\n    recommendations.push('High severity errors that cannot be auto-fixed, recommend establishing early warning mechanisms');\n  }\n  \n  return recommendations.length > 0 ? recommendations : ['System operating normally, no special recommendations'];\n}\n\nconst outcomeMessage = {\n  'auto_fixed': 'Error automatically fixed',\n  'retry_scheduled': 'Retry processing scheduled',\n  'requires_manual_intervention': 'Requires manual intervention',\n  'handled_with_notifications': 'Handled with notifications sent'\n}[finalReport.summary.outcome] || 'Error handling completed';\n\nfinalReport.humanReadableStatus = outcomeMessage;\n\nconsole.log('Error handling completed: ' + outcomeMessage);\n\nreturn [finalReport];"
+      },
+      "id": "generate-final-report",
+      "name": "Generate Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 400]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "=http://localhost:3000/api/error-callback",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={{JSON.stringify($json)}}",
+          "timeout": 10000
+        }
+      },
+      "id": "send-final-callback",
+      "name": "Send Processing Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1800, 400],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "workflow-complete",
+      "name": "Error Handling Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2000, 400]
+    }
+  ],
+  "connections": {
+    "Receive Error Report": {
+      "main": [
+        [
+          {
+            "node": "Intelligent Error Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intelligent Error Analysis": {
+      "main": [
+        [
+          {
+            "node": "Can Auto Fix?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Can Retry?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Need Notification?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Auto Fix?": {
+      "main": [
+        [
+          {
+            "node": "Auto Fix Processing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Can Retry?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Intelligent Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Auto Fix Processing": {
+      "main": [
+        [
+          {
+            "node": "Generate Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Intelligent Retry": {
+      "main": [
+        [
+          {
+            "node": "Generate Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Need Notification?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Error Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Error Notification": {
+      "main": [
+        [
+          {
+            "node": "Generate Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Final Report": {
+      "main": [
+        [
+          {
+            "node": "Send Processing Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Processing Results": {
+      "main": [
+        [
+          {
+            "node": "Error Handling Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {},
+  "tags": [
+    {
+      "createdAt": "2025-01-23T00:00:00.000Z",
+      "updatedAt": "2025-01-23T00:00:00.000Z",
+      "id": "error-handling",
+      "name": "Error Handling"
+    },
+    {
+      "createdAt": "2025-01-23T00:00:00.000Z",
+      "updatedAt": "2025-01-23T00:00:00.000Z",
+      "id": "auto-recovery",
+      "name": "Auto Recovery"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "error-handler",
+  "versionId": "1.0.0"
+}

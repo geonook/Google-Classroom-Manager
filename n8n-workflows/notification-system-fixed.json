@@ -1,0 +1,407 @@
+{
+  "name": "Notification System - Multi-Channel Student Change Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "notification",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "notification-webhook",
+      "name": "Receive Notification Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "notification-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse notification request and categorize processing\nconst inputData = $input.all();\n\nif (!inputData || inputData.length === 0) {\n  throw new Error('No notification request received');\n}\n\nlet notificationData;\ntry {\n  const bodyData = inputData[0].json.body;\n  if (typeof bodyData === 'string') {\n    notificationData = JSON.parse(bodyData);\n  } else {\n    notificationData = bodyData;\n  }\n} catch (error) {\n  throw new Error('Invalid notification request format');\n}\n\nif (!notificationData || !notificationData.type) {\n  throw new Error('Notification request format error');\n}\n\n// Define notification types and corresponding processing logic\nconst notificationTypes = {\n  'student_added': {\n    title: 'Student Added Notification',\n    priority: 'normal',\n    channels: ['email', 'teams'],\n    recipients: ['teacher', 'admin']\n  },\n  'student_removed': {\n    title: 'Student Removed Notification',\n    priority: 'normal',\n    channels: ['email', 'teams'],\n    recipients: ['teacher', 'admin']\n  },\n  'student_transferred': {\n    title: 'Student Transfer Notification',\n    priority: 'high',\n    channels: ['email', 'teams', 'sms'],\n    recipients: ['teacher', 'admin', 'parent']\n  },\n  'batch_completed': {\n    title: 'Batch Processing Complete',\n    priority: 'normal',\n    channels: ['email', 'teams'],\n    recipients: ['admin']\n  },\n  'batch_failed': {\n    title: 'Batch Processing Failed',\n    priority: 'urgent',\n    channels: ['email', 'teams', 'sms'],\n    recipients: ['admin', 'tech_support']\n  },\n  'bulk_processing_complete': {\n    title: 'Bulk Data Processing Complete',\n    priority: 'high',\n    channels: ['email', 'teams'],\n    recipients: ['admin']\n  },\n  'system_error': {\n    title: 'System Error Warning',\n    priority: 'urgent',\n    channels: ['email', 'teams', 'sms'],\n    recipients: ['admin', 'tech_support']\n  }\n};\n\nconst requestType = notificationData.type;\nconst config = notificationTypes[requestType] || notificationTypes['system_error'];\n\n// Build notification object\nconst notification = {\n  id: 'notify_' + Date.now(),\n  type: requestType,\n  title: config.title,\n  priority: config.priority,\n  timestamp: new Date().toISOString(),\n  data: notificationData.data || {},\n  channels: config.channels,\n  recipients: config.recipients,\n  originalRequest: notificationData\n};\n\n// Generate content based on notification type\nswitch (requestType) {\n  case 'student_added':\n    notification.message = 'Student ' + (notification.data.studentEmail || 'Unknown') + ' has been successfully added to course ' + (notification.data.courseName || 'Unknown');\n    notification.details = {\n      student: notification.data.studentEmail,\n      course: notification.data.courseName,\n      courseId: notification.data.courseId,\n      addedBy: notification.data.addedBy || 'System',\n      timestamp: notification.timestamp\n    };\n    break;\n    \n  case 'student_removed':\n    notification.message = 'Student ' + (notification.data.studentEmail || 'Unknown') + ' has been removed from course ' + (notification.data.courseName || 'Unknown');\n    notification.details = {\n      student: notification.data.studentEmail,\n      course: notification.data.courseName,\n      courseId: notification.data.courseId,\n      removedBy: notification.data.removedBy || 'System',\n      reason: notification.data.reason || 'Not specified'\n    };\n    break;\n    \n  case 'student_transferred':\n    notification.message = 'Student ' + (notification.data.studentEmail || 'Unknown') + ' has been transferred from ' + (notification.data.fromCourse || 'Unknown') + ' to ' + (notification.data.toCourse || 'Unknown');\n    notification.details = {\n      student: notification.data.studentEmail,\n      fromCourse: notification.data.fromCourse,\n      toCourse: notification.data.toCourse,\n      transferredBy: notification.data.transferredBy || 'System',\n      reason: notification.data.reason || 'Administrative change'\n    };\n    break;\n    \n  case 'batch_completed':\n  case 'bulk_processing_complete':\n    const stats = notification.data.statistics || notification.data;\n    notification.message = 'Batch processing complete: ' + (stats.successful || 0) + ' successful, ' + (stats.failed || 0) + ' failed';\n    notification.details = {\n      batchId: notification.data.batchId,\n      totalProcessed: stats.totalProcessed || 0,\n      successful: stats.successful || 0,\n      failed: stats.failed || 0,\n      successRate: stats.successRate || 0,\n      processingTime: (notification.data.timing && notification.data.timing.processingTimeMinutes) || 'Unknown'\n    };\n    break;\n    \n  case 'batch_failed':\n  case 'system_error':\n    notification.message = 'System error: ' + (notification.data.error || 'Unknown error');\n    notification.details = {\n      error: notification.data.error || 'Unknown error',\n      batchId: notification.data.batchId,\n      timestamp: notification.timestamp,\n      context: notification.data.context || 'No context provided'\n    };\n    break;\n    \n  default:\n    notification.message = 'System notification: ' + JSON.stringify(notification.data);\n    notification.details = notification.data;\n}\n\nconsole.log('Preparing to send notification: ' + notification.title + ' - ' + notification.message);\n\nreturn [notification];"
+      },
+      "id": "parse-notification",
+      "name": "Parse Notification Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get contact information based on recipient type\nconst notification = $input.first().json;\n\n// Simulated recipient database (should be retrieved from database or API in actual use)\nconst contactDatabase = {\n  admin: [\n    { \n      name: 'System Administrator',\n      email: 'admin@school.edu',\n      phone: '+886-2-1234-5678',\n      teams: 'admin@school.edu'\n    }\n  ],\n  teacher: [\n    {\n      name: 'Academic Director',\n      email: 'academic@school.edu', \n      phone: '+886-2-1234-5679',\n      teams: 'academic@school.edu'\n    },\n    {\n      name: 'Course Coordinator',\n      email: 'coordinator@school.edu',\n      phone: '+886-2-1234-5680', \n      teams: 'coordinator@school.edu'\n    }\n  ],\n  tech_support: [\n    {\n      name: 'Technical Support',\n      email: 'tech@school.edu',\n      phone: '+886-2-1234-5681',\n      teams: 'tech@school.edu'\n    }\n  ],\n  parent: [\n    {\n      name: 'Parent Liaison',\n      email: 'parent-liaison@school.edu',\n      phone: '+886-2-1234-5682'\n    }\n  ]\n};\n\n// Collect all contacts based on recipient type\nconst allContacts = [];\nnotification.recipients.forEach(recipientType => {\n  if (contactDatabase[recipientType]) {\n    allContacts.push(...contactDatabase[recipientType]);\n  }\n});\n\n// Prepare recipient lists for each notification channel\nconst channelRecipients = {\n  email: allContacts.filter(contact => contact.email).map(contact => ({\n    name: contact.name,\n    email: contact.email\n  })),\n  \n  sms: allContacts.filter(contact => contact.phone).map(contact => ({\n    name: contact.name,\n    phone: contact.phone\n  })),\n  \n  teams: allContacts.filter(contact => contact.teams).map(contact => ({\n    name: contact.name,\n    teams: contact.teams\n  }))\n};\n\n// Create tasks for each enabled notification channel\nconst notificationTasks = [];\nnotification.channels.forEach(channel => {\n  if (channelRecipients[channel] && channelRecipients[channel].length > 0) {\n    notificationTasks.push({\n      channel: channel,\n      recipients: channelRecipients[channel],\n      notification: notification,\n      taskId: notification.id + '_' + channel\n    });\n  }\n});\n\nconsole.log('Preparing to send to ' + notificationTasks.length + ' notification channels');\n\nreturn notificationTasks;"
+      },
+      "id": "resolve-recipients", 
+      "name": "Resolve Recipient Information",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.channel}}",
+            "operation": "equal",
+            "rightValue": "email"
+          }
+        }
+      },
+      "id": "route-email",
+      "name": "Route - Email",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [800, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.channel}}",
+            "operation": "equal", 
+            "rightValue": "sms"
+          }
+        }
+      },
+      "id": "route-sms",
+      "name": "Route - SMS",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.channel}}",
+            "operation": "equal",
+            "rightValue": "teams"
+          }
+        }
+      },
+      "id": "route-teams",
+      "name": "Route - Teams",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [800, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "fromEmail": "classroom-manager@school.edu",
+        "toEmail": "={{$json.recipients.map(r => r.email).join(',')}}",
+        "subject": "[Google Classroom] ={{$json.notification.title}}",
+        "text": "={{$json.notification.message}}",
+        "html": "=<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'><div style='background: #4285f4; color: white; padding: 20px; border-radius: 8px 8px 0 0;'><h2>Google Classroom Manager</h2><h3>{{$json.notification.title}}</h3></div><div style='padding: 20px;'><p><strong>Message:</strong></p><p>{{$json.notification.message}}</p><p><strong>Time:</strong> {{$json.notification.timestamp}}</p><p><strong>Notification ID:</strong> {{$json.notification.id}}</p></div><div style='background: #f8f9fa; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #666;'><p>This email was sent automatically by Google Classroom Manager Pro</p></div></div>"
+      },
+      "id": "send-email",
+      "name": "Send Email Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1000, 200],
+      "credentials": {
+        "smtp": {
+          "id": "school-smtp",
+          "name": "School SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "httpMethod": "POST",
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/YOUR_ACCOUNT_SID/Messages.json",
+        "options": {
+          "bodyContentType": "form-urlencoded",
+          "formParameters": {
+            "parameters": [
+              {
+                "name": "To",
+                "value": "={{$json.recipients[0].phone}}"
+              },
+              {
+                "name": "From",
+                "value": "+1234567890"
+              },
+              {
+                "name": "Body",
+                "value": "[Google Classroom] ={{$json.notification.title}} - {{$json.notification.message}} - Time: {{$json.notification.timestamp}} - ID: {{$json.notification.id}}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "send-sms",
+      "name": "Send SMS Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 300],
+      "credentials": {
+        "twilioApi": {
+          "id": "twilio-sms",
+          "name": "Twilio SMS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "httpMethod": "POST",
+        "url": "=https://graph.microsoft.com/v1.0/teams/YOUR_TEAM_ID/channels/YOUR_CHANNEL_ID/messages",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={{JSON.stringify({\n  \"body\": {\n    \"contentType\": \"html\",\n    \"content\": \"<h3>\" + $json.notification.title + \"</h3><p><strong>\" + $json.notification.message + \"</strong></p><p>Time: \" + $json.notification.timestamp + \"</p><p>Notification ID: \" + $json.notification.id + \"</p><p>Priority: \" + $json.notification.priority + \"</p>\"\n  }\n})}}"
+        }
+      },
+      "id": "send-teams",
+      "name": "Send Teams Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 400],
+      "credentials": {
+        "microsoftTeamsOAuth2Api": {
+          "id": "teams-oauth",
+          "name": "Microsoft Teams OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByIndex",
+        "options": {}
+      },
+      "id": "merge-results",
+      "name": "Merge Notification Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate notification sending report\nconst results = $input.all();\nconst originalNotification = results[0].json.notification || $('parse-notification').first().json;\n\nconst report = {\n  notificationId: originalNotification.id,\n  type: originalNotification.type,\n  title: originalNotification.title,\n  timestamp: originalNotification.timestamp,\n  completedAt: new Date().toISOString(),\n  channels: {\n    attempted: originalNotification.channels.length,\n    successful: 0,\n    failed: 0\n  },\n  recipients: {\n    total: 0,\n    notified: 0\n  },\n  details: []\n};\n\nresults.forEach(result => {\n  const channelResult = result.json;\n  \n  if (channelResult.error) {\n    report.channels.failed++;\n    report.details.push({\n      channel: channelResult.channel || 'unknown',\n      status: 'failed',\n      error: channelResult.error,\n      recipients: (channelResult.recipients && channelResult.recipients.length) || 0\n    });\n  } else {\n    report.channels.successful++;\n    const recipientCount = (channelResult.recipients && channelResult.recipients.length) || 1;\n    report.recipients.notified += recipientCount;\n    report.details.push({\n      channel: channelResult.channel || result.json.channel,\n      status: 'success',\n      recipients: recipientCount\n    });\n  }\n  \n  if (channelResult.recipients) {\n    report.recipients.total += channelResult.recipients.length;\n  }\n});\n\n// Calculate success rate\nreport.successRate = report.channels.attempted > 0 ? \n  Math.round((report.channels.successful / report.channels.attempted) * 100) : 0;\n\n// Generate human-readable report message\nlet reportMessage = 'Notification Sending Complete Report\\\\n\\\\n';\nreportMessage += 'Notification Information:\\\\n';\nreportMessage += '• Type: ' + report.type + '\\\\n';\nreportMessage += '• Title: ' + report.title + '\\\\n';\nreportMessage += '• Send Time: ' + new Date(report.timestamp).toLocaleString() + '\\\\n';\nreportMessage += '• Complete Time: ' + new Date(report.completedAt).toLocaleString() + '\\\\n\\\\n';\n\nreportMessage += 'Sending Statistics:\\\\n';\nreportMessage += '• Attempted Channels: ' + report.channels.attempted + '\\\\n';\nreportMessage += '• Successful Channels: ' + report.channels.successful + '\\\\n';\nreportMessage += '• Failed Channels: ' + report.channels.failed + '\\\\n';\nreportMessage += '• Success Rate: ' + report.successRate + '%\\\\n';\nreportMessage += '• Total Recipients: ' + report.recipients.total + '\\\\n';\nreportMessage += '• Successfully Notified: ' + report.recipients.notified + '\\\\n\\\\n';\n\nif (report.details.length > 0) {\n  reportMessage += 'Detailed Results:\\\\n';\n  report.details.forEach(detail => {\n    const status = detail.status === 'success' ? 'Success' : 'Failed';\n    reportMessage += '• ' + status + ' ' + detail.channel + ': ' + (detail.recipients || 0) + ' recipients';\n    if (detail.error) {\n      reportMessage += ' (Error: ' + detail.error + ')';\n    }\n    reportMessage += '\\\\n';\n  });\n}\n\nreport.reportMessage = reportMessage;\n\nconsole.log(reportMessage);\n\nreturn [report];"
+      },
+      "id": "generate-report",
+      "name": "Generate Notification Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "=http://localhost:3000/api/notification-callback",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={{JSON.stringify($json)}}",
+          "timeout": 10000
+        }
+      },
+      "id": "send-callback",
+      "name": "Send Notification Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1600, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "workflow-end",
+      "name": "Notification Workflow End",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1800, 300]
+    }
+  ],
+  "connections": {
+    "Receive Notification Request": {
+      "main": [
+        [
+          {
+            "node": "Parse Notification Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Notification Content": {
+      "main": [
+        [
+          {
+            "node": "Resolve Recipient Information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Recipient Information": {
+      "main": [
+        [
+          {
+            "node": "Route - Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route - SMS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route - Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route - Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Notification Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route - SMS": {
+      "main": [
+        [
+          {
+            "node": "Send SMS Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Notification Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route - Teams": {
+      "main": [
+        [
+          {
+            "node": "Send Teams Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Notification Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Notification": {
+      "main": [
+        [
+          {
+            "node": "Merge Notification Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS Notification": {
+      "main": [
+        [
+          {
+            "node": "Merge Notification Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Teams Notification": {
+      "main": [
+        [
+          {
+            "node": "Merge Notification Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Notification Results": {
+      "main": [
+        [
+          {
+            "node": "Generate Notification Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Notification Report": {
+      "main": [
+        [
+          {
+            "node": "Send Notification Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Notification Results": {
+      "main": [
+        [
+          {
+            "node": "Notification Workflow End",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {},
+  "tags": [
+    {
+      "createdAt": "2025-01-23T00:00:00.000Z",
+      "updatedAt": "2025-01-23T00:00:00.000Z",
+      "id": "notification",
+      "name": "Notification System"
+    },
+    {
+      "createdAt": "2025-01-23T00:00:00.000Z",
+      "updatedAt": "2025-01-23T00:00:00.000Z",
+      "id": "multi-channel",
+      "name": "Multi Channel"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "notification-system",
+  "versionId": "1.0.0"
+}

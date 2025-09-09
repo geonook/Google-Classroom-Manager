@@ -1,0 +1,303 @@
+{
+  "name": "Google Classroom - Student Batch Management",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "student-batch",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Receive Student Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "student-batch-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and preprocess student data\nconst inputData = $input.all();\n\nif (!inputData || inputData.length === 0) {\n  throw new Error('No student data received');\n}\n\nlet students;\ntry {\n  const bodyData = inputData[0].json.body;\n  if (typeof bodyData === 'string') {\n    students = JSON.parse(bodyData);\n  } else if (bodyData && Array.isArray(bodyData.students)) {\n    students = bodyData.students;\n  } else if (Array.isArray(bodyData)) {\n    students = bodyData;\n  } else {\n    students = [bodyData];\n  }\n} catch (error) {\n  throw new Error('Invalid JSON format in request body');\n}\n\nif (!students || !Array.isArray(students)) {\n  throw new Error('Student data must be an array');\n}\n\n// Validate each student record\nconst validatedStudents = [];\nconst errors = [];\n\nstudents.forEach((student, index) => {\n  const validation = {\n    rowIndex: index + 1,\n    email: student.email,\n    courseId: student.courseId || student.course_id,\n    courseName: student.courseName || student.course_name,\n    isValid: true,\n    errors: []\n  };\n  \n  // Validate email format\n  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  if (!validation.email || !emailRegex.test(validation.email)) {\n    validation.isValid = false;\n    validation.errors.push('Invalid email format');\n  }\n  \n  // Validate course ID\n  if (!validation.courseId) {\n    validation.isValid = false;\n    validation.errors.push('Missing course ID');\n  }\n  \n  if (validation.isValid) {\n    validatedStudents.push({\n      email: validation.email,\n      courseId: validation.courseId,\n      courseName: validation.courseName || 'Course-' + validation.courseId,\n      originalIndex: index\n    });\n  } else {\n    errors.push(validation);\n  }\n});\n\nconsole.log('Data validation complete: ' + validatedStudents.length + ' valid, ' + errors.length + ' errors');\n\nreturn {\n  validStudents: validatedStudents,\n  invalidStudents: errors,\n  totalCount: students.length,\n  validCount: validatedStudents.length,\n  errorCount: errors.length,\n  batchId: 'batch_' + Date.now(),\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "validate-data",
+      "name": "Validate Student Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.validCount}}",
+            "operation": "larger",
+            "rightValue": 0
+          }
+        }
+      },
+      "id": "check-valid-data",
+      "name": "Has Valid Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 50,
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "split-batches",
+      "name": "Split into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [800, 220]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "httpMethod": "POST",
+        "url": "=https://classroom.googleapis.com/v1/courses/{{$json.courseId}}/students",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={\"userId\": \"{{$json.email}}\"}",
+          "timeout": 30000
+        }
+      },
+      "id": "add-student-api",
+      "name": "Add Student to Course",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1000, 220],
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "google-classroom-oauth",
+          "name": "Google Classroom OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process API response results\nconst items = $input.all();\nconst results = [];\n\nitems.forEach((item, index) => {\n  const inputItems = $node['split-batches'].json;\n  const student = Array.isArray(inputItems) ? inputItems[index] : inputItems;\n  \n  let status = 'unknown';\n  let message = '';\n  let apiResponse = null;\n  \n  if (item.json.error) {\n    // API error handling\n    const error = item.json.error;\n    if (error.code === 409) {\n      status = 'already_exists';\n      message = 'Student already exists in course';\n    } else if (error.code === 404) {\n      status = 'course_not_found';\n      message = 'Course not found';\n    } else if (error.code === 403) {\n      status = 'permission_denied';\n      message = 'Permission denied';\n    } else {\n      status = 'api_error';\n      message = 'API Error: ' + (error.message || 'Unknown error');\n    }\n  } else if (item.json.userId) {\n    // Success\n    status = 'success';\n    message = 'Student successfully added to course';\n    apiResponse = item.json;\n  } else {\n    status = 'unknown_error';\n    message = 'Unknown processing result';\n  }\n  \n  results.push({\n    email: student ? student.email : 'unknown',\n    courseId: student ? student.courseId : 'unknown',\n    courseName: student ? student.courseName : 'unknown',\n    status: status,\n    message: message,\n    processedAt: new Date().toISOString(),\n    apiResponse: apiResponse\n  });\n});\n\nconsole.log('Batch processing complete: ' + results.filter(r => r.status === 'success').length + ' success, ' + results.filter(r => r.status !== 'success').length + ' failed');\n\nreturn results;"
+      },
+      "id": "process-results",
+      "name": "Process Batch Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 220]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByIndex",
+        "options": {}
+      },
+      "id": "merge-batches",
+      "name": "Merge All Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate final processing report\nconst allResults = $input.all();\nconst batchData = $node['validate-data'].json;\n\nconst summary = {\n  batchId: batchData.batchId,\n  processedAt: new Date().toISOString(),\n  totalProcessed: allResults.length,\n  successful: allResults.filter(item => item.json.status === 'success').length,\n  alreadyExists: allResults.filter(item => item.json.status === 'already_exists').length,\n  failed: allResults.filter(item => item.json.status !== 'success' && item.json.status !== 'already_exists').length,\n  successRate: 0,\n  details: allResults.map(item => item.json)\n};\n\n// Calculate success rate (including existing students)\nsummary.successRate = summary.totalProcessed > 0 ? \n  Math.round(((summary.successful + summary.alreadyExists) / summary.totalProcessed) * 100) : 0;\n\n// Categorize error reasons\nconst errorAnalysis = {};\nallResults.forEach(item => {\n  if (item.json.status !== 'success' && item.json.status !== 'already_exists') {\n    const errorType = item.json.status;\n    if (!errorAnalysis[errorType]) {\n      errorAnalysis[errorType] = 0;\n    }\n    errorAnalysis[errorType]++;\n  }\n});\n\nsummary.errorAnalysis = errorAnalysis;\n\n// Generate human-readable report\nlet reportMessage = 'Student Batch Processing Report\\n\\n';\nreportMessage += 'Processing Statistics:\\n';\nreportMessage += '• Total Processed: ' + summary.totalProcessed + '\\n';\nreportMessage += '• Successfully Added: ' + summary.successful + '\\n';\nreportMessage += '• Already Exists: ' + summary.alreadyExists + '\\n';\nreportMessage += '• Failed: ' + summary.failed + '\\n';\nreportMessage += '• Success Rate: ' + summary.successRate + '%\\n\\n';\n\nif (summary.failed > 0) {\n  reportMessage += 'Error Analysis:\\n';\n  Object.entries(errorAnalysis).forEach(([error, count]) => {\n    reportMessage += '• ' + error + ': ' + count + ' items\\n';\n  });\n  reportMessage += '\\n';\n}\n\nreportMessage += 'Processing Time: ' + summary.processedAt + '\\n';\nreportMessage += 'Batch ID: ' + summary.batchId;\n\nsummary.reportMessage = reportMessage;\n\nconsole.log(reportMessage);\n\nreturn [summary];"
+      },
+      "id": "generate-report",
+      "name": "Generate Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "=http://localhost:3000/api/callback",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={{JSON.stringify($json)}}",
+          "timeout": 10000
+        }
+      },
+      "id": "send-callback",
+      "name": "Send Results Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1800, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "=http://localhost:3000/api/error",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={\"error\": \"No valid student data to process\", \"timestamp\": \"{{new Date().toISOString()}}\"}",
+          "timeout": 10000
+        }
+      },
+      "id": "send-error",
+      "name": "Send Error Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [800, 380],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "no-operation",
+      "name": "No Operation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2000, 300]
+    }
+  ],
+  "connections": {
+    "Receive Student Data": {
+      "main": [
+        [
+          {
+            "node": "Validate Student Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Student Data": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Data?": {
+      "main": [
+        [
+          {
+            "node": "Split into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split into Batches": {
+      "main": [
+        [
+          {
+            "node": "Add Student to Course",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Student to Course": {
+      "main": [
+        [
+          {
+            "node": "Process Batch Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Batch Results": {
+      "main": [
+        [
+          {
+            "node": "Merge All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Results": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Report": {
+      "main": [
+        [
+          {
+            "node": "Send Results Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Results Callback": {
+      "main": [
+        [
+          {
+            "node": "No Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Error Response": {
+      "main": [
+        [
+          {
+            "node": "No Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {},
+  "tags": [
+    {
+      "createdAt": "2025-01-23T00:00:00.000Z",
+      "updatedAt": "2025-01-23T00:00:00.000Z",
+      "id": "google-classroom",
+      "name": "Google Classroom"
+    },
+    {
+      "createdAt": "2025-01-23T00:00:00.000Z", 
+      "updatedAt": "2025-01-23T00:00:00.000Z",
+      "id": "batch-processing",
+      "name": "Batch Processing"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "student-batch-management",
+  "versionId": "1.0.0"
+}

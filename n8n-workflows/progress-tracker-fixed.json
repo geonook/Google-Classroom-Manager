@@ -1,0 +1,449 @@
+{
+  "name": "Progress Tracker - Real-time Batch Processing Status Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "progress-update",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "progress-webhook",
+      "name": "Receive Progress Update",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "progress-update-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse progress update data\nconst inputData = $input.all();\n\nif (!inputData || inputData.length === 0) {\n  throw new Error('No progress update data received');\n}\n\nlet progressData;\ntry {\n  const bodyData = inputData[0].json.body;\n  if (typeof bodyData === 'string') {\n    progressData = JSON.parse(bodyData);\n  } else {\n    progressData = bodyData;\n  }\n} catch (error) {\n  throw new Error('Invalid progress update data format');\n}\n\nif (!progressData || !progressData.batchId) {\n  throw new Error('Progress update data format error, batchId required');\n}\n\n// Define progress update types\nconst progressTypes = {\n  'batch_started': {\n    stage: 'Processing Started',\n    description: 'Batch processing has started',\n    percentage: 0,\n    icon: 'Start'\n  },\n  'validation_complete': {\n    stage: 'Data Validation Complete',\n    description: 'Data validation and preprocessing completed',\n    percentage: 15,\n    icon: 'Check'\n  },\n  'batches_split': {\n    stage: 'Batch Split Complete',\n    description: 'Data has been split into processing batches',\n    percentage: 25,\n    icon: 'Split'\n  },\n  'processing_started': {\n    stage: 'Batch Processing Started',\n    description: 'Started executing batch processing operations',\n    percentage: 30,\n    icon: 'Process'\n  },\n  'batch_progress': {\n    stage: 'Batch Processing',\n    description: 'Processing batch data',\n    percentage: null, // Dynamic calculation\n    icon: 'Progress'\n  },\n  'batch_complete': {\n    stage: 'Batch Processing Complete',\n    description: 'Single batch processing completed',\n    percentage: null, // Dynamic calculation\n    icon: 'Complete'\n  },\n  'all_batches_complete': {\n    stage: 'All Batches Complete',\n    description: 'All batch processing completed',\n    percentage: 90,\n    icon: 'Success'\n  },\n  'report_generated': {\n    stage: 'Report Generation Complete',\n    description: 'Processing report has been generated',\n    percentage: 95,\n    icon: 'Report'\n  },\n  'process_complete': {\n    stage: 'Process Fully Complete',\n    description: 'Entire processing flow completed',\n    percentage: 100,\n    icon: 'Done'\n  },\n  'error_occurred': {\n    stage: 'Error Occurred',\n    description: 'Error occurred during processing',\n    percentage: null,\n    icon: 'Error'\n  }\n};\n\nconst updateType = progressData.type || 'batch_progress';\nconst config = progressTypes[updateType] || progressTypes['batch_progress'];\n\n// Build progress update object\nconst progressUpdate = {\n  batchId: progressData.batchId,\n  updateId: 'update_' + Date.now(),\n  timestamp: new Date().toISOString(),\n  type: updateType,\n  stage: config.stage,\n  description: config.description,\n  icon: config.icon,\n  percentage: config.percentage,\n  data: progressData.data || {}\n};\n\n// Dynamic percentage calculation\nif (progressUpdate.percentage === null) {\n  switch (updateType) {\n    case 'batch_progress':\n      const processed = progressData.data.processed || 0;\n      const total = progressData.data.total || 1;\n      progressUpdate.percentage = Math.min(Math.round((processed / total) * 60) + 30, 89); // 30-89%\n      progressUpdate.description = 'Processing: ' + processed + '/' + total + ' (' + Math.round((processed/total)*100) + '%)';\n      break;\n      \n    case 'batch_complete':\n      const completedBatches = progressData.data.completedBatches || 0;\n      const totalBatches = progressData.data.totalBatches || 1;\n      progressUpdate.percentage = Math.min(Math.round((completedBatches / totalBatches) * 60) + 30, 89);\n      progressUpdate.description = 'Completed batches: ' + completedBatches + '/' + totalBatches;\n      break;\n      \n    case 'error_occurred':\n      progressUpdate.percentage = -1; // Indicates error state\n      progressUpdate.description = 'Error: ' + (progressData.data.error || 'Unknown error');\n      break;\n      \n    default:\n      progressUpdate.percentage = 50; // Default value\n  }\n}\n\n// Add detailed statistics\nif (progressData.data) {\n  progressUpdate.statistics = {\n    totalItems: progressData.data.total || progressData.data.totalStudents || 0,\n    processedItems: progressData.data.processed || progressData.data.processedStudents || 0,\n    successfulItems: progressData.data.successful || 0,\n    failedItems: progressData.data.failed || 0,\n    remainingItems: (progressData.data.total || 0) - (progressData.data.processed || 0),\n    estimatedTimeRemaining: progressData.data.estimatedTimeRemaining || null,\n    processingSpeed: progressData.data.processingSpeed || null\n  };\n}\n\n// Add error information (if any)\nif (progressData.data.errors && Array.isArray(progressData.data.errors)) {\n  progressUpdate.errors = progressData.data.errors;\n}\n\n// Add pipeline information (for bulk data processing)\nif (progressData.data.pipelines) {\n  progressUpdate.pipelines = progressData.data.pipelines.map(pipeline => ({\n    pipelineId: pipeline.pipelineId,\n    status: pipeline.status,\n    processed: pipeline.processed || 0,\n    total: pipeline.total || 0,\n    percentage: pipeline.total > 0 ? Math.round((pipeline.processed / pipeline.total) * 100) : 0\n  }));\n}\n\nconsole.log('Progress update: ' + progressUpdate.stage + ' - ' + progressUpdate.percentage + '%');\n\nreturn [progressUpdate];"
+      },
+      "id": "parse-progress",
+      "name": "Parse Progress Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "httpMethod": "POST",
+        "url": "http://localhost:5432",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={{JSON.stringify({\n  \"query\": \"INSERT INTO batch_progress (batch_id, update_id, timestamp, type, stage, description, percentage, statistics, errors, pipelines) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (update_id) DO UPDATE SET timestamp = EXCLUDED.timestamp, percentage = EXCLUDED.percentage, statistics = EXCLUDED.statistics\",\n  \"parameters\": [\n    $json.batchId,\n    $json.updateId,\n    $json.timestamp,\n    $json.type,\n    $json.stage,\n    $json.description,\n    $json.percentage,\n    JSON.stringify($json.statistics || {}),\n    JSON.stringify($json.errors || []),\n    JSON.stringify($json.pipelines || [])\n  ]\n})}}"
+        }
+      },
+      "id": "save-to-database",
+      "name": "Save to Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [600, 220],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "=ws://localhost:3001/progress-updates",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={{JSON.stringify({\n  \"type\": \"progress_update\",\n  \"data\": $json\n})}}",
+          "timeout": 5000
+        }
+      },
+      "id": "broadcast-websocket",
+      "name": "Broadcast Real-time Update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [600, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.percentage}}",
+            "operation": "largerEqual",
+            "rightValue": 100
+          }
+        }
+      },
+      "id": "check-completion",
+      "name": "Is Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "leftValue": "={{$json.percentage}}",
+            "operation": "equal",
+            "rightValue": -1
+          }
+        }
+      },
+      "id": "check-error",
+      "name": "Has Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [800, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final statistics when processing is complete\nconst progress = $input.first().json;\n\n// Get complete processing history from database\nconst completionSummary = {\n  batchId: progress.batchId,\n  completedAt: progress.timestamp,\n  finalStatistics: progress.statistics,\n  \n  // Generate completion report\n  completionReport: {\n    title: 'Batch Processing Complete',\n    summary: 'Batch ' + progress.batchId + ' has successfully completed processing',\n    statistics: {\n      totalProcessed: (progress.statistics && progress.statistics.processedItems) || 0,\n      successRate: (progress.statistics && progress.statistics.processedItems > 0) ? \n        Math.round(((progress.statistics.successfulItems || 0) / progress.statistics.processedItems) * 100) : 0,\n      totalTime: 'To be calculated', // Need to calculate from start time\n      avgProcessingSpeed: (progress.statistics && progress.statistics.processingSpeed) || 'Unknown'\n    }\n  },\n  \n  // Trigger completion notification\n  notificationPayload: {\n    type: 'batch_completed',\n    data: {\n      batchId: progress.batchId,\n      statistics: progress.statistics,\n      completedAt: progress.timestamp\n    }\n  }\n};\n\nconsole.log('Batch ' + progress.batchId + ' processing completed');\n\nreturn [completionSummary];"
+      },
+      "id": "handle-completion",
+      "name": "Handle Completion Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error report when processing error occurs\nconst progress = $input.first().json;\n\nconst errorSummary = {\n  batchId: progress.batchId,\n  errorOccurredAt: progress.timestamp,\n  errorDetails: {\n    stage: progress.stage,\n    description: progress.description,\n    errors: progress.errors || [],\n    lastKnownProgress: progress.percentage !== -1 ? progress.percentage : 'Unknown'\n  },\n  \n  // Generate error report\n  errorReport: {\n    title: 'Batch Processing Error Occurred',\n    summary: 'Batch ' + progress.batchId + ' encountered error at ' + progress.stage + ' stage',\n    errorDetails: progress.errors || [],\n    recommendedActions: [\n      'Check error logs for detailed information',\n      'Verify input data format is correct',\n      'Confirm Google Classroom API permissions and quota',\n      'If temporary error, can try reprocessing'\n    ]\n  },\n  \n  // Trigger error notification\n  notificationPayload: {\n    type: 'batch_failed',\n    data: {\n      batchId: progress.batchId,\n      error: progress.description,\n      stage: progress.stage,\n      errorOccurredAt: progress.timestamp,\n      errors: progress.errors || []\n    }\n  }\n};\n\nconsole.log('Batch ' + progress.batchId + ' processing failed: ' + progress.description);\n\nreturn [errorSummary];"
+      },
+      "id": "handle-error",
+      "name": "Handle Error Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "workflowId": "notification-system",
+        "options": {
+          "loadFromCurrentWorkflow": false,
+          "waitForExecution": false
+        }
+      },
+      "id": "send-completion-notification",
+      "name": "Send Completion Notification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1200, 220]
+    },
+    {
+      "parameters": {
+        "workflowId": "notification-system", 
+        "options": {
+          "loadFromCurrentWorkflow": false,
+          "waitForExecution": false
+        }
+      },
+      "id": "send-error-notification",
+      "name": "Send Error Notification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1200, 400]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "=http://localhost:3000/api/progress-callback",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={{JSON.stringify($json)}}",
+          "timeout": 10000
+        }
+      },
+      "id": "send-callback",
+      "name": "Send Progress Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1400, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "workflow-end",
+      "name": "Progress Tracking End",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1600, 300]
+    },
+    {
+      "parameters": {
+        "path": "progress-query",
+        "httpMethod": "GET"
+      },
+      "id": "query-webhook",
+      "name": "Progress Query Endpoint",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 500],
+      "webhookId": "progress-query-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process progress query request\nconst queryParams = $input.first().json.query || {};\n\nif (!queryParams.batchId) {\n  throw new Error('batchId parameter required');\n}\n\nconst batchId = queryParams.batchId;\n\n// Build query request (actual implementation would query database)\nconst queryRequest = {\n  action: 'get_batch_progress',\n  batchId: batchId,\n  includeHistory: queryParams.includeHistory === 'true',\n  includeStatistics: queryParams.includeStatistics !== 'false' // Default to true\n};\n\nconsole.log('Querying batch progress: ' + batchId);\n\nreturn [queryRequest];"
+      },
+      "id": "process-query",
+      "name": "Process Progress Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 500]
+    },
+    {
+      "parameters": {
+        "authentication": "none",
+        "httpMethod": "POST", 
+        "url": "http://localhost:5432",
+        "options": {
+          "bodyContentType": "json",
+          "jsonBody": "={{JSON.stringify({\n  \"query\": \"SELECT * FROM batch_progress WHERE batch_id = $1 ORDER BY timestamp DESC\",\n  \"parameters\": [$json.batchId]\n})}}"
+        }
+      },
+      "id": "query-database",
+      "name": "Query Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [600, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format progress query results\nconst queryResult = $input.first().json;\nconst queryRequest = $('process-query').first().json;\n\n// Simulate database query results (actual implementation would process real database response)\nconst progressHistory = queryResult.rows || [\n  {\n    batch_id: queryRequest.batchId,\n    update_id: 'update_current',\n    timestamp: new Date().toISOString(),\n    type: 'batch_progress',\n    stage: 'Batch Processing',\n    description: 'Processing batch data',\n    percentage: 75,\n    statistics: {\n      totalItems: 4500,\n      processedItems: 3375,\n      successfulItems: 3200,\n      failedItems: 175,\n      remainingItems: 1125\n    }\n  }\n];\n\nconst latestProgress = progressHistory[0];\n\nconst response = {\n  success: true,\n  batchId: queryRequest.batchId,\n  currentStatus: {\n    stage: latestProgress.stage,\n    description: latestProgress.description,\n    percentage: latestProgress.percentage,\n    lastUpdated: latestProgress.timestamp,\n    icon: getIconForStage(latestProgress.type)\n  }\n};\n\n// If request includes statistics\nif (queryRequest.includeStatistics && latestProgress.statistics) {\n  response.statistics = latestProgress.statistics;\n  \n  // Calculate additional statistics\n  const stats = latestProgress.statistics;\n  response.calculatedStats = {\n    successRate: stats.totalItems > 0 ? \n      Math.round((stats.successfulItems / stats.processedItems) * 100) : 0,\n    progressRate: stats.totalItems > 0 ? \n      Math.round((stats.processedItems / stats.totalItems) * 100) : 0,\n    errorRate: stats.processedItems > 0 ? \n      Math.round((stats.failedItems / stats.processedItems) * 100) : 0\n  };\n}\n\n// If request includes history\nif (queryRequest.includeHistory) {\n  response.history = progressHistory.map(record => ({\n    timestamp: record.timestamp,\n    stage: record.stage,\n    percentage: record.percentage,\n    type: record.type\n  }));\n}\n\n// Helper function: Get icon based on stage type\nfunction getIconForStage(type) {\n  const icons = {\n    'batch_started': 'Start',\n    'validation_complete': 'Check',\n    'batches_split': 'Split',\n    'processing_started': 'Process',\n    'batch_progress': 'Progress',\n    'batch_complete': 'Complete',\n    'all_batches_complete': 'Success',\n    'report_generated': 'Report',\n    'process_complete': 'Done',\n    'error_occurred': 'Error'\n  };\n  return icons[type] || 'Info';\n}\n\nconsole.log('Returning progress information for batch ' + queryRequest.batchId);\n\nreturn [response];"
+      },
+      "id": "format-query-response",
+      "name": "Format Query Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify($json)}}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-query",
+      "name": "Respond Progress Query",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1000, 500]
+    }
+  ],
+  "connections": {
+    "Receive Progress Update": {
+      "main": [
+        [
+          {
+            "node": "Parse Progress Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Progress Data": {
+      "main": [
+        [
+          {
+            "node": "Save to Database",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Broadcast Real-time Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Database": {
+      "main": [
+        [
+          {
+            "node": "Is Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Broadcast Real-time Update": {
+      "main": [
+        [
+          {
+            "node": "Has Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Completed?": {
+      "main": [
+        [
+          {
+            "node": "Handle Completion Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Progress Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Error?": {
+      "main": [
+        [
+          {
+            "node": "Handle Error Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Handle Completion Event": {
+      "main": [
+        [
+          {
+            "node": "Send Completion Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Error Event": {
+      "main": [
+        [
+          {
+            "node": "Send Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Completion Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Progress Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Error Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Progress Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Progress Results": {
+      "main": [
+        [
+          {
+            "node": "Progress Tracking End",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Progress Query Endpoint": {
+      "main": [
+        [
+          {
+            "node": "Process Progress Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Progress Query": {
+      "main": [
+        [
+          {
+            "node": "Query Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Database": {
+      "main": [
+        [
+          {
+            "node": "Format Query Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Query Results": {
+      "main": [
+        [
+          {
+            "node": "Respond Progress Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {},
+  "tags": [
+    {
+      "createdAt": "2025-01-23T00:00:00.000Z",
+      "updatedAt": "2025-01-23T00:00:00.000Z",
+      "id": "progress-tracking",
+      "name": "Progress Tracking"
+    },
+    {
+      "createdAt": "2025-01-23T00:00:00.000Z",
+      "updatedAt": "2025-01-23T00:00:00.000Z",
+      "id": "real-time",
+      "name": "Real Time"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "progress-tracker",
+  "versionId": "1.0.0"
+}
