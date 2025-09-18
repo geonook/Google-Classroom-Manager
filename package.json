@@ -143,6 +143,7 @@
       "ErrorHandler.js",
       "ProgressTracker.js",
       "ClassroomService.js",
+      "NewCourseManager.js",
       "Code.js"
     ]
   },
