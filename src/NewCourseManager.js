@@ -302,7 +302,7 @@ function addStudentsToNewCourse(courseId, sheetName = 'stu_course') {
 
           // 更新狀態
           sheet.getRange(globalIndex + 2, headers.indexOf('status') + 1).setValue('⏭️ 已存在');
-          continue;
+          return; // 在 forEach 中使用 return 而不是 continue
         }
 
         // 新增學生
