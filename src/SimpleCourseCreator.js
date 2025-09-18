@@ -135,7 +135,7 @@ async function createSingleCourseWithRetry(courseName, ownerId, maxRetries = 3) 
 
       // 等待後重試
       console.log(`⏳ 等待 2 秒後重試...`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      Utilities.sleep(2000);
     }
   }
 }
@@ -192,7 +192,7 @@ async function addTeachersFromSheet(courseId, sheetName = 'course_teacher') {
       }
 
       // 限速
-      await new Promise(resolve => setTimeout(resolve, 200));
+      Utilities.sleep(200);
 
     } catch (error) {
       console.log(`  ❌ 失敗：${error.message}`);
@@ -275,7 +275,7 @@ async function addStudentsFromSheet(courseId, sheetName = 'stu_course') {
         }
 
         // 限速
-        await new Promise(resolve => setTimeout(resolve, 100));
+        Utilities.sleep(100);
 
       } catch (error) {
         console.log(`  ❌ 失敗：${error.message}`);
@@ -295,7 +295,7 @@ async function addStudentsFromSheet(courseId, sheetName = 'stu_course') {
     // 批次間暫停
     if (i + BATCH_SIZE < students.length) {
       console.log(`⏸️ 批次完成，暫停 2 秒...`);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      Utilities.sleep(2000);
     }
   }
 

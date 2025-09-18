@@ -2976,7 +2976,7 @@ function initAmbassadorsWorksheets() {
  * 🚀 將成員加入到已存在的 Ambassadors 課程
  * 課程 ID: 807369717823
  */
-function addMembersToAmbassadorsCourse() {
+async function addMembersToAmbassadorsCourse() {
   const courseId = '807369717823'; // 已創建的 Ambassadors 課程 ID
   console.log(`\n🎯 開始將成員加入 Ambassadors 課程 (ID: ${courseId})...`);
 
@@ -3083,6 +3083,160 @@ function runAmbassadorsSetup() {
 
   // 執行成員新增
   return addMembersToAmbassadorsCourse();
+}
+
+/**
+ * 🔄 新增剩餘的 Ambassadors 學生（從第 8 位開始）
+ */
+function addRemainingAmbassadorsStudents() {
+  const courseId = '807369717823';
+  console.log(`\n🎯 繼續新增剩餘的 Ambassadors 學生到課程 (ID: ${courseId})...`);
+
+  const remainingStudents = [
+    'le09088@stu.kcislk.ntpc.edu.tw',  // #8
+    'le09103@stu.kcislk.ntpc.edu.tw',  // #9
+    'le09118@stu.kcislk.ntpc.edu.tw',  // #10
+    'le09022@stu.kcislk.ntpc.edu.tw',  // #11
+    'le09053@stu.kcislk.ntpc.edu.tw',  // #12
+    'le10162@stu.kcislk.ntpc.edu.tw',  // #13
+    'le10037@stu.kcislk.ntpc.edu.tw',  // #14
+    'le10161@stu.kcislk.ntpc.edu.tw',  // #15
+    'le10237@stu.kcislk.ntpc.edu.tw',  // #16
+    'le10219@stu.kcislk.ntpc.edu.tw',  // #17
+    'le10221@stu.kcislk.ntpc.edu.tw',  // #18
+    'le09137@stu.kcislk.ntpc.edu.tw',  // #19
+    'le09133@stu.kcislk.ntpc.edu.tw',  // #20
+    'le09020@stu.kcislk.ntpc.edu.tw',  // #21
+    'le09119@stu.kcislk.ntpc.edu.tw',  // #22
+    'le09215@stu.kcislk.ntpc.edu.tw',  // #23
+    'le09196@stu.kcislk.ntpc.edu.tw'   // #24
+  ];
+
+  console.log(`📊 準備新增剩餘的 ${remainingStudents.length} 位學生`);
+
+  const results = { success: 0, failed: 0, details: [] };
+
+  remainingStudents.forEach((email, index) => {
+    console.log(`[${index + 8}/${24}] 新增學生：${email}`);
+
+    try {
+      const student = { userId: email };
+      rateLimiter.execute(() => {
+        return Classroom.Courses.Students.create(student, courseId);
+      });
+
+      console.log(`  ✅ 成功`);
+      results.success++;
+      results.details.push({ email: email, status: 'success' });
+
+      // 限速處理
+      Utilities.sleep(100);
+
+    } catch (error) {
+      // 檢查是否已經是學生
+      if (error.message && error.message.includes('already exists') ||
+          error.message.includes('ALREADY_EXISTS')) {
+        console.log(`  ⏭️ 已是學生，跳過`);
+        results.details.push({ email: email, status: 'already_exists' });
+      } else {
+        console.log(`  ❌ 失敗：${error.message}`);
+        results.failed++;
+        results.details.push({ email: email, status: 'failed', error: error.message });
+      }
+    }
+  });
+
+  console.log(`\n📊 ========== 剩餘學生新增完成 ==========`);
+  console.log(`✅ 成功：${results.success} 位`);
+  console.log(`❌ 失敗：${results.failed} 位`);
+  console.log(`🔗 課程連結：https://classroom.google.com/c/${courseId}`);
+
+  return results;
+}
+
+/**
+ * 📊 檢查 Ambassadors 課程成員狀態
+ */
+function checkAmbassadorsMemberStatus() {
+  const courseId = '807369717823';
+  console.log(`\n📊 檢查 Ambassadors 課程成員狀態 (ID: ${courseId})...`);
+
+  const status = {
+    courseName: '2025-2026 KCISLK ID. Ambassadors',
+    courseId: courseId,
+    teachers: { total: 0, list: [] },
+    students: { total: 0, list: [] }
+  };
+
+  try {
+    // 檢查教師
+    console.log('\n👨‍🏫 檢查教師...');
+    try {
+      const teachers = Classroom.Courses.Teachers.list(courseId);
+      if (teachers.teachers) {
+        status.teachers.total = teachers.teachers.length;
+        teachers.teachers.forEach(teacher => {
+          const email = teacher.profile.emailAddress;
+          console.log(`  ✅ ${email}`);
+          status.teachers.list.push(email);
+        });
+      }
+      console.log(`總計：${status.teachers.total} 位教師`);
+    } catch (error) {
+      console.error(`❌ 無法獲取教師清單：${error.message}`);
+    }
+
+    // 檢查學生
+    console.log('\n👨‍🎓 檢查學生...');
+    try {
+      const students = Classroom.Courses.Students.list(courseId);
+      if (students.students) {
+        status.students.total = students.students.length;
+        console.log(`總計：${status.students.total} 位學生`);
+
+        // 只顯示前幾位和後幾位
+        if (status.students.total > 0) {
+          const firstFew = students.students.slice(0, 3);
+          const lastFew = students.students.slice(-3);
+
+          console.log('前 3 位：');
+          firstFew.forEach(student => {
+            const email = student.profile.emailAddress;
+            console.log(`  ✅ ${email}`);
+            status.students.list.push(email);
+          });
+
+          if (status.students.total > 6) {
+            console.log(`  ... 還有 ${status.students.total - 6} 位 ...`);
+          }
+
+          if (status.students.total > 3) {
+            console.log('後 3 位：');
+            lastFew.forEach(student => {
+              const email = student.profile.emailAddress;
+              console.log(`  ✅ ${email}`);
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`❌ 無法獲取學生清單：${error.message}`);
+    }
+
+    // 總結報告
+    console.log('\n📊 ========== 成員狀態總結 ==========');
+    console.log(`📚 課程：${status.courseName}`);
+    console.log(`🆔 ID：${status.courseId}`);
+    console.log(`👨‍🏫 教師：${status.teachers.total} 位`);
+    console.log(`👨‍🎓 學生：${status.students.total} 位`);
+    console.log(`🔗 連結：https://classroom.google.com/c/${courseId}`);
+
+    return status;
+
+  } catch (error) {
+    console.error(`❌ 檢查失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
