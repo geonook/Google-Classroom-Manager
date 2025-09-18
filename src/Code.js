@@ -2843,6 +2843,94 @@ function createExecutionReport(operationType, sheetName, results, errors = [], s
 }
 
 /**
+ * 🎯 創建 Ambassadors 課程的專用函數
+ * 解決 Google Apps Script 編輯器中無法輸入參數的問題
+ */
+function createAmbassadorsCourse() {
+  console.log('🚀 開始創建 Ambassadors 課程...');
+
+  const courseName = "2025-2026 KCISLK ID. Ambassadors";
+  console.log(`📚 課程名稱：${courseName}`);
+
+  try {
+    // 使用 SimpleCourseCreator 的穩定功能
+    return createCourseWithMembers(courseName, {
+      ownerId: 'lkclassle114@kcislk.ntpc.edu.tw',
+      teacherSheet: 'course_teacher',
+      studentSheet: 'stu_course'
+    });
+  } catch (error) {
+    console.error(`❌ 創建 Ambassadors 課程失敗：${error.message}`);
+    return {
+      success: false,
+      error: error.message,
+      courseName: courseName
+    };
+  }
+}
+
+/**
+ * 🔧 準備 Ambassadors 課程創建所需的工作表
+ */
+function prepareAmbassadorsWorksheets() {
+  console.log('📋 準備 Ambassadors 課程工作表...');
+
+  try {
+    // 使用現有的工作表準備功能
+    prepareCourseMemberSheets();
+
+    console.log('✅ Ambassadors 課程工作表準備完成');
+    return { success: true, message: '工作表準備完成' };
+  } catch (error) {
+    console.error(`❌ 準備工作表失敗：${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 🧪 測試 Ambassadors 課程創建流程
+ */
+function testAmbassadorsCourseCreation() {
+  console.log('🧪 測試 Ambassadors 課程創建流程...');
+
+  // 步驟 1：準備工作表
+  console.log('步驟 1：準備工作表');
+  const prepResult = prepareAmbassadorsWorksheets();
+  if (!prepResult.success) {
+    console.error('❌ 工作表準備失敗');
+    return prepResult;
+  }
+
+  // 步驟 2：檢查必要條件
+  console.log('步驟 2：檢查必要條件');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const teacherSheet = ss.getSheetByName('course_teacher');
+  const studentSheet = ss.getSheetByName('stu_course');
+
+  if (!teacherSheet) {
+    return { success: false, error: '找不到 course_teacher 工作表' };
+  }
+  if (!studentSheet) {
+    return { success: false, error: '找不到 stu_course 工作表' };
+  }
+
+  console.log('✅ 所有必要條件已滿足');
+
+  // 步驟 3：模擬創建（不實際執行）
+  console.log('步驟 3：模擬課程創建流程');
+  console.log('📚 目標課程：2025-2026 KCISLK ID. Ambassadors');
+  console.log('👤 課程擁有者：lkclassle114@kcislk.ntpc.edu.tw');
+  console.log('👨‍🏫 教師工作表：course_teacher');
+  console.log('👨‍🎓 學生工作表：stu_course');
+
+  return {
+    success: true,
+    message: '測試通過，可以執行 createAmbassadorsCourse() 創建課程',
+    courseName: '2025-2026 KCISLK ID. Ambassadors'
+  };
+}
+
+/**
  * 🔄 智能重試系統 - 分析失敗原因並提供重試建議
  */
 function analyzeFailuresAndSuggestRetry(errors, operationType = '批次新增學生') {
