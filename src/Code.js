@@ -2856,8 +2856,8 @@ function createAmbassadorsCourse() {
     // 使用 SimpleCourseCreator 的穩定功能
     return createCourseWithMembers(courseName, {
       ownerId: 'lkclassle114@kcislk.ntpc.edu.tw',
-      teacherSheet: 'course_teacher',
-      studentSheet: 'stu_course'
+      teacherSheet: 'ambassadors_teachers',
+      studentSheet: 'ambassadors_students'
     });
   } catch (error) {
     console.error(`❌ 創建 Ambassadors 課程失敗：${error.message}`);
@@ -2870,64 +2870,219 @@ function createAmbassadorsCourse() {
 }
 
 /**
- * 🔧 準備 Ambassadors 課程創建所需的工作表
+ * 📚 初始化 Ambassadors 專屬工作表並填入成員資料
  */
-function prepareAmbassadorsWorksheets() {
-  console.log('📋 準備 Ambassadors 課程工作表...');
+function initAmbassadorsWorksheets() {
+  console.log('📋 初始化 Ambassadors 專屬工作表...');
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 創建或取得教師工作表
+  let teacherSheet = ss.getSheetByName('ambassadors_teachers');
+  if (!teacherSheet) {
+    teacherSheet = ss.insertSheet('ambassadors_teachers');
+    console.log('✅ 創建 ambassadors_teachers 工作表');
+  } else {
+    teacherSheet.clear();
+    console.log('🔄 清空現有 ambassadors_teachers 工作表');
+  }
+
+  // 設定教師工作表標題和資料
+  const teacherHeaders = ['email', 'name', 'status', 'timestamp', 'error'];
+  const teacherEmails = [
+    ['vickielicari@kcislk.ntpc.edu.tw', 'Vickie Licari'],
+    ['angelaliou@kcislk.ntpc.edu.tw', 'Angela Liou'],
+    ['sharanku@kcislk.ntpc.edu.tw', 'Sharan Ku'],
+    ['linghong@kcislk.ntpc.edu.tw', 'Ling Hong'],
+    ['victorli@kcislk.ntpc.edu.tw', 'Victor Li'],
+    ['yenyulin@kcislk.ntpc.edu.tw', 'Yenyu Lin']
+  ];
+
+  teacherSheet.getRange(1, 1, 1, teacherHeaders.length).setValues([teacherHeaders]);
+  teacherSheet.getRange(1, 1, 1, teacherHeaders.length).setFontWeight('bold').setBackground('#E8F5E8');
+
+  if (teacherEmails.length > 0) {
+    const teacherData = teacherEmails.map(([email, name]) => [email, name, '', '', '']);
+    teacherSheet.getRange(2, 1, teacherData.length, teacherHeaders.length).setValues(teacherData);
+  }
+
+  console.log(`✅ 新增 ${teacherEmails.length} 位教師到工作表`);
+
+  // 創建或取得學生工作表
+  let studentSheet = ss.getSheetByName('ambassadors_students');
+  if (!studentSheet) {
+    studentSheet = ss.insertSheet('ambassadors_students');
+    console.log('✅ 創建 ambassadors_students 工作表');
+  } else {
+    studentSheet.clear();
+    console.log('🔄 清空現有 ambassadors_students 工作表');
+  }
+
+  // 設定學生工作表標題和資料
+  const studentHeaders = ['email', 'name', 'grade', 'status', 'timestamp', 'error'];
+  const studentEmails = [
+    'le10088@stu.kcislk.ntpc.edu.tw',
+    'le10138@stu.kcislk.ntpc.edu.tw',
+    'le10055@stu.kcislk.ntpc.edu.tw',
+    'le10136@stu.kcislk.ntpc.edu.tw',
+    'le10174@stu.kcislk.ntpc.edu.tw',
+    'le09120@stu.kcislk.ntpc.edu.tw',
+    'le09117@stu.kcislk.ntpc.edu.tw',
+    'le09088@stu.kcislk.ntpc.edu.tw',
+    'le09103@stu.kcislk.ntpc.edu.tw',
+    'le09118@stu.kcislk.ntpc.edu.tw',
+    'le09022@stu.kcislk.ntpc.edu.tw',
+    'le09053@stu.kcislk.ntpc.edu.tw',
+    'le10162@stu.kcislk.ntpc.edu.tw',
+    'le10037@stu.kcislk.ntpc.edu.tw',
+    'le10161@stu.kcislk.ntpc.edu.tw',
+    'le10237@stu.kcislk.ntpc.edu.tw',
+    'le10219@stu.kcislk.ntpc.edu.tw',
+    'le10221@stu.kcislk.ntpc.edu.tw',
+    'le09137@stu.kcislk.ntpc.edu.tw',
+    'le09133@stu.kcislk.ntpc.edu.tw',
+    'le09020@stu.kcislk.ntpc.edu.tw',
+    'le09119@stu.kcislk.ntpc.edu.tw',
+    'le09215@stu.kcislk.ntpc.edu.tw',
+    'le09196@stu.kcislk.ntpc.edu.tw'
+  ];
+
+  studentSheet.getRange(1, 1, 1, studentHeaders.length).setValues([studentHeaders]);
+  studentSheet.getRange(1, 1, 1, studentHeaders.length).setFontWeight('bold').setBackground('#E8F5E8');
+
+  if (studentEmails.length > 0) {
+    const studentData = studentEmails.map(email => {
+      const studentId = email.split('@')[0];
+      return [email, studentId, 'Ambassadors', '', '', ''];
+    });
+    studentSheet.getRange(2, 1, studentData.length, studentHeaders.length).setValues(studentData);
+  }
+
+  console.log(`✅ 新增 ${studentEmails.length} 位學生到工作表`);
+
+  // 自動調整欄位寬度
+  teacherSheet.autoResizeColumns(1, teacherHeaders.length);
+  studentSheet.autoResizeColumns(1, studentHeaders.length);
+
+  return {
+    success: true,
+    message: `成功初始化 Ambassadors 工作表：${teacherEmails.length} 位教師，${studentEmails.length} 位學生`,
+    teachers: teacherEmails.length,
+    students: studentEmails.length
+  };
+}
+
+/**
+ * 🚀 將成員加入到已存在的 Ambassadors 課程
+ * 課程 ID: 807369717823
+ */
+function addMembersToAmbassadorsCourse() {
+  const courseId = '807369717823'; // 已創建的 Ambassadors 課程 ID
+  console.log(`\n🎯 開始將成員加入 Ambassadors 課程 (ID: ${courseId})...`);
+
+  const startTime = Date.now();
+  const report = {
+    courseId: courseId,
+    courseName: '2025-2026 KCISLK ID. Ambassadors',
+    teachers: { success: 0, failed: 0, details: [] },
+    students: { success: 0, failed: 0, details: [] },
+    totalTime: 0
+  };
 
   try {
-    // 使用現有的工作表準備功能
-    prepareCourseMemberSheets();
+    // 步驟 1：初始化工作表
+    console.log('\n📋 步驟 1/3：初始化工作表資料...');
+    const initResult = initAmbassadorsWorksheets();
+    if (!initResult.success) {
+      throw new Error('工作表初始化失敗');
+    }
+    console.log(`✅ 工作表準備完成：${initResult.teachers} 位教師，${initResult.students} 位學生`);
 
-    console.log('✅ Ambassadors 課程工作表準備完成');
-    return { success: true, message: '工作表準備完成' };
+    // 步驟 2：新增教師
+    console.log('\n👨‍🏫 步驟 2/3：新增教師到課程...');
+    try {
+      const teacherResult = await addTeachersFromSheet(courseId, 'ambassadors_teachers');
+      report.teachers = teacherResult;
+      console.log(`✅ 教師新增完成：成功 ${teacherResult.success} 位，失敗 ${teacherResult.failed} 位`);
+    } catch (error) {
+      console.error(`❌ 教師新增失敗：${error.message}`);
+      report.teachers.error = error.message;
+    }
+
+    // 步驟 3：新增學生
+    console.log('\n👨‍🎓 步驟 3/3：新增學生到課程...');
+    try {
+      const studentResult = await addStudentsFromSheet(courseId, 'ambassadors_students');
+      report.students = studentResult;
+      console.log(`✅ 學生新增完成：成功 ${studentResult.success} 位，失敗 ${studentResult.failed} 位`);
+    } catch (error) {
+      console.error(`❌ 學生新增失敗：${error.message}`);
+      report.students.error = error.message;
+    }
+
+    // 計算總時間
+    report.totalTime = Math.round((Date.now() - startTime) / 1000);
+
+    // 生成最終報告
+    console.log(`\n\n🎉 ========== Ambassadors 課程成員新增完成 ==========`);
+    console.log(`📚 課程名稱：${report.courseName}`);
+    console.log(`🆔 課程 ID：${report.courseId}`);
+    console.log(`⏱️ 總耗時：${report.totalTime} 秒`);
+    console.log(`\n👨‍🏫 教師新增結果：`);
+    console.log(`   ✅ 成功：${report.teachers.success} 位`);
+    console.log(`   ❌ 失敗：${report.teachers.failed} 位`);
+    console.log(`\n👨‍🎓 學生新增結果：`);
+    console.log(`   ✅ 成功：${report.students.success} 位`);
+    console.log(`   ❌ 失敗：${report.students.failed} 位`);
+    console.log(`\n🔗 課程連結：https://classroom.google.com/c/${courseId}`);
+    console.log(`✅ 所有操作完成！`);
+
+    return report;
+
   } catch (error) {
-    console.error(`❌ 準備工作表失敗：${error.message}`);
-    return { success: false, error: error.message };
+    console.error(`\n❌ 執行過程中發生錯誤：${error.message}`);
+    report.totalTime = Math.round((Date.now() - startTime) / 1000);
+    report.error = error.message;
+    return report;
   }
 }
 
 /**
- * 🧪 測試 Ambassadors 課程創建流程
+ * 🧪 快速測試 Ambassadors 成員新增
  */
-function testAmbassadorsCourseCreation() {
-  console.log('🧪 測試 Ambassadors 課程創建流程...');
+function testAmbassadorsMembers() {
+  console.log('🧪 測試 Ambassadors 成員新增流程...');
 
-  // 步驟 1：準備工作表
-  console.log('步驟 1：準備工作表');
-  const prepResult = prepareAmbassadorsWorksheets();
-  if (!prepResult.success) {
-    console.error('❌ 工作表準備失敗');
-    return prepResult;
+  // 初始化工作表並查看資料
+  const initResult = initAmbassadorsWorksheets();
+
+  if (initResult.success) {
+    console.log('✅ 測試通過！');
+    console.log(`📊 準備新增：${initResult.teachers} 位教師，${initResult.students} 位學生`);
+    console.log('\n💡 現在可以執行 addMembersToAmbassadorsCourse() 來新增成員');
+    return initResult;
+  } else {
+    console.error('❌ 測試失敗');
+    return initResult;
   }
+}
 
-  // 步驟 2：檢查必要條件
-  console.log('步驟 2：檢查必要條件');
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const teacherSheet = ss.getSheetByName('course_teacher');
-  const studentSheet = ss.getSheetByName('stu_course');
+/**
+ * 🎯 一鍵執行：將所有成員加入 Ambassadors 課程
+ * 這是最簡單的執行方式，直接在 Apps Script 編輯器中點擊運行
+ */
+function runAmbassadorsSetup() {
+  console.log('🚀 ========== 開始 Ambassadors 課程設置 ==========');
+  console.log('📚 課程：2025-2026 KCISLK ID. Ambassadors');
+  console.log('🆔 課程 ID：807369717823');
+  console.log('\n執行步驟：');
+  console.log('1. 初始化專屬工作表');
+  console.log('2. 新增 6 位教師');
+  console.log('3. 新增 24 位學生');
+  console.log('\n開始執行...');
 
-  if (!teacherSheet) {
-    return { success: false, error: '找不到 course_teacher 工作表' };
-  }
-  if (!studentSheet) {
-    return { success: false, error: '找不到 stu_course 工作表' };
-  }
-
-  console.log('✅ 所有必要條件已滿足');
-
-  // 步驟 3：模擬創建（不實際執行）
-  console.log('步驟 3：模擬課程創建流程');
-  console.log('📚 目標課程：2025-2026 KCISLK ID. Ambassadors');
-  console.log('👤 課程擁有者：lkclassle114@kcislk.ntpc.edu.tw');
-  console.log('👨‍🏫 教師工作表：course_teacher');
-  console.log('👨‍🎓 學生工作表：stu_course');
-
-  return {
-    success: true,
-    message: '測試通過，可以執行 createAmbassadorsCourse() 創建課程',
-    courseName: '2025-2026 KCISLK ID. Ambassadors'
-  };
+  // 執行成員新增
+  return addMembersToAmbassadorsCourse();
 }
 
 /**
