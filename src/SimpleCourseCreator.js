@@ -376,6 +376,24 @@ function demonstrateUsage() {
 3. 快速測試：
    createTestCourse()
 
+4. 建立 myPal 課程：
+   createMyPalCourse()
+
 這個系統使用現有的穩定功能，避免權限問題！
   `);
+}
+
+/**
+ * 快速建置 "2025-2026 myPal International Exchange" 課程
+ * 執行此函數即可建立課程
+ */
+async function createMyPalCourse() {
+  const courseName = '2025-2026 myPal International Exchange';
+  console.log(`準備建立課程: ${courseName}`);
+  
+  // 使用 'me' 作為擁有者，即當前執行腳本的使用者
+  // 若要使用預設管理員，請移除 ownerId 參數
+  return await createCourseWithMembers(courseName, {
+    ownerId: 'me' 
+  });
 }
