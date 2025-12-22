@@ -21,7 +21,27 @@
 | `CLAUDE.md` | AI 記憶體、上下文、執行歷史 |
 | `data/teachers.json` | 老師資料庫（別名解析） |
 | `data/courses.json` | 課程分類與統計 |
+| `data/school-years/{year}.json` | 學年設定（課程模板、任務進度） |
 | `workflows/*.json` | 可重用工作流程 |
+
+### 🎓 學年管理（年度重複作業）
+
+每年開學前只需：
+1. 複製 `data/school-years/2025-2026.json` → `2026-2027.json`
+2. 修改帳號、老師清單（如有變動）
+3. 跟 AI 說「開始新學年設定」
+
+```
+使用者：初始化 2026-2027 學年
+
+AI：
+  📋 讀取設定檔: data/school-years/2026-2027.json
+  📚 將建立 84 個 KCFS 課程 + 1 個 myPal 課程
+  👨‍🏫 預設老師: carolegodfrey@kcislk.ntpc.edu.tw
+  
+  ⏱️ 預計分 6 批執行，每批約 5 分鐘
+  📌 準備好了請說「開始」
+```
 
 ### 對話範例
 ```
