@@ -1,0 +1,111 @@
+{
+  "_meta": {
+    "schoolYear": "2025-2026",
+    "status": "planning",
+    "createdAt": "2024-12-22",
+    "lastUpdated": "2024-12-22"
+  },
+  
+  "accounts": {
+    "courseOwner": {
+      "email": "lkclassle114@kcislk.ntpc.edu.tw",
+      "description": "課程擁有者帳號"
+    },
+    "executor": {
+      "email": "tsehungchen@kcislk.ntpc.edu.tw", 
+      "description": "腳本執行帳號"
+    }
+  },
+
+  "courseTemplates": {
+    "KCFS": {
+      "pattern": "KCFS-G{grade} {class}",
+      "grades": ["1", "2", "3", "4", "5", "6"],
+      "classes": [
+        "Inventors", "Trailblazers", "Seekers", "Pioneers",
+        "Changemakers", "Visionaries", "Pathfinders"
+      ],
+      "defaultTeachers": [
+        "carolegodfrey@kcislk.ntpc.edu.tw"
+      ],
+      "studentSource": {
+        "type": "sheet",
+        "sheetName": "stu_course_{grade}"
+      }
+    },
+    "myPal": {
+      "pattern": "{year} myPal International Exchange",
+      "defaultTeachers": [],
+      "studentSource": {
+        "type": "sheet",
+        "sheetName": "myPal_students"
+      }
+    }
+  },
+
+  "tasks": [
+    {
+      "id": "1",
+      "name": "建立 KCFS-G1 課程",
+      "status": "pending",
+      "template": "KCFS",
+      "grade": "1"
+    },
+    {
+      "id": "2", 
+      "name": "建立 KCFS-G2 課程",
+      "status": "pending",
+      "template": "KCFS",
+      "grade": "2"
+    },
+    {
+      "id": "3",
+      "name": "建立 KCFS-G3 課程",
+      "status": "pending", 
+      "template": "KCFS",
+      "grade": "3"
+    },
+    {
+      "id": "4",
+      "name": "建立 KCFS-G4 課程",
+      "status": "pending",
+      "template": "KCFS",
+      "grade": "4"
+    },
+    {
+      "id": "5",
+      "name": "建立 KCFS-G5 課程",
+      "status": "pending",
+      "template": "KCFS",
+      "grade": "5"
+    },
+    {
+      "id": "6",
+      "name": "建立 KCFS-G6 課程",
+      "status": "pending",
+      "template": "KCFS",
+      "grade": "6"
+    },
+    {
+      "id": "7",
+      "name": "建立 myPal 課程",
+      "status": "pending",
+      "template": "myPal"
+    },
+    {
+      "id": "8",
+      "name": "新增老師到所有課程",
+      "status": "pending",
+      "dependsOn": ["1", "2", "3", "4", "5", "6", "7"]
+    },
+    {
+      "id": "9",
+      "name": "新增學生到所有課程",
+      "status": "pending",
+      "dependsOn": ["8"]
+    }
+  ],
+
+  "executionHistory": []
+}
+
