@@ -1,0 +1,66 @@
+{
+  "_meta": {
+    "name": "新增老師到課程群組",
+    "description": "將指定老師加入某個課程群組的所有課程",
+    "version": "1.0.0",
+    "createdAt": "2024-12-22",
+    "author": "Claude"
+  },
+  "trigger": {
+    "type": "natural_language",
+    "examples": [
+      "把 {teacher} 加進 {courseGroup} 課程",
+      "新增 {teacher} 到 {courseGroup}",
+      "讓 {teacher} 加入 {courseGroup}"
+    ]
+  },
+  "parameters": {
+    "teacher": {
+      "type": "teacher_reference",
+      "source": "data/teachers.json",
+      "required": true
+    },
+    "courseGroup": {
+      "type": "course_group_reference", 
+      "source": "data/courses.json",
+      "required": true
+    },
+    "gradeFilter": {
+      "type": "string",
+      "description": "篩選特定年級 (G1-G6)",
+      "required": false
+    }
+  },
+  "steps": [
+    {
+      "id": "validate",
+      "action": "validate_parameters",
+      "description": "確認老師和課程群組存在"
+    },
+    {
+      "id": "generate_function",
+      "action": "generate_gas_function",
+      "template": "addTeacherToCourseGroup",
+      "output": "src/SimpleCourseCreator.js"
+    },
+    {
+      "id": "deploy",
+      "action": "run_command",
+      "command": "clasp push --force"
+    },
+    {
+      "id": "instruct_user",
+      "action": "display_message",
+      "message": "請用 {executor} 帳號執行：{functionName}"
+    }
+  ],
+  "history": [
+    {
+      "date": "2024-12-22",
+      "teacher": "carolegodfrey@kcislk.ntpc.edu.tw",
+      "courseGroup": "KCFS",
+      "result": "84 課程成功"
+    }
+  ]
+}
+

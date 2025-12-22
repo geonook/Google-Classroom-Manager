@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "description": "課程分類資料 - AI 可讀寫",
+    "lastUpdated": "2024-12-22",
+    "updatedBy": "Claude"
+  },
+  "courseGroups": {
+    "KCFS": {
+      "description": "KCFS 外師課程",
+      "pattern": "^KCFS-G[1-6]",
+      "owner": "lkclassle114@kcislk.ntpc.edu.tw",
+      "totalCourses": 84,
+      "grades": {
+        "G1": { "count": 14, "pattern": "KCFS-G1" },
+        "G2": { "count": 14, "pattern": "KCFS-G2" },
+        "G3": { "count": 14, "pattern": "KCFS-G3" },
+        "G4": { "count": 14, "pattern": "KCFS-G4" },
+        "G5": { "count": 14, "pattern": "KCFS-G5" },
+        "G6": { "count": 14, "pattern": "KCFS-G6" }
+      }
+    },
+    "myPal": {
+      "description": "國際交流課程",
+      "pattern": "myPal",
+      "owner": "lkclassle114@kcislk.ntpc.edu.tw"
+    }
+  }
+}
+

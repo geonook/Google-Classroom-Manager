@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "description": "老師資料庫 - AI 可讀寫",
+    "lastUpdated": "2024-12-22",
+    "updatedBy": "Claude"
+  },
+  "teachers": {
+    "carole": {
+      "email": "carolegodfrey@kcislk.ntpc.edu.tw",
+      "name": "Carole Godfrey",
+      "alias": ["carole", "godfrey", "carolegodfrey"]
+    },
+    "lkclassle114": {
+      "email": "lkclassle114@kcislk.ntpc.edu.tw",
+      "name": "課程管理帳號",
+      "alias": ["lk", "課程帳號", "管理帳號"],
+      "isOwner": true
+    },
+    "tsehungchen": {
+      "email": "tsehungchen@kcislk.ntpc.edu.tw",
+      "name": "陳澤宏",
+      "alias": ["tsehung", "澤宏", "我"],
+      "isExecutor": true
+    }
+  }
+}
+
