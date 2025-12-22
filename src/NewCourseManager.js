@@ -18,7 +18,7 @@ function smartCourseIdHandler(courseIdOrName) {
       success: true,
       courseId: courseIdOrName,
       format: 'base64',
-      originalInput: courseIdOrName
+      originalInput: courseIdOrName,
     };
   }
 
@@ -29,7 +29,7 @@ function smartCourseIdHandler(courseIdOrName) {
       success: true,
       courseId: courseIdOrName,
       format: 'numeric',
-      originalInput: courseIdOrName
+      originalInput: courseIdOrName,
     };
   }
 
@@ -44,7 +44,7 @@ function smartCourseIdHandler(courseIdOrName) {
       courseId: mappingResult.courseId,
       format: 'mapped',
       originalInput: courseIdOrName,
-      mappedName: mappingResult.originalName
+      mappedName: mappingResult.originalName,
     };
   }
 
@@ -52,7 +52,7 @@ function smartCourseIdHandler(courseIdOrName) {
   return {
     success: false,
     error: `無法識別課程：${courseIdOrName}`,
-    originalInput: courseIdOrName
+    originalInput: courseIdOrName,
   };
 }
 
@@ -78,9 +78,7 @@ function validateCourseAccess(courseId) {
     try {
       const teachers = Classroom.Courses.Teachers.list(courseId);
       if (teachers.teachers) {
-        hasTeacherAccess = teachers.teachers.some(
-          t => t.profile.emailAddress === currentUser
-        );
+        hasTeacherAccess = teachers.teachers.some((t) => t.profile.emailAddress === currentUser);
       }
     } catch (e) {
       console.log(`⚠️ 無法檢查教師權限：${e.message}`);
@@ -93,15 +91,14 @@ function validateCourseAccess(courseId) {
       isOwner: course.ownerId === currentUser,
       isTeacher: hasTeacherAccess,
       canManageStudents: true, // 假設有權限，實際操作時會驗證
-      canManageTeachers: course.ownerId === currentUser
+      canManageTeachers: course.ownerId === currentUser,
     };
-
   } catch (error) {
     console.error(`❌ 課程驗證失敗：${error.message}`);
     return {
       success: false,
       error: error.message,
-      courseId: courseId
+      courseId: courseId,
     };
   }
 }
@@ -156,10 +153,10 @@ function addTeachersToNewCourse(courseId, sheetName = 'course_teacher') {
   const results = {
     success: [],
     failed: [],
-    skipped: []
+    skipped: [],
   };
 
-  const teachers = data.slice(1).filter(row => row[emailIndex]);
+  const teachers = data.slice(1).filter((row) => row[emailIndex]);
   console.log(`📊 準備新增 ${teachers.length} 位教師`);
 
   teachers.forEach((row, index) => {
@@ -170,7 +167,7 @@ function addTeachersToNewCourse(courseId, sheetName = 'course_teacher') {
       // 檢查是否已經是教師
       const existingTeachers = Classroom.Courses.Teachers.list(actualCourseId);
       const alreadyTeacher = existingTeachers.teachers?.some(
-        t => t.profile.emailAddress === email
+        (t) => t.profile.emailAddress === email
       );
 
       if (alreadyTeacher) {
@@ -180,10 +177,7 @@ function addTeachersToNewCourse(courseId, sheetName = 'course_teacher') {
       }
 
       // 新增教師
-      const teacher = Classroom.Courses.Teachers.create(
-        { userId: email },
-        actualCourseId
-      );
+      const teacher = Classroom.Courses.Teachers.create({ userId: email }, actualCourseId);
 
       console.log(`✅ 成功新增教師：${email}`);
       results.success.push(email);
@@ -194,7 +188,6 @@ function addTeachersToNewCourse(courseId, sheetName = 'course_teacher') {
 
       // 限速處理
       Utilities.sleep(200);
-
     } catch (error) {
       console.error(`❌ 新增失敗：${error.message}`);
       results.failed.push({ email: email, error: error.message });
@@ -215,7 +208,7 @@ function addTeachersToNewCourse(courseId, sheetName = 'course_teacher') {
     success: true,
     courseId: actualCourseId,
     courseName: validation.course.name,
-    results: results
+    results: results,
   };
 }
 
@@ -265,10 +258,10 @@ function addStudentsToNewCourse(courseId, sheetName = 'stu_course') {
   const results = {
     success: [],
     failed: [],
-    skipped: []
+    skipped: [],
   };
 
-  const students = data.slice(1).filter(row => row[emailIndex]);
+  const students = data.slice(1).filter((row) => row[emailIndex]);
   console.log(`📊 準備新增 ${students.length} 位學生`);
 
   // 分批處理
@@ -289,9 +282,7 @@ function addStudentsToNewCourse(courseId, sheetName = 'stu_course') {
         let alreadyStudent = false;
         try {
           const existingStudents = Classroom.Courses.Students.list(actualCourseId);
-          alreadyStudent = existingStudents.students?.some(
-            s => s.profile.emailAddress === email
-          );
+          alreadyStudent = existingStudents.students?.some((s) => s.profile.emailAddress === email);
         } catch (e) {
           // 可能沒有權限檢查，繼續嘗試新增
         }
@@ -306,10 +297,7 @@ function addStudentsToNewCourse(courseId, sheetName = 'stu_course') {
         }
 
         // 新增學生
-        const student = Classroom.Courses.Students.create(
-          { userId: email },
-          actualCourseId
-        );
+        const student = Classroom.Courses.Students.create({ userId: email }, actualCourseId);
 
         console.log(`✅ 成功新增學生：${email}`);
         results.success.push(email);
@@ -320,7 +308,6 @@ function addStudentsToNewCourse(courseId, sheetName = 'stu_course') {
 
         // 限速處理
         Utilities.sleep(100);
-
       } catch (error) {
         console.error(`❌ 新增失敗：${error.message}`);
         results.failed.push({ email: email, error: error.message });
@@ -348,7 +335,7 @@ function addStudentsToNewCourse(courseId, sheetName = 'stu_course') {
     success: true,
     courseId: actualCourseId,
     courseName: validation.course.name,
-    results: results
+    results: results,
   };
 }
 
@@ -366,7 +353,7 @@ function quickAddMembersToNewCourse(courseId) {
     courseId: courseId,
     teachers: null,
     students: null,
-    totalTime: 0
+    totalTime: 0,
   };
 
   // 步驟 1：新增教師
@@ -419,7 +406,7 @@ function quickAddMembersToNewCourse(courseId) {
  * 測試功能：驗證特定課程
  */
 function testNewCourseAccess() {
-  const testCourseId = "ODA3MTE4MjE1MzU1"; // 你的新課程 ID
+  const testCourseId = 'ODA3MTE4MjE1MzU1'; // 你的新課程 ID
 
   console.log(`\n🧪 ========== 測試課程存取 ==========`);
 
@@ -467,7 +454,7 @@ function prepareNewCourseSheets() {
   if (teacherSheet) {
     const headers = teacherSheet.getRange(1, 1, 1, 10).getValues()[0];
     if (!headers.includes('status')) {
-      const lastCol = headers.filter(h => h).length + 1;
+      const lastCol = headers.filter((h) => h).length + 1;
       teacherSheet.getRange(1, lastCol).setValue('status');
       teacherSheet.getRange(1, lastCol + 1).setValue('timestamp');
       teacherSheet.getRange(1, lastCol + 2).setValue('error');
@@ -480,7 +467,7 @@ function prepareNewCourseSheets() {
   if (studentSheet) {
     const headers = studentSheet.getRange(1, 1, 1, 10).getValues()[0];
     if (!headers.includes('status')) {
-      const lastCol = headers.filter(h => h).length + 1;
+      const lastCol = headers.filter((h) => h).length + 1;
       studentSheet.getRange(1, lastCol).setValue('status');
       studentSheet.getRange(1, lastCol + 1).setValue('timestamp');
       studentSheet.getRange(1, lastCol + 2).setValue('error');

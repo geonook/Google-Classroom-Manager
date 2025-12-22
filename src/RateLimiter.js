@@ -1,17 +1,25 @@
 /**
  * API 限速器 - 控制 Classroom API 呼叫頻率
  * 避免超過 Google API 配額限制
+ * 
+ * v2.0 優化版：智能限速，支援突發請求
  */
 class RateLimiter {
   constructor() {
     this.lastCallTime = 0;
     this.callCount = 0;
-    this.resetTime = 0;
+    this.resetTime = Date.now();
 
-    // API 限制設定
+    // API 限制設定（Google Classroom API 限制）
     this.REQUESTS_PER_MINUTE = 50;
     this.REQUESTS_PER_DAY = 50000;
-    this.MIN_DELAY_MS = 1200; // 每次呼叫最小間隔
+    
+    // 智能限速設定
+    this.MIN_DELAY_MS = 100;       // 最小間隔：100ms（快速連續呼叫）
+    this.BURST_LIMIT = 10;         // 允許連續 10 個快速呼叫
+    this.COOLDOWN_DELAY_MS = 2000; // 超過突發限制後等待 2 秒
+    this.burstCount = 0;
+    this.lastBurstReset = Date.now();
   }
 
   /**
@@ -35,17 +43,45 @@ class RateLimiter {
   }
 
   /**
-   * 檢查是否需要等待
+   * 智能等待 - 支援突發請求
    */
   async waitIfNeeded() {
     const now = Date.now();
-    const timeSinceLastCall = now - this.lastCallTime;
-
-    if (timeSinceLastCall < this.MIN_DELAY_MS) {
-      const waitTime = this.MIN_DELAY_MS - timeSinceLastCall;
-      console.log(`[DEBUG] API 限速等待 ${waitTime}ms`);
-      await Utilities.sleep(waitTime);
+    
+    // 每分鐘重置突發計數
+    if (now - this.lastBurstReset > 60000) {
+      this.burstCount = 0;
+      this.lastBurstReset = now;
+      this.callCount = 0;
+      this.resetTime = now;
     }
+    
+    // 檢查是否接近每分鐘限制
+    if (this.callCount >= this.REQUESTS_PER_MINUTE - 5) {
+      const waitTime = 60000 - (now - this.resetTime);
+      if (waitTime > 0) {
+        console.log(`[WARN] 接近 API 限制，等待 ${Math.round(waitTime / 1000)} 秒`);
+        await Utilities.sleep(waitTime);
+        this.callCount = 0;
+        this.resetTime = Date.now();
+      }
+      return;
+    }
+    
+    // 突發模式：允許快速連續呼叫
+    if (this.burstCount < this.BURST_LIMIT) {
+      const timeSinceLastCall = now - this.lastCallTime;
+      if (timeSinceLastCall < this.MIN_DELAY_MS) {
+        await Utilities.sleep(this.MIN_DELAY_MS - timeSinceLastCall);
+      }
+      this.burstCount++;
+      return;
+    }
+    
+    // 超過突發限制，進入冷卻
+    console.log(`[DEBUG] 突發冷卻 ${this.COOLDOWN_DELAY_MS}ms`);
+    await Utilities.sleep(this.COOLDOWN_DELAY_MS);
+    this.burstCount = 0;
   }
 
   /**

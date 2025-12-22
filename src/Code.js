@@ -2849,7 +2849,7 @@ function createExecutionReport(operationType, sheetName, results, errors = [], s
 function createAmbassadorsCourse() {
   console.log('🚀 開始創建 Ambassadors 課程...');
 
-  const courseName = "2025-2026 KCISLK ID. Ambassadors";
+  const courseName = '2025-2026 KCISLK ID. Ambassadors';
   console.log(`📚 課程名稱：${courseName}`);
 
   try {
@@ -2857,14 +2857,14 @@ function createAmbassadorsCourse() {
     return createCourseWithMembers(courseName, {
       ownerId: 'lkclassle114@kcislk.ntpc.edu.tw',
       teacherSheet: 'ambassadors_teachers',
-      studentSheet: 'ambassadors_students'
+      studentSheet: 'ambassadors_students',
     });
   } catch (error) {
     console.error(`❌ 創建 Ambassadors 課程失敗：${error.message}`);
     return {
       success: false,
       error: error.message,
-      courseName: courseName
+      courseName: courseName,
     };
   }
 }
@@ -2895,11 +2895,14 @@ function initAmbassadorsWorksheets() {
     ['sharanku@kcislk.ntpc.edu.tw', 'Sharan Ku'],
     ['linghong@kcislk.ntpc.edu.tw', 'Ling Hong'],
     ['victorli@kcislk.ntpc.edu.tw', 'Victor Li'],
-    ['yenyulin@kcislk.ntpc.edu.tw', 'Yenyu Lin']
+    ['yenyulin@kcislk.ntpc.edu.tw', 'Yenyu Lin'],
   ];
 
   teacherSheet.getRange(1, 1, 1, teacherHeaders.length).setValues([teacherHeaders]);
-  teacherSheet.getRange(1, 1, 1, teacherHeaders.length).setFontWeight('bold').setBackground('#E8F5E8');
+  teacherSheet
+    .getRange(1, 1, 1, teacherHeaders.length)
+    .setFontWeight('bold')
+    .setBackground('#E8F5E8');
 
   if (teacherEmails.length > 0) {
     const teacherData = teacherEmails.map(([email, name]) => [email, name, '', '', '']);
@@ -2944,14 +2947,17 @@ function initAmbassadorsWorksheets() {
     'le09020@stu.kcislk.ntpc.edu.tw',
     'le09119@stu.kcislk.ntpc.edu.tw',
     'le09215@stu.kcislk.ntpc.edu.tw',
-    'le09196@stu.kcislk.ntpc.edu.tw'
+    'le09196@stu.kcislk.ntpc.edu.tw',
   ];
 
   studentSheet.getRange(1, 1, 1, studentHeaders.length).setValues([studentHeaders]);
-  studentSheet.getRange(1, 1, 1, studentHeaders.length).setFontWeight('bold').setBackground('#E8F5E8');
+  studentSheet
+    .getRange(1, 1, 1, studentHeaders.length)
+    .setFontWeight('bold')
+    .setBackground('#E8F5E8');
 
   if (studentEmails.length > 0) {
-    const studentData = studentEmails.map(email => {
+    const studentData = studentEmails.map((email) => {
       const studentId = email.split('@')[0];
       return [email, studentId, 'Ambassadors', '', '', ''];
     });
@@ -2968,7 +2974,7 @@ function initAmbassadorsWorksheets() {
     success: true,
     message: `成功初始化 Ambassadors 工作表：${teacherEmails.length} 位教師，${studentEmails.length} 位學生`,
     teachers: teacherEmails.length,
-    students: studentEmails.length
+    students: studentEmails.length,
   };
 }
 
@@ -2986,7 +2992,7 @@ async function addMembersToAmbassadorsCourse() {
     courseName: '2025-2026 KCISLK ID. Ambassadors',
     teachers: { success: 0, failed: 0, details: [] },
     students: { success: 0, failed: 0, details: [] },
-    totalTime: 0
+    totalTime: 0,
   };
 
   try {
@@ -3003,7 +3009,9 @@ async function addMembersToAmbassadorsCourse() {
     try {
       const teacherResult = await addTeachersFromSheet(courseId, 'ambassadors_teachers');
       report.teachers = teacherResult;
-      console.log(`✅ 教師新增完成：成功 ${teacherResult.success} 位，失敗 ${teacherResult.failed} 位`);
+      console.log(
+        `✅ 教師新增完成：成功 ${teacherResult.success} 位，失敗 ${teacherResult.failed} 位`
+      );
     } catch (error) {
       console.error(`❌ 教師新增失敗：${error.message}`);
       report.teachers.error = error.message;
@@ -3014,7 +3022,9 @@ async function addMembersToAmbassadorsCourse() {
     try {
       const studentResult = await addStudentsFromSheet(courseId, 'ambassadors_students');
       report.students = studentResult;
-      console.log(`✅ 學生新增完成：成功 ${studentResult.success} 位，失敗 ${studentResult.failed} 位`);
+      console.log(
+        `✅ 學生新增完成：成功 ${studentResult.success} 位，失敗 ${studentResult.failed} 位`
+      );
     } catch (error) {
       console.error(`❌ 學生新增失敗：${error.message}`);
       report.students.error = error.message;
@@ -3038,7 +3048,6 @@ async function addMembersToAmbassadorsCourse() {
     console.log(`✅ 所有操作完成！`);
 
     return report;
-
   } catch (error) {
     console.error(`\n❌ 執行過程中發生錯誤：${error.message}`);
     report.totalTime = Math.round((Date.now() - startTime) / 1000);
@@ -3093,23 +3102,23 @@ function addRemainingAmbassadorsStudents() {
   console.log(`\n🎯 繼續新增剩餘的 Ambassadors 學生到課程 (ID: ${courseId})...`);
 
   const remainingStudents = [
-    'le09088@stu.kcislk.ntpc.edu.tw',  // #8
-    'le09103@stu.kcislk.ntpc.edu.tw',  // #9
-    'le09118@stu.kcislk.ntpc.edu.tw',  // #10
-    'le09022@stu.kcislk.ntpc.edu.tw',  // #11
-    'le09053@stu.kcislk.ntpc.edu.tw',  // #12
-    'le10162@stu.kcislk.ntpc.edu.tw',  // #13
-    'le10037@stu.kcislk.ntpc.edu.tw',  // #14
-    'le10161@stu.kcislk.ntpc.edu.tw',  // #15
-    'le10237@stu.kcislk.ntpc.edu.tw',  // #16
-    'le10219@stu.kcislk.ntpc.edu.tw',  // #17
-    'le10221@stu.kcislk.ntpc.edu.tw',  // #18
-    'le09137@stu.kcislk.ntpc.edu.tw',  // #19
-    'le09133@stu.kcislk.ntpc.edu.tw',  // #20
-    'le09020@stu.kcislk.ntpc.edu.tw',  // #21
-    'le09119@stu.kcislk.ntpc.edu.tw',  // #22
-    'le09215@stu.kcislk.ntpc.edu.tw',  // #23
-    'le09196@stu.kcislk.ntpc.edu.tw'   // #24
+    'le09088@stu.kcislk.ntpc.edu.tw', // #8
+    'le09103@stu.kcislk.ntpc.edu.tw', // #9
+    'le09118@stu.kcislk.ntpc.edu.tw', // #10
+    'le09022@stu.kcislk.ntpc.edu.tw', // #11
+    'le09053@stu.kcislk.ntpc.edu.tw', // #12
+    'le10162@stu.kcislk.ntpc.edu.tw', // #13
+    'le10037@stu.kcislk.ntpc.edu.tw', // #14
+    'le10161@stu.kcislk.ntpc.edu.tw', // #15
+    'le10237@stu.kcislk.ntpc.edu.tw', // #16
+    'le10219@stu.kcislk.ntpc.edu.tw', // #17
+    'le10221@stu.kcislk.ntpc.edu.tw', // #18
+    'le09137@stu.kcislk.ntpc.edu.tw', // #19
+    'le09133@stu.kcislk.ntpc.edu.tw', // #20
+    'le09020@stu.kcislk.ntpc.edu.tw', // #21
+    'le09119@stu.kcislk.ntpc.edu.tw', // #22
+    'le09215@stu.kcislk.ntpc.edu.tw', // #23
+    'le09196@stu.kcislk.ntpc.edu.tw', // #24
   ];
 
   console.log(`📊 準備新增剩餘的 ${remainingStudents.length} 位學生`);
@@ -3131,11 +3140,12 @@ function addRemainingAmbassadorsStudents() {
 
       // 限速處理
       Utilities.sleep(100);
-
     } catch (error) {
       // 檢查是否已經是學生
-      if (error.message && error.message.includes('already exists') ||
-          error.message.includes('ALREADY_EXISTS')) {
+      if (
+        (error.message && error.message.includes('already exists')) ||
+        error.message.includes('ALREADY_EXISTS')
+      ) {
         console.log(`  ⏭️ 已是學生，跳過`);
         results.details.push({ email: email, status: 'already_exists' });
       } else {
@@ -3165,7 +3175,7 @@ function checkAmbassadorsMemberStatus() {
     courseName: '2025-2026 KCISLK ID. Ambassadors',
     courseId: courseId,
     teachers: { total: 0, list: [] },
-    students: { total: 0, list: [] }
+    students: { total: 0, list: [] },
   };
 
   try {
@@ -3175,7 +3185,7 @@ function checkAmbassadorsMemberStatus() {
       const teachers = Classroom.Courses.Teachers.list(courseId);
       if (teachers.teachers) {
         status.teachers.total = teachers.teachers.length;
-        teachers.teachers.forEach(teacher => {
+        teachers.teachers.forEach((teacher) => {
           const email = teacher.profile.emailAddress;
           console.log(`  ✅ ${email}`);
           status.teachers.list.push(email);
@@ -3200,7 +3210,7 @@ function checkAmbassadorsMemberStatus() {
           const lastFew = students.students.slice(-3);
 
           console.log('前 3 位：');
-          firstFew.forEach(student => {
+          firstFew.forEach((student) => {
             const email = student.profile.emailAddress;
             console.log(`  ✅ ${email}`);
             status.students.list.push(email);
@@ -3212,7 +3222,7 @@ function checkAmbassadorsMemberStatus() {
 
           if (status.students.total > 3) {
             console.log('後 3 位：');
-            lastFew.forEach(student => {
+            lastFew.forEach((student) => {
               const email = student.profile.emailAddress;
               console.log(`  ✅ ${email}`);
             });
@@ -3232,7 +3242,6 @@ function checkAmbassadorsMemberStatus() {
     console.log(`🔗 連結：https://classroom.google.com/c/${courseId}`);
 
     return status;
-
   } catch (error) {
     console.error(`❌ 檢查失敗：${error.message}`);
     return { success: false, error: error.message };
@@ -11829,28 +11838,48 @@ async function updateStudentCourseStatusBatch(results, sheetName) {
     const headers = data[0];
 
     // 針對 stu_course 工作表的固定格式：A欄=Email, B欄=課程ID, C欄=狀態
-    let emailIndex = 0;    // A 欄
-    let courseIndex = 1;   // B 欄  
-    let statusIndex = 2;   // C 欄
+    let emailIndex = 0; // A 欄
+    let courseIndex = 1; // B 欄
+    let statusIndex = 2; // C 欄
 
     // 嘗試從標題行自動識別欄位（備用方案）
     if (headers && headers.length > 0) {
-      const autoEmailIndex = headers.findIndex((h) => h && (h.toString().includes('Email') || h.toString().includes('email') || h.toString().includes('學生')));
-      const autoCourseIndex = headers.findIndex((h) => h && (h.toString().includes('課程') || h.toString().includes('Course') || h.toString().includes('ID')));
-      const autoStatusIndex = headers.findIndex((h) => h && (h.toString().includes('狀態') || h.toString().includes('Status') || h.toString().includes('status')));
+      const autoEmailIndex = headers.findIndex(
+        (h) =>
+          h &&
+          (h.toString().includes('Email') ||
+            h.toString().includes('email') ||
+            h.toString().includes('學生'))
+      );
+      const autoCourseIndex = headers.findIndex(
+        (h) =>
+          h &&
+          (h.toString().includes('課程') ||
+            h.toString().includes('Course') ||
+            h.toString().includes('ID'))
+      );
+      const autoStatusIndex = headers.findIndex(
+        (h) =>
+          h &&
+          (h.toString().includes('狀態') ||
+            h.toString().includes('Status') ||
+            h.toString().includes('status'))
+      );
 
       if (autoEmailIndex !== -1) emailIndex = autoEmailIndex;
       if (autoCourseIndex !== -1) courseIndex = autoCourseIndex;
       if (autoStatusIndex !== -1) statusIndex = autoStatusIndex;
     }
 
-    console.log(`[DEBUG] 欄位索引 - Email: ${emailIndex}, 課程: ${courseIndex}, 狀態: ${statusIndex}`);
+    console.log(
+      `[DEBUG] 欄位索引 - Email: ${emailIndex}, 課程: ${courseIndex}, 狀態: ${statusIndex}`
+    );
 
     // 確保欄位索引有效
     if (emailIndex < 0 || courseIndex < 0 || statusIndex < 0) {
       console.log('[WARN] 欄位索引無效，使用預設格式 A=Email, B=課程, C=狀態');
       emailIndex = 0;
-      courseIndex = 1; 
+      courseIndex = 1;
       statusIndex = 2;
     }
 
@@ -11859,14 +11888,16 @@ async function updateStudentCourseStatusBatch(results, sheetName) {
     console.log(`[DEBUG] 開始處理 ${results.length} 筆結果資料`);
 
     results.forEach((result, resultIndex) => {
-      console.log(`[DEBUG] 結果 ${resultIndex + 1}: ${result.userEmail} → 課程 ${result.courseId} (${result.success ? '成功' : '失敗'})`);
-      
+      console.log(
+        `[DEBUG] 結果 ${resultIndex + 1}: ${result.userEmail} → 課程 ${result.courseId} (${result.success ? '成功' : '失敗'})`
+      );
+
       let foundMatch = false;
       for (let i = 1; i < data.length; i++) {
         const row = data[i];
         const rowEmail = row[emailIndex] ? row[emailIndex].toString().trim() : '';
         const rowCourse = row[courseIndex] ? row[courseIndex].toString().trim() : '';
-        
+
         if (rowEmail === result.userEmail && rowCourse === result.courseId) {
           const status = result.success
             ? result.status === 'ALREADY_EXISTS'
@@ -11874,12 +11905,14 @@ async function updateStudentCourseStatusBatch(results, sheetName) {
               : 'success'
             : 'failed';
           updates.push({ row: i + 1, col: statusIndex + 1, value: status });
-          console.log(`[DEBUG] ✅ 找到匹配 - 行 ${i + 1}: ${rowEmail} → ${rowCourse}, 狀態: ${status}`);
+          console.log(
+            `[DEBUG] ✅ 找到匹配 - 行 ${i + 1}: ${rowEmail} → ${rowCourse}, 狀態: ${status}`
+          );
           foundMatch = true;
           break;
         }
       }
-      
+
       if (!foundMatch) {
         console.log(`[WARN] ❌ 找不到匹配記錄: ${result.userEmail} → ${result.courseId}`);
       }
@@ -12777,30 +12810,30 @@ async function resumeBatchDirect(jobId = null) {
 
 /**
  * 🔄 手動批次處理 - 學生新增任務繼續執行
- * 
+ *
  * ⚠️ 重要說明：因缺少 ScriptApp 權限，系統無法自動安排下一批次
  * 需要採用手動重複執行模式完成所有學生資料處理
- * 
+ *
  * 📊 當前執行狀況：
  * - 總學生數: 4521 筆
  * - 已處理: ~200 筆 (4.4%)
  * - 剩餘處理: ~4321 筆學生資料
  * - 每次執行處理: 約 275 筆 (一個批次)
  * - 需要手動執行: 約 16 次
- * 
+ *
  * 🚀 使用方式 - 手動重複執行模式：
  * 1. 在 Google Apps Script 編輯器中選擇此函式
  * 2. 點擊執行按鈕 ▶️ (每次處理一個批次)
  * 3. 等待執行完成 (約 6 分鐘)
  * 4. 重複步驟 2-3，直到所有學生處理完成
  * 5. 監控執行日誌查看每次進度
- * 
+ *
  * 💡 執行提示：
  * - 每次執行會自動從上次停止點繼續
  * - 系統會跳過已處理的學生記錄
  * - 建議間隔 1-2 分鐘再執行下一次（避免 API 限制）
  * - 預計總完成時間: ~96 分鐘 (16次 × 6分鐘)
- * 
+ *
  * 🎯 執行進度追蹤：
  * 每次執行後查看日誌中的「已處理: X/4521」來追蹤總進度
  */
@@ -12818,26 +12851,26 @@ async function resumeCurrentBatch() {
   console.log('  ⏱️  單次執行時間: ~6 分鐘');
   console.log('');
   console.log('💡 執行模式: 手動重複執行 (因缺少 ScriptApp 權限)');
-  
+
   // 直接調用恢復函式，內建正確的任務 ID
   const CURRENT_JOB_ID = 'batch_1756283799443_xl71qczge';
-  
+
   try {
     const result = await resumeBatchDirect(CURRENT_JOB_ID);
-    
+
     console.log('✅ 恢復函式執行完成');
     console.log('📊 執行結果:', JSON.stringify(result, null, 2));
-    
+
     return result;
   } catch (error) {
     console.log('❌ 恢復過程中發生錯誤:', error.message);
-    
+
     // 如果當前任務 ID 失效，提供替代方案
     console.log('');
     console.log('💡 替代解決方案:');
     console.log('1. 執行 executeStudentBatchDirect() - 系統會跳過已處理記錄');
     console.log('2. 檢查最新的任務 ID 並手動更新此函式');
-    
+
     return {
       success: false,
       error: error.message,
@@ -12848,10 +12881,10 @@ async function resumeCurrentBatch() {
 
 /**
  * 📋 顯示手動執行指引和當前進度狀況
- * 
+ *
  * 此函式提供詳細的執行指引，幫助用戶了解如何手動完成
  * 剩餘的學生批次新增任務
- * 
+ *
  * 功能：
  * - 顯示當前執行進度
  * - 提供詳細的手動執行步驟
@@ -12863,7 +12896,7 @@ function showManualExecutionGuide() {
   console.log('📋 手動批次處理執行指引');
   console.log('📋 ============================================');
   console.log('');
-  
+
   // 當前狀況分析
   console.log('📊 當前執行狀況:');
   console.log('  🎯 總任務: 4521 筆學生新增');
@@ -12874,7 +12907,7 @@ function showManualExecutionGuide() {
   console.log('  ⏱️  單次時間: ~6 分鐘');
   console.log('  🏁 預計完成: ~96 分鐘');
   console.log('');
-  
+
   // 執行步驟
   console.log('🚀 手動執行步驟:');
   console.log('  1️⃣  選擇函式: resumeCurrentBatch');
@@ -12884,14 +12917,14 @@ function showManualExecutionGuide() {
   console.log('  5️⃣  等待 1-2 分鐘 (避免API限制)');
   console.log('  6️⃣  重複步驟 1-5，直到全部完成');
   console.log('');
-  
+
   // 進度追蹤
   console.log('📈 進度追蹤方式:');
   console.log('  • 查看執行日誌中的 "已處理: X/4521"');
   console.log('  • 查看 "當前進度: X%" 百分比');
   console.log('  • 留意 "批次處理完成" 訊息');
   console.log('');
-  
+
   // 重要提醒
   console.log('⚠️ 重要提醒:');
   console.log('  • 每次執行會自動從停止點繼續');
@@ -12899,16 +12932,16 @@ function showManualExecutionGuide() {
   console.log('  • 建議間隔執行避免 API 配額問題');
   console.log('  • 如遇錯誤可重複執行相同步驟');
   console.log('');
-  
+
   // 完成條件
   console.log('🎉 完成條件:');
   console.log('  ✅ 執行日誌顯示 "已處理: 4521/4521 (100%)"');
   console.log('  ✅ 不再有新的批次任務創建');
   console.log('  ✅ 所有學生成功加入指定課程');
   console.log('');
-  
+
   console.log('💡 現在可以開始執行 resumeCurrentBatch() 函式！');
-  
+
   return {
     status: 'guide_displayed',
     nextAction: 'Execute resumeCurrentBatch() function',

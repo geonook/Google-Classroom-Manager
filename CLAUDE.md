@@ -106,6 +106,75 @@ git status
 git log --oneline -5
 ```
 
+## 🖥️ IDE 工作流程（Cursor 內完成所有操作）
+
+### 📋 標準工作流程
+```
+1️⃣ 使用者在 Cursor 描述需求
+    ↓
+2️⃣ Claude 修改程式碼
+    ↓
+3️⃣ clasp push --force 部署
+    ↓
+4️⃣ 使用者到 GAS 網頁執行函數
+    ↓
+5️⃣ 使用者貼回執行記錄
+    ↓
+6️⃣ Claude 根據結果調整
+```
+
+### ⚠️ Google Apps Script 執行限制（需融入設計）
+
+| 限制 | 數值 | 解決策略 |
+|------|------|----------|
+| **執行時間** | 6 分鐘 | 分批處理、斷點續傳 |
+| **API 配額** | 50/分鐘 | RateLimiter 限速 |
+| **每日配額** | 50,000/天 | 監控 + 警告 |
+| **記憶體** | 50MB | 分頁載入資料 |
+
+### 🛡️ 無感限制設計原則
+
+1. **自動分批**：大量操作自動切割成 <5 分鐘的批次
+2. **進度持久化**：使用 PropertiesService 儲存進度
+3. **斷點續傳**：失敗時可從中斷點繼續
+4. **智能限速**：突發模式 + 冷卻，體感不會有延遲
+5. **即時回報**：每個操作即時輸出結果
+
+### 📊 執行帳號注意事項
+
+| 帳號 | 用途 | 權限 |
+|------|------|------|
+| `tsehungchen@kcislk.ntpc.edu.tw` | 執行腳本 | ✅ 可新增/移除老師 |
+| `lkclassle114@kcislk.ntpc.edu.tw` | 課程擁有者 | ✅ 擁有 KCFS 課程 |
+
+> **重要**：需用 `tsehungchen` 執行腳本操作，但課程會歸屬於 `lkclassle114`
+
+### 🚀 快速指令
+
+```bash
+# 部署到 GAS（每次修改後）
+clasp push --force
+
+# 查看 GAS 專案
+clasp open
+
+# 查看執行日誌
+clasp logs
+```
+
+### 📚 可用函數清單（SimpleCourseCreator.js）
+
+| 函數名稱 | 用途 | 預計時間 |
+|----------|------|----------|
+| `previewKCFSCourses` | 預覽所有 KCFS 課程清單 | 2-3 分鐘 |
+| `addTeacherToKCFSCourses` | 新增老師到 84 個 KCFS 課程 | 3-4 分鐘 |
+| `quickTestAddTeacher` | 快速測試新增老師權限 | 3-5 秒 |
+| `quickRemoveTeacherFromOldCourses` | 移除老師從舊課程（已知 ID） | ~40 秒 |
+| `createMyPalCourse` | 建立 myPal 課程 | 1-2 分鐘 |
+| `getCourseOwnerInfo` | 查詢課程擁有者資訊 | 3-5 秒 |
+
+---
+
 ## 專案概述
 Google Classroom Manager Pro v2.0.0 - 課程管理工具
 基於 Google Apps Script 的批次處理工具，用於課程與成員管理
