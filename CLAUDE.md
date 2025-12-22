@@ -1,10 +1,40 @@
 # CLAUDE.md - Google Classroom Manager Pro
 
-> **Documentation Version**: 2.0.1  
-> **Last Updated**: 2025-01-23  
-> **Project**: Google Classroom Manager Pro v2.0.1  
-> **Description**: 基於 Google Apps Script 的批次處理工具，用於課程與成員管理  
-> **Features**: GitHub auto-backup, Task agents, technical debt prevention, SuperClaude integration, 動態教師資料系統
+> **Documentation Version**: 2.1.0  
+> **Last Updated**: 2024-12-22  
+> **Project**: Google Classroom Manager Pro  
+> **Architecture**: 🤖 **AI Agent 為核心的共構工作模式**  
+> **Description**: 基於 Cursor + GAS 的 AI 驅動課程管理工具
+
+## 🤖 AI Agent 共構模式
+
+### 核心理念
+```
+資料以 .md/.json 儲存 → AI 可讀寫
+對話結果包裝成 Workflow → 一鍵調用
+所有操作在對話框完成 → 無需切換介面
+```
+
+### 資料文件（AI 可直接修改）
+| 文件 | 用途 |
+|------|------|
+| `CLAUDE.md` | AI 記憶體、上下文、執行歷史 |
+| `data/teachers.json` | 老師資料庫（別名解析） |
+| `data/courses.json` | 課程分類與統計 |
+| `workflows/*.json` | 可重用工作流程 |
+
+### 對話範例
+```
+使用者：把 Carole 加進 G5 課程
+
+AI：
+  📋 解析：teacher=carole → carolegodfrey@kcislk.ntpc.edu.tw
+         course=G5 → KCFS-G5 (14 個課程)
+  ✅ 已生成函數並部署
+  📌 請執行：addTeacherToG5Courses
+```
+
+---
 
 This file provides essential guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -374,5 +404,26 @@ Edit(file_path="src/ExistingFeature.js", old_string="...", new_string="...")
 
 ---
 
-*SuperClaude v2.0.1 | Google Classroom Manager Pro | 教育管理工具*  
-*Template by Chang Ho Chien | HC AI 說人話channel | Enhanced with Claude Code best practices*
+## 📜 執行歷史（AI 自動更新）
+
+### 2024-12-22
+
+| 時間 | 操作 | 目標 | 結果 |
+|------|------|------|------|
+| 14:09 | 新增老師 | KCFS 全部 (84 課程) | ✅ 84 成功 |
+| 13:53 | 移除老師 | 舊 KCFS 課程 (19 課程) | ✅ 19 成功 |
+| 13:19 | 快速測試 | KCFS-G6 Inventors | ✅ 權限正常 |
+
+### 常用操作快速參考
+
+| 需求 | 執行函數 | 備註 |
+|------|----------|------|
+| 預覽 KCFS 課程 | `previewKCFSCourses` | 約 2-3 分鐘 |
+| 新增老師到 KCFS | `addTeacherToKCFSCourses` | 需指定老師 email |
+| 快速測試權限 | `quickTestAddTeacher` | 3-5 秒 |
+| 建立 myPal 課程 | `createMyPalCourse` | 需填寫 sheets |
+
+---
+
+*🤖 AI Agent 為核心 | Google Classroom Manager Pro | 2024*  
+*Powered by Cursor + Claude | 對話即開發*
